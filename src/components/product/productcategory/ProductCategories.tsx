@@ -188,6 +188,7 @@ export default function ProductCategories({
                 <button 
                   onClick={() => setActiveCategory(null)}
                   className="p-1 rounded-full hover:bg-gray-200"
+                  title="Close"
                 >
                   <X className="w-4 h-4" />
                 </button>

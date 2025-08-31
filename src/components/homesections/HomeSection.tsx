@@ -49,7 +49,7 @@ const HeroSlider = () => {
     setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
   };
 
-  const goToSlide = (index) => {
+  const goToSlide = (index: number) => {
     setCurrentSlide(index);
   };
 
@@ -116,12 +116,14 @@ const HeroSlider = () => {
             {/* Navigation Arrows - Hidden on mobile */}
             <button
               onClick={prevSlide}
+              aria-label="Previous Slide"
               className="hidden sm:block absolute left-2 sm:left-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 text-gray-800 p-1 sm:p-2 rounded-full transition-all duration-200 z-20"
             >
               <ChevronLeft size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6" />
             </button>
             <button
               onClick={nextSlide}
+              aria-label="Next Slide"
               className="hidden sm:block absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 text-gray-800 p-1 sm:p-2 rounded-full transition-all duration-200 z-20"
             >
               <ChevronRight size={18} className="sm:w-5 sm:h-5 md:w-6 md:h-6" />

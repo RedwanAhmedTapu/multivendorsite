@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Plus, Minus, Star, ChevronDown, ChevronUp, Filter } from "lucide-react";
+import { X, Plus, Minus, Star, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -263,7 +263,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     );
   };
 
-  const clearAll = () => setSelectedFilters([]);
+//   const clearAll = () => setSelectedFilters([]);
 
   const toggleCategory = (categoryName: string) => {
     setExpandedCategories((prev) => ({

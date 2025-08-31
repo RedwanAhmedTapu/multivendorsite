@@ -164,7 +164,7 @@ const MoreInfoProduct = () => {
               </div>
               
               <div>
-                <h4 className="font-medium text-gray-900 mb-3">What's in the Box</h4>
+                <h4 className="font-medium text-gray-900 mb-3">Whats in the Box</h4>
                 <ul className="space-y-3 text-gray-700">
                   <li className="flex items-start">
                     <Check className="w-5 h-5 text-teal-600 mr-3 flex-shrink-0 mt-0.5" />
@@ -297,7 +297,7 @@ const MoreInfoProduct = () => {
                       </li>
                       <li className="flex items-start">
                         <span className="w-2 h-2 bg-teal-600 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-                        <span>Return shipping fees are the customer's responsibility</span>
+                        <span>Return shipping fees are the customers responsibility</span>
                       </li>
                       <li className="flex items-start">
                         <span className="w-2 h-2 bg-teal-600 rounded-full mt-2 mr-3 flex-shrink-0"></span>

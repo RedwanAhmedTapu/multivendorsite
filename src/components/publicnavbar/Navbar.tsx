@@ -17,8 +17,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 
 export default function Navbar(): JSX.Element {
+
+   const pathname = usePathname(); // ✅ get current route
+
+ 
+
   const [search, setSearch] = useState<string>("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isNavbarFixed, setIsNavbarFixed] = useState<boolean>(false);
@@ -50,7 +56,7 @@ export default function Navbar(): JSX.Element {
     if (searchContainerRef.current) {
       setPopoverWidth(searchContainerRef.current.clientWidth);
     }
-  }, [searchContainerRef.current]);
+  }, []);
 
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>): void => {
     setSearch(e.target.value);
@@ -59,7 +65,10 @@ export default function Navbar(): JSX.Element {
   const toggleMobileMenu = (): void => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
-
+ // ✅ hide navbar if URL contains "admin-dashboard"
+  if (pathname.includes("admin-dashboard")) {
+    return <></>;
+  }
   const categories: string[][] = [
     [
       "Smart Appliances",
@@ -167,7 +176,7 @@ export default function Navbar(): JSX.Element {
                     variant="ghost"
                     className="flex items-center gap-1 text-white font-semibold hover:bg-teal-800 px-2 py-1 text-xs lg:text-sm"
                   >
-                    What's New <ChevronDown size={14} />
+                    Whats New <ChevronDown size={14} />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-white text-black">
@@ -340,7 +349,7 @@ export default function Navbar(): JSX.Element {
                         variant="ghost"
                         className="w-full justify-between text-white font-semibold hover:bg-teal-800 py-2 h-9 text-xs"
                       >
-                        What's New <ChevronDown size={14} />
+                        Whats New <ChevronDown size={14} />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="bg-white text-black w-52">

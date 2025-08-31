@@ -1,6 +1,6 @@
 "use client";
 
-import { Star, Heart, Eye, ShoppingCart } from "lucide-react";
+import {  Heart, Eye, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -104,10 +104,16 @@ export const ProductCard: React.FC<{ product: Product; view?: "grid" | "list" }>
     <Card className="group relative p-3 sm:p-4 rounded-xl border flex flex-col justify-between transition-all duration-300 hover:shadow-lg">
       {/* Wishlist & Eye Icons */}
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        <button className="bg-white rounded-full p-2 shadow-md hover:bg-gray-100 transition-colors">
+        <button
+          className="bg-white rounded-full p-2 shadow-md hover:bg-gray-100 transition-colors"
+          title="Add to Wishlist"
+        >
           <Heart size={16} className="text-gray-600" />
         </button>
-        <button className="bg-white rounded-full p-2 shadow-md hover:bg-gray-100 transition-colors">
+        <button
+          className="bg-white rounded-full p-2 shadow-md hover:bg-gray-100 transition-colors"
+          title="View Details"
+        >
           <Eye size={16} className="text-gray-600" />
         </button>
       </div>

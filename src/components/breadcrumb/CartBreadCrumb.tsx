@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { Home, ShoppingCart } from "lucide-react";
+import { Home } from "lucide-react";
 
 export default function CartBreadcrumb() {
   // Dummy data for the cart
