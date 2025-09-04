@@ -1,34 +1,16 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useGetSlidersQuery } from "@/features/sliderApi"; 
 
 const HeroSlider = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
 
-  const slides = [
-    {
-      category: "ELECTRONICS",
-      title: "Spring Deals",
-      description: "Spring into incredible deals on a selection of TVs, Smart screens, and so much more.",
-      buttonText: "Shop Now",
-      image: "/homesection/homev3-slider1.webp"
-    },
-    {
-      category: "IMAC",
-      title: "Macbook Air ",
-      description: "Discover amazing offers on the latest smartphones, tablets, and mobile accessories.",
-      buttonText: "Shop Now",
-      image: "/homesection/homev3-slider2.webp"
-    },
-    {
-      category: "Furniture",
-      title: "Simple Living",
-      description: "Explore our collection of stylish and functional furniture for every room in your home. ",
-      buttonText: "Shop Now",
-      image: "/homesection/homev3-slider3.webp"
-    }
-  ];
+  // Fetch sliders from API
+  const { data: slides = [], isLoading, isError } = useGetSlidersQuery();
+
+  
 
   // Auto-play functionality
   useEffect(() => {
@@ -84,7 +66,7 @@ const HeroSlider = () => {
                         : 'opacity-0 translate-x-full'
                   }`}
                   style={{
-                    backgroundImage: `url(${slide.image})`,
+                    backgroundImage: `url('http://localhost:5000/${slide.imageUrl}')`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center'
                   }}
@@ -94,10 +76,10 @@ const HeroSlider = () => {
                     <div className="flex flex-col justify-center p-6 md:p-8 lg:p-12 z-10 max-w-md">
                       <div className="text-gray-900">
                         <p className="text-xs sm:text-sm font-semibold tracking-wider mb-2 opacity-90">
-                          {slide.category}
+                          {slide.title}
                         </p>
                         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 md:mb-6 leading-tight">
-                          {slide.title}
+                          {slide.subtitle}
                         </h1>
                         <p className="text-sm sm:text-base md:text-lg mb-4 md:mb-8 opacity-90 leading-relaxed">
                           {slide.description}

@@ -26,7 +26,7 @@ interface Props {
   onSelectCategory?: (category: string) => void;
 }
 
-const categoryIcons: Record<string, JSX.Element> = {
+const categoryIcons: Record<string, React.JSX.Element> = {
   Fashion: <Shirt className="w-4 h-4 text-gray-600" />,
   Electronics: <Laptop className="w-4 h-4 text-gray-600" />,
   "Home & Garden": <Home className="w-4 h-4 text-gray-600" />,

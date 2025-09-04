@@ -3,17 +3,21 @@ import { configureStore, combineReducers } from "@reduxjs/toolkit";
 import { persistReducer, persistStore } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import { apiSlice } from "../features/apiSlice";
+import { authApi } from "../features/authApi";
+import { sliderApi } from "../features/sliderApi"; // ⬅️ add this
 
 // Persist configuration
 const persistConfig = {
   key: "root",
   storage,
-  whitelist: ["user", "auth"], // Removed "filters"
+  whitelist: [authApi.reducerPath], // persist authApi slice
 };
 
 // Combine reducers
 const rootReducer = combineReducers({
   [apiSlice.reducerPath]: apiSlice.reducer,
+  [authApi.reducerPath]: authApi.reducer,
+  [sliderApi.reducerPath]: sliderApi.reducer, 
 });
 
 // Persisted reducer
@@ -25,10 +29,14 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredActions: ["persist/PERSIST"],
+        ignoredActions: ["persist/PERSIST", "persist/REHYDRATE"],
       },
-    }).concat(apiSlice.middleware),
-  devTools: process.env.NODE_ENV !== 'production',
+    }).concat(
+      apiSlice.middleware,
+      authApi.middleware,
+      sliderApi.middleware 
+    ),
+  devTools: process.env.NODE_ENV !== "production",
 });
 
 export const persistor = persistStore(store);

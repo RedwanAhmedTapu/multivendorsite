@@ -20,7 +20,7 @@ const AdminCategoryManager = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [activeTab, setActiveTab] = useState<"attributes" | "specifications">("attributes");
 
-  const { data: categories = [], isLoading: categoriesLoading, refetch: refetchCategories } = useGetCategoriesQuery();
+  const { data: categories = [], refetch: refetchCategories } = useGetCategoriesQuery();
   const [createCategory] = useCreateCategoryMutation();
   const [updateCategory] = useUpdateCategoryMutation();
   const [deleteCategory] = useDeleteCategoryMutation();
@@ -47,7 +47,7 @@ const AdminCategoryManager = () => {
       return;
     }
     try {
-      const promise = createCategory({ ...categoryData, parentId: parentId || null }).unwrap();
+      const promise = createCategory({ ...categoryData, parentId: parentId ?? undefined }).unwrap();
       toast.promise(promise, {
         loading: `Creating category "${categoryData.name}"...`,
         success: (category) => {
@@ -56,7 +56,7 @@ const AdminCategoryManager = () => {
         },
         error: (error) => error.data?.message || "Failed to create category",
       });
-    } catch (err) {
+    } catch {
       toast.error("Failed to create category");
     }
   };
@@ -78,24 +78,24 @@ const AdminCategoryManager = () => {
         },
         error: (error) => error.data?.message || "Failed to update category",
       });
-    } catch (err) {
+    } catch {
       toast.error("Failed to update category");
     }
   };
 
-  const handleDeleteCategory = async (id: string, name: string) => {
+  const handleDeleteCategory = async (category: Category) => {
     try {
-      const promise = deleteCategory(id).unwrap();
+      const promise = deleteCategory(category.id).unwrap();
       toast.promise(promise, {
-        loading: `Deleting category "${name}"...`,
+        loading: `Deleting category "${category.name}"...`,
         success: () => {
-          if (selectedCategoryId === id) setSelectedCategoryId(null);
+          if (selectedCategoryId === category.id) setSelectedCategoryId(null);
           refetchCategories();
           return "Category deleted successfully";
         },
         error: (error) => error.data?.message || "Failed to delete category",
       });
-    } catch (err) {
+    } catch {
       toast.error("Failed to delete category");
     }
   };
@@ -144,7 +144,7 @@ const AdminCategoryManager = () => {
           <div className="lg:col-span-3 space-y-6">
             <CategoryForm
               editingCategory={editingCategory}
-              selectedParentId={selectedCategory?.parentId || null}
+              selectedParentId={selectedCategoryId} // <-- pass exact selected category
               parentCategories={parentCategories}
               onUpdateCategory={handleUpdateCategory}
               onCreateCategory={handleCreateCategory}

@@ -23,23 +23,18 @@ const CategoryTreeItem: React.FC<{
 
   return (
     <div className="ml-4">
-      <div
-        className={`flex justify-between items-center p-1 cursor-pointer rounded text-sm ${
-          selectedCategoryId === category.id ? "bg-teal-50 border border-teal-200 text-teal-800" : "hover:bg-gray-100"
-        }`}
-      >
-        <div
-          className="flex items-center gap-1"
-          onClick={() => {
-            setOpen(!open);
-            onSelectCategory(category.id);
-          }}
-        >
+      <div className={`flex justify-between items-center p-1 cursor-pointer rounded text-sm ${selectedCategoryId === category.id ? "bg-teal-50 border border-teal-200 text-teal-800" : "hover:bg-gray-100"}`}>
+        {/* Expand/Collapse Arrow */}
+        <div className="flex items-center gap-1" onClick={(e) => { e.stopPropagation(); if (hasChildren) setOpen(!open); }}>
           {hasChildren ? (
             <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
           ) : (
             <ChevronRight className="h-3 w-3 opacity-0" />
           )}
+        </div>
+
+        {/* Category Name - Select */}
+        <div className="flex-1 flex items-center gap-1" onClick={() => onSelectCategory(category.id)}>
           <Folder className="h-3 w-3" />
           <span className="truncate">{category.name}</span>
         </div>

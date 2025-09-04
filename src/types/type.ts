@@ -3,15 +3,16 @@
 // -------- Enums --------
 export enum AttributeType {
   TEXT = "TEXT",
-  NUMBER = "NUMBER", 
+  NUMBER = "NUMBER",
   BOOLEAN = "BOOLEAN",
-  SELECT = "SELECT"
+  SELECT = "SELECT",
 }
 
 export enum SpecificationType {
   TEXT = "TEXT",
   NUMBER = "NUMBER",
-  BOOLEAN = "BOOLEAN"
+  BOOLEAN = "BOOLEAN",
+  SELECT = "SELECT",
 }
 
 export enum OrderStatus {
@@ -21,7 +22,7 @@ export enum OrderStatus {
   SHIPPED = "SHIPPED",
   DELIVERED = "DELIVERED",
   CANCELLED = "CANCELLED",
-  REFUNDED = "REFUNDED"
+  REFUNDED = "REFUNDED",
 }
 
 // -------- Vendor --------
@@ -99,9 +100,32 @@ export interface Specification {
   unit?: string;
   categories: CategorySpecification[];
   values: ProductSpecificationValue[];
+  options: SpecificationOption[]; // ✅ has options
   createdAt: string;
   updatedAt: string;
 }
+export interface SpecificationOption {
+  id: string;
+  specificationId: string;
+  value: string;
+  createdAt: string;  // ISO date string from backend
+  updatedAt: string;  // ISO date string from backend
+}
+
+
+// -------- SpecificationOption --------
+export interface CategorySpecification {
+  id: string;
+  categoryId: string;
+  category: Category;
+  specificationId: string;
+  specification: Specification;  // ✅ contains the Specification
+  isRequired: boolean;
+  filterable: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 
 // -------- CategorySpecification (Join table) --------
 export interface CategorySpecification {
