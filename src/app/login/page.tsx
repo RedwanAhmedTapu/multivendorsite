@@ -1,31 +1,33 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, Mail, Phone, Lock, User, Facebook } from "lucide-react";
+import { Eye, EyeOff, Mail, Phone, Lock, Facebook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { useLoginMutation } from "@/features/authApi"; // <- import the mutation
+import { useLoginMutation } from "@/features/authApi";
+import { useDispatch } from "react-redux";
+import { setCredentials } from "@/features/authSlice";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loginMethod, setLoginMethod] = useState("email");
-  const [credentials, setCredentials] = useState({
+  const [credentials, setCredentialsState] = useState({
     email: "",
     phone: "",
     password: "",
-    rememberMe: false,
   });
 
-  const [login, { isLoading }] = useLoginMutation(); // RTK Query mutation
+  const dispatch = useDispatch();
+  const [login, { isLoading }] = useLoginMutation();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setCredentials((prev) => ({
+    const { name, value } = e.target;
+    setCredentialsState((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: value,
     }));
   };
 
@@ -33,21 +35,23 @@ export default function LoginPage() {
     e.preventDefault();
 
     try {
-      // Validate either email or phone
       if ((!credentials.email && !credentials.phone) || (credentials.email && credentials.phone)) {
         alert("Please provide either email or phone, but not both.");
         return;
       }
 
       const response = await login({
-        email: credentials.email ,
-        phone: credentials.phone ,
+        email: credentials.email || undefined,
+        phone: credentials.phone || undefined,
         password: credentials.password,
       }).unwrap();
 
+      // Save user + accessToken in Redux
+      dispatch(setCredentials({ user: response.user, accessToken: response.accessToken|| "" }));
+
       alert("Login successful!");
       console.log("User info:", response);
-      // TODO: redirect user or save token to state/localStorage
+      // TODO: redirect user with next/navigation
     } catch (error: any) {
       alert(error.data?.message || error.message || "Login failed");
     }
@@ -95,25 +99,12 @@ export default function LoginPage() {
                   />
                 </div>
 
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    placeholder="Enter your password"
-                    value={credentials.password}
-                    onChange={handleInputChange}
-                    className="pl-10 pr-10 py-2 rounded-lg"
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-3 text-gray-500"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
+                <PasswordField
+                  showPassword={showPassword}
+                  setShowPassword={setShowPassword}
+                  value={credentials.password}
+                  onChange={handleInputChange}
+                />
 
                 <Button
                   type="submit"
@@ -141,25 +132,12 @@ export default function LoginPage() {
                   />
                 </div>
 
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    placeholder="Enter your password"
-                    value={credentials.password}
-                    onChange={handleInputChange}
-                    className="pl-10 pr-10 py-2 rounded-lg"
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-3 text-gray-500"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
+                <PasswordField
+                  showPassword={showPassword}
+                  setShowPassword={setShowPassword}
+                  value={credentials.password}
+                  onChange={handleInputChange}
+                />
 
                 <Button
                   type="submit"
@@ -179,9 +157,7 @@ export default function LoginPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" className="py-2 rounded-lg">
-              Google
-            </Button>
+            <Button variant="outline" className="py-2 rounded-lg">Google</Button>
             <Button variant="outline" className="py-2 rounded-lg">
               <Facebook size={16} className="mr-2 text-blue-600" />
               Facebook
@@ -196,6 +172,31 @@ export default function LoginPage() {
           </p>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// Extracted password field for reuse
+function PasswordField({ showPassword, setShowPassword, value, onChange }: any) {
+  return (
+    <div className="relative">
+      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+      <Input
+        type={showPassword ? "text" : "password"}
+        name="password"
+        placeholder="Enter your password"
+        value={value}
+        onChange={onChange}
+        className="pl-10 pr-10 py-2 rounded-lg"
+        required
+      />
+      <button
+        type="button"
+        className="absolute right-3 top-3 text-gray-500"
+        onClick={() => setShowPassword(!showPassword)}
+      >
+        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
     </div>
   );
 }

@@ -1,14 +1,14 @@
 "use client";
 
-import {  Heart, Eye, ShoppingCart } from "lucide-react";
+import { Heart, Eye, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import Image from "next/image";
+import { getImageUrl } from "@/utils/image";
 
-// Types
 interface Product {
-  id: number;
+  id: string;
   title: string;
   image: string;
   images: string[];
@@ -24,9 +24,21 @@ export const ProductCard: React.FC<{ product: Product; view?: "grid" | "list" }>
   product,
   view = "grid",
 }) => {
-  const hasValidImage = product.image && product.image.trim() !== "";
+  // Get the primary image with proper fallback
+  const getPrimaryImage = () => {
+    if (product.image && product.image.trim() !== "") {
+      return getImageUrl(product.image);
+    }
+    if (product.images && product.images.length > 0) {
+      return getImageUrl(product.images[0]);
+    }
+    return null;
+  };
 
-  // --- LIST VIEW ---
+  const primaryImage = getPrimaryImage();
+  const hasValidImage = primaryImage !== null;
+
+  // ---------------- LIST VIEW ----------------
   if (view === "list") {
     return (
       <Card className="overflow-hidden">
@@ -36,7 +48,7 @@ export const ProductCard: React.FC<{ product: Product; view?: "grid" | "list" }>
               <div className="w-full h-48 md:h-full bg-gray-100 flex items-center justify-center relative overflow-hidden">
                 {hasValidImage ? (
                   <Image
-                    src={product.image}
+                    src={primaryImage}
                     alt={product.title}
                     fill
                     className="object-contain transition-transform duration-500 ease-in-out hover:scale-105"
@@ -99,26 +111,20 @@ export const ProductCard: React.FC<{ product: Product; view?: "grid" | "list" }>
     );
   }
 
-  // --- GRID VIEW ---
+  // ---------------- GRID VIEW ----------------
   return (
     <Card className="group relative p-3 sm:p-4 rounded-xl border flex flex-col justify-between transition-all duration-300 hover:shadow-lg">
-      {/* Wishlist & Eye Icons */}
+      {/* Icons */}
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        <button
-          className="bg-white rounded-full p-2 shadow-md hover:bg-gray-100 transition-colors"
-          title="Add to Wishlist"
-        >
+        <button className="bg-white rounded-full p-2 shadow-md hover:bg-gray-100">
           <Heart size={16} className="text-gray-600" />
         </button>
-        <button
-          className="bg-white rounded-full p-2 shadow-md hover:bg-gray-100 transition-colors"
-          title="View Details"
-        >
+        <button className="bg-white rounded-full p-2 shadow-md hover:bg-gray-100">
           <Eye size={16} className="text-gray-600" />
         </button>
       </div>
 
-      {/* Sale Tags */}
+      {/* Tags */}
       {product.tags.length > 0 && (
         <div className="absolute top-3 left-3 flex gap-2 z-10">
           {product.tags.map((tag, i) => (
@@ -136,12 +142,12 @@ export const ProductCard: React.FC<{ product: Product; view?: "grid" | "list" }>
         </div>
       )}
 
+      {/* Image */}
       <CardContent className="flex flex-col items-center p-0">
-        {/* Product Image with Scale on Hover */}
-        <div className="relative w-full h-32 sm:h-40 mb-3 flex items-center justify-center bg-gray-100 overflow-hidden">
+        <div className="relative w-full h-32 sm:h-40 mb-3 flex items-center justify-center bg-gray-100 overflow-hidden rounded-lg">
           {hasValidImage ? (
             <Image
-              src={product.image}
+              src={primaryImage}
               alt={product.title}
               fill
               className="object-contain transition-transform duration-500 ease-in-out group-hover:scale-105"
@@ -180,7 +186,6 @@ export const ProductCard: React.FC<{ product: Product; view?: "grid" | "list" }>
         </div>
       </CardContent>
 
-      {/* Hover Add to Cart */}
       <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         <Button className="w-full bg-teal-900 hover:bg-teal-800 text-white rounded-lg flex items-center justify-center gap-2 py-2 text-sm">
           <ShoppingCart size={16} />

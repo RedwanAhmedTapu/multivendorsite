@@ -1,4 +1,3 @@
-// components/product/productcategory/CategoryBreadcrumb.tsx
 "use client";
 
 import Image from "next/image";
@@ -11,56 +10,63 @@ interface Category {
 }
 
 interface Props {
-  category: Category;
+  path: Category[];
 }
 
-export default function CategoryBreadcrumb({ category }: Props) {
+export default function CategoryBreadcrumb({ path }: Props) {
+  const rootCategory = path[0];
+  const childPath = path.slice(1); // remaining subcategories
+
   return (
-    <section className="relative w-full h-[280px] md:h-[320px] flex items-center overflow-hidden bg-gradient-to-r from-white via-white to-rose-50">
+    <section className="relative w-full h-[220px] sm:h-[260px] md:h-[300px] lg:h-[340px] xl:h-[380px] flex items-center overflow-hidden bg-gradient-to-r from-white via-white to-rose-50">
       {/* Background Image */}
-      {category.image && (
+      {rootCategory.image && (
         <div className="absolute inset-0">
           <Image
-            src={category.image}
-            alt={category.name}
+            src={rootCategory.image}
+            alt={rootCategory.name}
             fill
             priority
-            className="object-cover object-right"
+            className="object-cover object-center sm:object-right"
           />
-          {/* Gradient overlay to ensure content readability */}
           <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-transparent" />
         </div>
       )}
 
-      {/* Content positioned at start */}
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 flex flex-col justify-center h-full">
+      {/* Content */}
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 md:px-8 flex flex-col justify-center h-full">
         {/* Breadcrumb */}
-        <div className="flex items-center space-x-2 mb-4">
-          <span className="text-xs text-rose-600 font-medium">Home</span>
-          <span className="text-xs text-rose-300">/</span>
-          <span className="text-xs text-rose-600 font-medium">Categories</span>
-          <span className="text-xs text-rose-300">/</span>
-          <span className="text-xs text-gray-900 font-semibold">
-            {category.name}
-          </span>
-        </div>
-
-        {/* Title + Count */}
-        <div className="flex flex-col sm:flex-row sm:items-center mb-3">
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-2 sm:mb-0">
-            {category.name}
-          </h1>
-          {category.productCount && (
-            <span className="sm:ml-4 text-xs text-rose-700 bg-rose-100 px-3 py-1.5 rounded-full font-medium self-start sm:self-center">
-              {category.productCount} products
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-1 mb-3 sm:mb-4 text-[11px] sm:text-xs md:text-sm">
+          {path.map((cat, idx) => (
+            <span key={cat.name} className="flex items-center">
+              {idx !== 0 && (
+                <span className="text-rose-300 mx-1 sm:mx-2">/</span>
+              )}
+              <span
+                className={`${
+                  idx === path.length - 1
+                    ? "text-gray-900 font-semibold"
+                    : "text-rose-600 font-medium hover:underline cursor-pointer"
+                }`}
+              >
+                {cat.name}
+              </span>
             </span>
-          )}
+          ))}
         </div>
 
-       
-      </div>
+        {/* Title: root category */}
+        <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-gray-900 leading-tight">
+          {rootCategory.name}
+        </h1>
 
-     
+        {/* Optional description */}
+        {rootCategory.description && (
+          <p className="mt-2 text-xs sm:text-sm md:text-base lg:text-lg text-gray-600 max-w-2xl">
+            {rootCategory.description}
+          </p>
+        )}
+      </div>
     </section>
   );
 }

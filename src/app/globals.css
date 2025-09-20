@@ -111,16 +111,26 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
-/* Hide scrollbar for Chrome, Safari and Opera */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
+ *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
 
-/* Hide scrollbar for IE, Edge and Firefox */
-.scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
-}
+  *::-webkit-scrollbar-thumb {
+    background-color: #14b8a6; /* teal-500 */
+    border-radius: 9999px; /* fully rounded */
+  }
+
+  *::-webkit-scrollbar-track {
+    background-color: #0f766e; /* teal-900 */
+    border-radius: 9999px;
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #14b8a6 #0f766e; /* thumb color / track color */
+  }
 @layer base {
   * {
     @apply border-border outline-ring/50;

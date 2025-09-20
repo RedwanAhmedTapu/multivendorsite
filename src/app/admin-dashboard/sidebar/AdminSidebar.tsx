@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { User, LogOut, ChevronDown } from "lucide-react";
@@ -10,7 +10,7 @@ type Icon = React.ComponentType<React.SVGProps<SVGSVGElement>>;
 
 type MenuItem = {
   title: string;
-  href: string;
+  href?: string;
   icon: Icon;
   color?: string;
   subItems?: MenuItem[];
@@ -48,7 +48,18 @@ export function AdminSidebar({
   mobileOpen = false,
   onClose,
 }: SidebarProps) {
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  // Initialize all dropdowns open by default
+  const initialOpenGroups: Record<string, boolean> = {};
+  sections.forEach((section) =>
+    section.items.forEach((item) => {
+      if (item.subItems) {
+        initialOpenGroups[item.title] = true;
+      }
+    })
+  );
+
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(initialOpenGroups);
+  const [expanded, setExpanded] = useState(false);
 
   const toggleGroup = (group: string) => {
     setOpenGroups((prev) => ({
@@ -58,24 +69,40 @@ export function AdminSidebar({
   };
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-teal-900 shadow-lg w-64 text-white">
-      {/* Logo / Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-teal-800">
-        <div className={`p-2 ${logo.iconBgColor || "bg-teal-800"} rounded-lg`}>
+    <motion.div
+      initial={{ width: 64 }}
+      animate={{ width: expanded ? 280 : 64 }}
+      transition={{ duration: 0.25, ease: "easeInOut" }}
+      onMouseEnter={() => setExpanded(true)}
+      onMouseLeave={() => setExpanded(false)}
+      className="flex flex-col h-full bg-teal-900 text-white shadow-lg"
+    >
+      {/* Logo */}
+      <div className="flex items-center gap-3 p-4 border-b border-teal-800 bg-teal-800">
+        <div className={`p-2 rounded-lg ${logo.iconBgColor || "bg-teal-700"}`}>
           <logo.icon className="h-5 w-5 text-white" />
         </div>
-        <div>
-          <h2 className="text-lg font-semibold">{logo.title}</h2>
-          <p className="text-xs text-teal-300">{logo.subtitle}</p>
-        </div>
+        <AnimatePresence>
+          {expanded && (
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <h2 className="text-lg font-bold">{logo.title}</h2>
+              <p className="text-xs text-teal-300">{logo.subtitle}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Menu */}
-      <div className="flex-1 overflow-y-auto py-4">
+      {/* Sections */}
+      <div className="flex-1 h-full overflow-y-auto py-4 scrollbar-thin scrollbar-thumb-teal-500 scrollbar-track-teal-900">
         {sections.map((section, sectionIndex) => (
-          <div key={sectionIndex}>
-            {section.title && (
-              <div className="px-4 pb-2 text-xs uppercase font-medium tracking-wider text-teal-300">
+          <div key={sectionIndex} className="mb-2">
+            {expanded && section.title && (
+              <div className="px-4 pb-2 text-xs uppercase font-semibold tracking-wider text-teal-300">
                 {section.title}
               </div>
             )}
@@ -91,16 +118,18 @@ export function AdminSidebar({
                         <item.icon
                           className={`h-5 w-5 ${item.color || "text-teal-200"}`}
                         />
-                        <span className="text-sm">{item.title}</span>
+                        {expanded && <span className="text-sm">{item.title}</span>}
                       </div>
-                      <ChevronDown
-                        className={`h-4 w-4 text-teal-300 transition-transform ${
-                          openGroups[item.title] ? "rotate-180" : ""
-                        }`}
-                      />
+                      {expanded && (
+                        <ChevronDown
+                          className={`h-4 w-4 text-teal-300 transition-transform ${
+                            openGroups[item.title] ? "rotate-180" : ""
+                          }`}
+                        />
+                      )}
                     </button>
                     <AnimatePresence>
-                      {openGroups[item.title] && (
+                      {expanded && openGroups[item.title] && (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
@@ -110,7 +139,7 @@ export function AdminSidebar({
                           {item.subItems.map((subItem, subIdx) => (
                             <Link
                               key={subIdx}
-                              href={subItem.href}
+                              href={subItem.href!}
                               className="flex items-center gap-3 px-12 py-2 rounded-md hover:bg-teal-800 text-teal-200 transition-colors"
                               onClick={onClose}
                             >
@@ -127,14 +156,14 @@ export function AdminSidebar({
                 ) : (
                   <Link
                     key={idx}
-                    href={item.href}
+                    href={item.href!}
                     className="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-teal-800 text-teal-200 transition-colors"
                     onClick={onClose}
                   >
                     <item.icon
                       className={`h-5 w-5 ${item.color || "text-teal-200"}`}
                     />
-                    <span className="text-sm">{item.title}</span>
+                    {expanded && <span className="text-sm">{item.title}</span>}
                   </Link>
                 )
               )}
@@ -148,25 +177,37 @@ export function AdminSidebar({
         <div className="h-9 w-9 rounded-full bg-teal-800 flex items-center justify-center">
           <User className="h-5 w-5 text-white" />
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate">{footer.user.name}</div>
-          <div className="text-xs text-teal-300 truncate">{footer.user.email}</div>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-teal-200 hover:text-white hover:bg-teal-800"
-          onClick={footer.logoutAction}
-        >
-          <LogOut className="h-5 w-5" />
-        </Button>
+        <AnimatePresence>
+          {expanded && (
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              className="flex-1 min-w-0"
+            >
+              <div className="text-sm font-medium truncate">{footer.user.name}</div>
+              <div className="text-xs text-teal-300 truncate">{footer.user.email}</div>
+            </motion.div>
+          )}
+          
+        </AnimatePresence>
+        {expanded && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-teal-200 hover:text-white hover:bg-teal-800"
+            onClick={footer.logoutAction}
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
+        )}
       </div>
-    </div>
+    </motion.div>
   );
 
-  // Mobile sidebar overlay
   return (
     <>
+      {/* Mobile Sidebar */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div

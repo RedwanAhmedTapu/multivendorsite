@@ -1,50 +1,18 @@
 // features/apiSlice.ts
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
 import {
   Category,
-  Attribute,
   AttributeValue,
-  Specification,
   CategoryAttribute,
   CategorySpecification,
   SpecificationOption,
-  Product,
 } from "../types/type";
-
-// Types for auth
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-export interface RegisterRequest {
-  name: string;
-  email: string;
-  password: string;
-  role?: "CUSTOMER" | "VENDOR" | "EMPLOYEE" | "ADMIN"; // optional, defaults to CUSTOMER
-}
-
-export interface AuthResponse {
-  token: string;
-  user: {
-    id: number;
-    name: string;
-    email: string;
-    role: string;
-  };
-}
-
-// Base Query Setup
-const baseQuery = fetchBaseQuery({
-  baseUrl: "http://localhost:5000/api",
-  
-});
-
+import baseQueryWithReauth from "./baseQueryWithReauth";
 
 // API Slice Definition
 export const apiSlice = createApi({
   reducerPath: "api",
-  baseQuery,
+  baseQuery: baseQueryWithReauth,
   tagTypes: [
     "Category",
     "Attribute",
@@ -54,46 +22,53 @@ export const apiSlice = createApi({
     "Auth",
   ],
   endpoints: (builder) => ({
-   
     // ---------- Category Endpoints ----------
     getCategories: builder.query<Category[], void>({
       query: () => "/categories",
-      providesTags: ["Category"],
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map(({ id }) => ({ type: "Category" as const, id })),
+              { type: "Category", id: "LIST" },
+            ]
+          : [{ type: "Category", id: "LIST" }],
     }),
+
     getCategoryById: builder.query<Category, string>({
       query: (id) => `/categories/${id}`,
-      providesTags: ["Category"],
+      providesTags: (result, error, id) => [{ type: "Category", id }],
     }),
-    createCategory: builder.mutation<Category, Partial<Category>>({
+
+    createCategory: builder.mutation<Category, { name: string; slug: string; parentId?: string }>({
       query: (body) => ({
         url: "/categories",
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Category"],
+      invalidatesTags: [{ type: "Category", id: "LIST" }],
     }),
-    updateCategory: builder.mutation<
-      Category,
-      { id: string; data: Partial<Category> }
-    >({
+
+    updateCategory: builder.mutation<Category, { id: string; data: Partial<Category> }>({
       query: ({ id, data }) => ({
         url: `/categories/${id}`,
         method: "PUT",
         body: data,
       }),
-      invalidatesTags: ["Category"],
+      invalidatesTags: (result, error, { id }) => [{ type: "Category", id }],
     }),
+
     deleteCategory: builder.mutation<{ message: string }, string>({
       query: (id) => ({
         url: `/categories/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["Category"],
+      invalidatesTags: (result, error, id) => [
+        { type: "Category", id },
+        { type: "Category", id: "LIST" },
+      ],
     }),
-    bulkImportCategories: builder.mutation<
-      { success: boolean; message: string },
-      FormData
-    >({
+
+    bulkImportCategories: builder.mutation<{ success: boolean; message: string }, FormData>({
       query: (formData) => ({
         url: "/bulk-import-category",
         method: "POST",
@@ -107,16 +82,17 @@ export const apiSlice = createApi({
       query: (categoryId) => `/attributes/${categoryId}`,
       providesTags: ["Attribute"],
     }),
+
     createAttribute: builder.mutation<
       CategoryAttribute,
-      Partial<{
+      {
         categoryId: string;
         name: string;
         type: string;
         filterable: boolean;
-        required: boolean;
+        isRequired: boolean; // ✅ fixed naming
         values?: string[];
-      }>
+      }
     >({
       query: (body) => ({
         url: "/attributes",
@@ -125,6 +101,7 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ["Attribute"],
     }),
+
     updateAttribute: builder.mutation<
       CategoryAttribute,
       {
@@ -133,7 +110,7 @@ export const apiSlice = createApi({
           name: string;
           type: string;
           filterable: boolean;
-          required: boolean;
+          isRequired: boolean; // ✅ fixed naming
         }>;
       }
     >({
@@ -142,19 +119,18 @@ export const apiSlice = createApi({
         method: "PUT",
         body: data,
       }),
-      invalidatesTags: ["Attribute"],
+      invalidatesTags: (result, error, { id }) => [{ type: "Attribute", id }],
     }),
+
     deleteAttribute: builder.mutation<{ message: string }, string>({
       query: (id) => ({
         url: `/attributes/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["Attribute"],
+      invalidatesTags: (result, error, id) => [{ type: "Attribute", id }],
     }),
-    addAttributeValue: builder.mutation<
-      AttributeValue,
-      { attributeId: string; value: string }
-    >({
+
+    addAttributeValue: builder.mutation<AttributeValue, { attributeId: string; value: string }>({
       query: ({ attributeId, value }) => ({
         url: `/attributes/${attributeId}/values`,
         method: "POST",
@@ -162,6 +138,7 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ["Attribute"],
     }),
+
     deleteAttributeValue: builder.mutation<{ message: string }, string>({
       query: (id) => ({
         url: `/attributes/values/${id}`,
@@ -175,16 +152,17 @@ export const apiSlice = createApi({
       query: (categoryId) => `/specifications/${categoryId}`,
       providesTags: ["Specification"],
     }),
+
     createSpecification: builder.mutation<
       CategorySpecification,
-      Partial<{
+      {
         categoryId: string;
         name: string;
         type: string;
         unit?: string;
         filterable: boolean;
-        required: boolean;
-      }>
+        isRequired: boolean; // ✅ fixed naming
+      }
     >({
       query: (body) => ({
         url: "/specifications",
@@ -193,6 +171,7 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ["Specification"],
     }),
+
     updateSpecification: builder.mutation<
       CategorySpecification,
       {
@@ -202,7 +181,7 @@ export const apiSlice = createApi({
           type: string;
           unit?: string;
           filterable: boolean;
-          required: boolean;
+          isRequired: boolean;
         }>;
       }
     >({
@@ -211,22 +190,23 @@ export const apiSlice = createApi({
         method: "PUT",
         body: data,
       }),
-      invalidatesTags: ["Specification"],
+      invalidatesTags: (result, error, { id }) => [{ type: "Specification", id }],
     }),
+
     deleteSpecification: builder.mutation<{ message: string }, string>({
       query: (id) => ({
         url: `/specifications/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["Specification"],
+      invalidatesTags: (result, error, id) => [{ type: "Specification", id }],
     }),
 
     // ---------- SpecificationOption Endpoints ----------
     getSpecificationOptions: builder.query<SpecificationOption[], string>({
-      query: (specificationId) =>
-        `/specifications/${specificationId}/options`,
+      query: (specificationId) => `/specifications/${specificationId}/options`,
       providesTags: ["SpecificationOption"],
     }),
+
     createSpecificationOption: builder.mutation<
       SpecificationOption,
       { specificationId: string; value: string }
@@ -238,6 +218,7 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ["SpecificationOption"],
     }),
+
     deleteSpecificationOption: builder.mutation<void, string>({
       query: (id) => ({
         url: `/specifications/options/${id}`,
@@ -245,48 +226,11 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ["SpecificationOption"],
     }),
-
-    // ---------- Product Endpoints ----------
-    getProducts: builder.query<Product[], void>({
-      query: () => "/products",
-      providesTags: ["Product"],
-    }),
-    getProductById: builder.query<Product, string>({
-      query: (id) => `/products/${id}`,
-      providesTags: ["Product"],
-    }),
-    createProduct: builder.mutation<Product, Partial<Product>>({
-      query: (body) => ({
-        url: "/products",
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: ["Product"],
-    }),
-    updateProduct: builder.mutation<
-      Product,
-      { id: string; data: Partial<Product> }
-    >({
-      query: ({ id, data }) => ({
-        url: `/products/${id}`,
-        method: "PUT",
-        body: data,
-      }),
-      invalidatesTags: ["Product"],
-    }),
-    deleteProduct: builder.mutation<{ message: string }, string>({
-      query: (id) => ({
-        url: `/products/${id}`,
-        method: "DELETE",
-      }),
-      invalidatesTags: ["Product"],
-    }),
   }),
 });
 
 // Export hooks for usage in components
 export const {
-
   // ---------- Category hooks ----------
   useGetCategoriesQuery,
   useGetCategoryByIdQuery,
@@ -313,11 +257,4 @@ export const {
   useGetSpecificationOptionsQuery,
   useCreateSpecificationOptionMutation,
   useDeleteSpecificationOptionMutation,
-
-  // ---------- Product hooks ----------
-  useGetProductsQuery,
-  useGetProductByIdQuery,
-  useCreateProductMutation,
-  useUpdateProductMutation,
-  useDeleteProductMutation,
 } = apiSlice;

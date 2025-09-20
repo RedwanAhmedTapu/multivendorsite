@@ -41,15 +41,18 @@ const AdminCategoryManager = () => {
     return null;
   }, [selectedCategoryId, categories]);
 
-  const handleCreateCategory = async (categoryData: { name: string; slug: string; image?: string }, parentId?: string) => {
-    if (!categoryData.name || !categoryData.slug) {
-      toast.error("Please provide both name and slug");
-      return;
-    }
+  const handleCreateCategory = async (formData: FormData, parentId?: string | null) => {
     try {
-      const promise = createCategory({ ...categoryData, parentId: parentId ?? undefined }).unwrap();
+      if (parentId) {
+        // always set as single string
+        formData.set("parentId", parentId);
+      } else {
+        formData.delete("parentId"); // don’t send undefined or array
+      }
+
+      const promise = createCategory(formData).unwrap();
       toast.promise(promise, {
-        loading: `Creating category "${categoryData.name}"...`,
+        loading: `Creating category...`,
         success: (category) => {
           refetchCategories();
           return `Category "${category.name}" created successfully`;
@@ -61,16 +64,11 @@ const AdminCategoryManager = () => {
     }
   };
 
-  const handleUpdateCategory = async (categoryData: Category) => {
-    if (!categoryData.name || !categoryData.slug) {
-      toast.error("Please provide both name and slug");
-      return;
-    }
+  const handleUpdateCategory = async (id: string, formData: FormData) => {
     try {
-      const { id, ...data } = categoryData;
-      const promise = updateCategory({ id, data }).unwrap();
+      const promise = updateCategory({ id, formData }).unwrap();
       toast.promise(promise, {
-        loading: `Updating category "${categoryData.name}"...`,
+        loading: `Updating category...`,
         success: (category) => {
           setEditingCategory(null);
           refetchCategories();
@@ -101,7 +99,7 @@ const AdminCategoryManager = () => {
   };
 
   // Only top-level categories for tree
-  const parentCategories = categories.filter(c => !c.parentId);
+  const parentCategories = categories.filter((c) => !c.parentId);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -113,7 +111,9 @@ const AdminCategoryManager = () => {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Category Management</h1>
-              <p className="text-gray-600">Manage your product categories, attributes and specifications</p>
+              <p className="text-gray-600">
+                Manage your product categories, attributes and specifications
+              </p>
             </div>
           </div>
           <Button className="bg-teal-600 hover:bg-teal-700">
@@ -126,8 +126,12 @@ const AdminCategoryManager = () => {
           {/* Left Panel - Category Tree */}
           <Card className="lg:col-span-1 bg-white border-gray-200 shadow-sm">
             <CardHeader className="bg-gray-50 border-b border-gray-200">
-              <CardTitle className="text-gray-900 flex items-center gap-2">Category Structure</CardTitle>
-              <CardDescription className="text-gray-500">View and manage your category hierarchy</CardDescription>
+              <CardTitle className="text-gray-900 flex items-center gap-2">
+                Category Structure
+              </CardTitle>
+              <CardDescription className="text-gray-500">
+                View and manage your category hierarchy
+              </CardDescription>
             </CardHeader>
             <CardContent className="p-4">
               <CategoryTree
@@ -144,7 +148,7 @@ const AdminCategoryManager = () => {
           <div className="lg:col-span-3 space-y-6">
             <CategoryForm
               editingCategory={editingCategory}
-              selectedParentId={selectedCategoryId} // <-- pass exact selected category
+              selectedParentId={selectedCategoryId}
               parentCategories={parentCategories}
               onUpdateCategory={handleUpdateCategory}
               onCreateCategory={handleCreateCategory}

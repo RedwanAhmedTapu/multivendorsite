@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, Trash2, CheckSquare, Type, Hash, ToggleLeft, Loader2, X } from "lucide-react";
+import { Plus, Edit, Trash2, CheckSquare, Type, Hash, ToggleLeft, Loader2, X, Link } from "lucide-react";
 import { toast } from "sonner";
 import {
   useGetCategoriesQuery,
@@ -13,6 +13,7 @@ import {
   useAddAttributeValueMutation,
   useDeleteAttributeValueMutation,
 } from "@/features/apiSlice";
+import { useGetAllAttributesQuery } from "@/features/attrSpecSlice";
 
 interface AttributesTabProps {
   selectedChildId: string;
@@ -46,16 +47,25 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     required: false,
     values: [] as string[]
   });
+  const [selectedExistingAttribute, setSelectedExistingAttribute] = useState("");
+  const [existingAttributeValues, setExistingAttributeValues] = useState<string[]>([]);
   const [newValue, setNewValue] = useState("");
   const [addingValueTo, setAddingValueTo] = useState<string>(""); // Track which attribute we're adding value to
   const [editingAttribute, setEditingAttribute] = useState<AttributeFromAPI | null>(null);
+  const [isCreatingNew, setIsCreatingNew] = useState(true); // Toggle between creating new or using existing
 
-  // Get categories data
+  // Get categories and attributes data
   const { 
     data: categories = [], 
     isLoading: categoriesLoading, 
     refetch: refetchCategories 
   } = useGetCategoriesQuery();
+  
+  const { 
+    data: allAttributes = [], 
+    isLoading: attributesLoading, 
+    refetch: refetchAttributes 
+  } = useGetAllAttributesQuery();
   
   const [createAttribute] = useCreateAttributeMutation();
   const [updateAttribute] = useUpdateAttributeMutation();
@@ -83,70 +93,161 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     return selectedCategory?.attributes || [];
   }, [categories, selectedChildId]);
 
+  // Get attributes that are not already assigned to this category
+  const availableAttributes = useMemo(() => {
+    const currentAttributeIds = currentAttributes.map((attr: AttributeFromAPI) => attr.id);
+    return allAttributes.filter(attr => !currentAttributeIds.includes(attr.id));
+  }, [allAttributes, currentAttributes]);
+
+  // Handle selection of existing attribute
+  const handleExistingAttributeSelect = (attributeId: string) => {
+    setSelectedExistingAttribute(attributeId);
+    const selectedAttr = allAttributes.find(attr => attr.id === attributeId);
+    if (selectedAttr) {
+      setExistingAttributeValues([]);
+      setNewAttribute({
+        name: selectedAttr.name,
+        type: selectedAttr.type,
+        filterable: true,
+        required: false,
+        values: []
+      });
+    }
+  };
+
   // Add value to the new attribute values array
   const handleAddValueToNewAttribute = () => {
     if (!newValue.trim()) {
       toast.error("Please enter a value");
       return;
     }
-    if (newAttribute.values.includes(newValue.trim())) {
+    
+    const targetValues = isCreatingNew ? newAttribute.values : existingAttributeValues;
+    
+    if (targetValues.includes(newValue.trim())) {
       toast.error("This value already exists");
       return;
     }
-    setNewAttribute(prev => ({
-      ...prev,
-      values: [...prev.values, newValue.trim()]
-    }));
+    
+    if (isCreatingNew) {
+      setNewAttribute(prev => ({
+        ...prev,
+        values: [...prev.values, newValue.trim()]
+      }));
+    } else {
+      setExistingAttributeValues(prev => [...prev, newValue.trim()]);
+    }
     setNewValue("");
   };
 
-  // Remove value from the new attribute values array
-  const handleRemoveValueFromNewAttribute = (index: number) => {
-    setNewAttribute(prev => ({
-      ...prev,
-      values: prev.values.filter((_, i) => i !== index)
-    }));
+  // Remove value from the attribute values array
+  const handleRemoveValueFromAttribute = (index: number) => {
+    if (isCreatingNew) {
+      setNewAttribute(prev => ({
+        ...prev,
+        values: prev.values.filter((_, i) => i !== index)
+      }));
+    } else {
+      setExistingAttributeValues(prev => prev.filter((_, i) => i !== index));
+    }
   };
 
-  // Create new attribute
-  const handleCreateAttribute = async () => {
-    if (!newAttribute.name || !selectedChildId) {
-      toast.error("Please provide attribute name and select a category");
+  // Create new attribute or link existing attribute to category
+  const handleCreateOrLinkAttribute = async () => {
+    if (!selectedChildId) {
+      toast.error("Please select a category");
       return;
     }
 
-    if (newAttribute.type === 'SELECT' && newAttribute.values.length === 0) {
-      toast.error("Please add at least one value for SELECT type attribute");
-      return;
-    }
+    if (isCreatingNew) {
+      // Create new attribute
+      if (!newAttribute.name) {
+        toast.error("Please provide attribute name");
+        return;
+      }
 
-    try {
-      const attributeData = {
-        name: newAttribute.name,
-        type: newAttribute.type,
-        filterable: newAttribute.filterable,
-        required: newAttribute.required,
-        categoryId: selectedChildId,
-        ...(newAttribute.type === 'SELECT' && { values: newAttribute.values })
-      };
+      if (newAttribute.type === 'SELECT' && newAttribute.values.length === 0) {
+        toast.error("Please add at least one value for SELECT type attribute");
+        return;
+      }
 
-      const result = await createAttribute(attributeData).unwrap();
-      
-      toast.success(`Attribute "${newAttribute.name}" created successfully${newAttribute.values.length > 0 ? ` with ${newAttribute.values.length} values` : ''}`);
-      
-      setNewAttribute({ 
-        name: "", 
-        type: "SELECT", 
-        filterable: true, 
-        required: false,
-        values: [] 
-      });
-      
-      // Invalidate categories to refresh data
-      refetchCategories();
-      
-    } catch (error: any) {
-      toast.error(error?.data?.message || "Failed to create attribute");
+      try {
+        const attributeData = {
+          name: newAttribute.name,
+          type: newAttribute.type,
+          filterable: newAttribute.filterable,
+          required: newAttribute.required,
+          categoryId: selectedChildId,
+          ...(newAttribute.type === 'SELECT' && { values: newAttribute.values })
+        };
+
+        const result = await createAttribute(attributeData).unwrap();
+        
+        toast.success(`Attribute "${newAttribute.name}" created successfully${newAttribute.values.length > 0 ? ` with ${newAttribute.values.length} values` : ''}`);
+        
+        setNewAttribute({ 
+          name: "", 
+          type: "SELECT", 
+          filterable: true, 
+          required: false,
+          values: [] 
+        });
+        
+        refetchCategories();
+        
+      } catch (error: any) {
+        toast.error(error?.data?.message || "Failed to create attribute");
+      }
+    } else {
+      // Link existing attribute to category
+      if (!selectedExistingAttribute) {
+        toast.error("Please select an existing attribute");
+        return;
+      }
+
+      const selectedAttr = allAttributes.find(attr => attr.id === selectedExistingAttribute);
+      if (!selectedAttr) {
+        toast.error("Selected attribute not found");
+        return;
+      }
+
+      try {
+        // Prepare the data in the same format as creating a new attribute
+        const attributeData = {
+          name: selectedAttr.name,
+          type: selectedAttr.type,
+          filterable: newAttribute.filterable,
+          required: newAttribute.required,
+          categoryId: selectedChildId,
+          // If it's a SELECT type and we have new values, add them
+          ...(selectedAttr.type === 'SELECT' && existingAttributeValues.length > 0 && { values: existingAttributeValues })
+        };
+
+        await createAttribute(attributeData).unwrap();
+        
+        let successMessage = `Attribute "${selectedAttr.name}" linked to category successfully`;
+        if (existingAttributeValues.length > 0) {
+          successMessage += ` with ${existingAttributeValues.length} additional values`;
+        }
+        
+        toast.success(successMessage);
+        
+        // Reset form
+        setSelectedExistingAttribute("");
+        setExistingAttributeValues([]);
+        setNewAttribute({ 
+          name: "", 
+          type: "SELECT", 
+          filterable: true, 
+          required: false,
+          values: [] 
+        });
+        
+        refetchCategories();
+        
+      } catch (error: any) {
+        toast.error(error?.data?.message || "Failed to link attribute");
+      }
     }
   };
 
@@ -180,35 +281,32 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     }
   };
 
-  // Delete attribute - Fixed the main issue
-const handleDeleteAttribute = async (attributeId: string, attributeName: string) => {
-  if (!window.confirm(`Are you sure you want to delete "${attributeName}"? This action cannot be undone.`)) {
-    return;
-  }
-
-  try {
-    // Find the categoryAttributeId for this attribute
-    const categoryAttribute = currentAttributes.find(
-      (attr: AttributeFromAPI) => attr.id === attributeId
-    );
-    
-    if (!categoryAttribute) {
-      throw new Error("Category attribute not found");
+  // Delete attribute
+  const handleDeleteAttribute = async (attributeId: string, attributeName: string) => {
+    if (!window.confirm(`Are you sure you want to delete "${attributeName}"? This action cannot be undone.`)) {
+      return;
     }
 
-    // The actual ID needed by the backend is the categoryAttribute relationship ID
-    // This assumes your API structure has the relationship ID available
-    await deleteAttribute(categoryAttribute.id).unwrap();
-    
-    toast.success("Attribute deleted successfully");
-    setEditingAttribute(null);
-    refetchCategories();
-  } catch (error: any) {
-    const errorMessage = error?.data?.message || "Failed to delete attribute";
-    toast.error(errorMessage);
-    console.error("Delete error:", error);
-  }
-};
+    try {
+      const categoryAttribute = currentAttributes.find(
+        (attr: AttributeFromAPI) => attr.id === attributeId
+      );
+      
+      if (!categoryAttribute) {
+        throw new Error("Category attribute not found");
+      }
+
+      await deleteAttribute(categoryAttribute.id).unwrap();
+      
+      toast.success("Attribute deleted successfully");
+      setEditingAttribute(null);
+      refetchCategories();
+    } catch (error: any) {
+      const errorMessage = error?.data?.message || "Failed to delete attribute";
+      toast.error(errorMessage);
+      console.error("Delete error:", error);
+    }
+  };
 
   // Add value to existing attribute
   const handleAddAttributeValue = async (attributeId: string, attributeName: string) => {
@@ -246,7 +344,22 @@ const handleDeleteAttribute = async (attributeId: string, attributeName: string)
     }
   };
 
-  if (categoriesLoading) {
+  // Toggle between creating new and using existing
+  const handleToggleMode = (mode: boolean) => {
+    setIsCreatingNew(mode);
+    setSelectedExistingAttribute("");
+    setExistingAttributeValues([]);
+    setNewAttribute({ 
+      name: "", 
+      type: "SELECT", 
+      filterable: true, 
+      required: false,
+      values: [] 
+    });
+    setNewValue("");
+  };
+
+  if (categoriesLoading || attributesLoading) {
     return (
       <div className="flex justify-center py-8">
         <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
@@ -437,130 +550,313 @@ const handleDeleteAttribute = async (attributeId: string, attributeName: string)
         </div>
       )}
 
-      {/* Add New Attribute */}
+      {/* Add New/Link Existing Attribute */}
       <div className="space-y-4 pt-4 border-t border-gray-200">
-        <h3 className="font-medium text-gray-900">Add New Attribute</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="attr-name" className="text-gray-700">Attribute Name *</Label>
-            <Input
-              id="attr-name"
-              placeholder="e.g., Color, Size, Material"
-              value={newAttribute.name}
-              onChange={(e) => setNewAttribute({...newAttribute, name: e.target.value})}
-              className="bg-white border-gray-300 focus:ring-teal-500"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="attr-type" className="text-gray-700">Type *</Label>
-            <Select 
-              value={newAttribute.type} 
-              onValueChange={(value) => setNewAttribute({...newAttribute, type: value, values: []})}
+        <div className="flex items-center justify-between">
+          <h3 className="font-medium text-gray-900">Add Attribute</h3>
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <Button
+              variant={isCreatingNew ? "default" : "ghost"}
+              size="sm"
+              className={`h-8 px-3 text-xs ${isCreatingNew ? 'bg-teal-600 hover:bg-teal-700 text-white' : 'text-gray-600'}`}
+              onClick={() => handleToggleMode(true)}
             >
-              <SelectTrigger className="bg-white border-gray-300 focus:ring-teal-500">
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="SELECT">Select (Multiple values)</SelectItem>
-                <SelectItem value="TEXT">Text</SelectItem>
-                <SelectItem value="NUMBER">Number</SelectItem>
-                <SelectItem value="BOOLEAN">Boolean</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="attr-filterable"
-              checked={newAttribute.filterable}
-              onChange={(e) => setNewAttribute({...newAttribute, filterable: e.target.checked})}
-              className="rounded text-teal-600 focus:ring-teal-500"
-            />
-            <Label htmlFor="attr-filterable" className="text-gray-700">Use in filters</Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="attr-required"
-              checked={newAttribute.required}
-              onChange={(e) => setNewAttribute({...newAttribute, required: e.target.checked})}
-              className="rounded text-teal-600 focus:ring-teal-500"
-            />
-            <Label htmlFor="attr-required" className="text-gray-700">Required for products</Label>
+              Create New
+            </Button>
+            <Button
+              variant={!isCreatingNew ? "default" : "ghost"}
+              size="sm"
+              className={`h-8 px-3 text-xs ${!isCreatingNew ? 'bg-teal-600 hover:bg-teal-700 text-white' : 'text-gray-600'}`}
+              onClick={() => handleToggleMode(false)}
+              disabled={availableAttributes.length === 0}
+            >
+              <Link className="h-3 w-3 mr-1" />
+              Use Existing
+            </Button>
           </div>
         </div>
 
-        {/* Attribute Values Section */}
-        {newAttribute.type === 'SELECT' && (
-          <div className="space-y-3">
-            <Label className="text-gray-700">Attribute Values *</Label>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Enter value (e.g., Red, Blue, Large, Small)"
-                value={newValue}
-                onChange={(e) => setNewValue(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleAddValueToNewAttribute();
-                  }
-                }}
-                className="flex-1"
-              />
-              <Button
-                type="button"
-                onClick={handleAddValueToNewAttribute}
-                className="bg-teal-600 hover:bg-teal-700"
-                disabled={!newValue.trim()}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
+        {!isCreatingNew && availableAttributes.length === 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <p className="text-sm text-amber-700">
+              All available attributes are already assigned to this category. Create a new attribute instead.
+            </p>
+          </div>
+        )}
+
+        {isCreatingNew ? (
+          // Create New Attribute Form
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="attr-name" className="text-gray-700">Attribute Name *</Label>
+                <Input
+                  id="attr-name"
+                  placeholder="e.g., Color, Size, Material"
+                  value={newAttribute.name}
+                  onChange={(e) => setNewAttribute({...newAttribute, name: e.target.value})}
+                  className="bg-white border-gray-300 focus:ring-teal-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="attr-type" className="text-gray-700">Type *</Label>
+                <Select 
+                  value={newAttribute.type} 
+                  onValueChange={(value) => setNewAttribute({...newAttribute, type: value, values: []})}
+                >
+                  <SelectTrigger className="bg-white border-gray-300 focus:ring-teal-500">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SELECT">Select (Multiple values)</SelectItem>
+                    <SelectItem value="TEXT">Text</SelectItem>
+                    <SelectItem value="NUMBER">Number</SelectItem>
+                    <SelectItem value="BOOLEAN">Boolean</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             
-            {newAttribute.values.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-sm text-gray-600">Added values ({newAttribute.values.length}):</Label>
-                <div className="flex flex-wrap gap-2">
-                  {newAttribute.values.map((value, index) => (
-                    <div key={index} className="flex items-center gap-1 bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-sm">
-                      <span>{value}</span>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="attr-filterable"
+                  checked={newAttribute.filterable}
+                  onChange={(e) => setNewAttribute({...newAttribute, filterable: e.target.checked})}
+                  className="rounded text-teal-600 focus:ring-teal-500"
+                />
+                <Label htmlFor="attr-filterable" className="text-gray-700">Use in filters</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="attr-required"
+                  checked={newAttribute.required}
+                  onChange={(e) => setNewAttribute({...newAttribute, required: e.target.checked})}
+                  className="rounded text-teal-600 focus:ring-teal-500"
+                />
+                <Label htmlFor="attr-required" className="text-gray-700">Required for products</Label>
+              </div>
+            </div>
+
+            {/* Attribute Values Section for New Attribute */}
+            {newAttribute.type === 'SELECT' && (
+              <div className="space-y-3">
+                <Label className="text-gray-700">Attribute Values *</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter value (e.g., Red, Blue, Large, Small)"
+                    value={newValue}
+                    onChange={(e) => setNewValue(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddValueToNewAttribute();
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleAddValueToNewAttribute}
+                    className="bg-teal-600 hover:bg-teal-700"
+                    disabled={!newValue.trim()}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                {newAttribute.values.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-600">Added values ({newAttribute.values.length}):</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {newAttribute.values.map((value, index) => (
+                        <div key={index} className="flex items-center gap-1 bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-sm">
+                          <span>{value}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0 text-teal-700 hover:text-teal-900 hover:bg-teal-200"
+                            onClick={() => handleRemoveValueFromAttribute(index)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          // Use Existing Attribute Form
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="existing-attr" className="text-gray-700">Select Existing Attribute *</Label>
+              <Select 
+                value={selectedExistingAttribute} 
+                onValueChange={handleExistingAttributeSelect}
+              >
+                <SelectTrigger className="bg-white border-gray-300 focus:ring-teal-500">
+                  <SelectValue placeholder="Choose an attribute to link" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableAttributes.map(attr => (
+                    <SelectItem key={attr.id} value={attr.id}>
+                      <div className="flex items-center gap-2">
+                        {attr.type === 'SELECT' && <CheckSquare className="h-3 w-3" />}
+                        {attr.type === 'TEXT' && <Type className="h-3 w-3" />}
+                        {attr.type === 'NUMBER' && <Hash className="h-3 w-3" />}
+                        {attr.type === 'BOOLEAN' && <ToggleLeft className="h-3 w-3" />}
+                        <span>{attr.name}</span>
+                        <span className="text-xs text-gray-500">({attr.type.toLowerCase()})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedExistingAttribute && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="existing-attr-filterable"
+                      checked={newAttribute.filterable}
+                      onChange={(e) => setNewAttribute({...newAttribute, filterable: e.target.checked})}
+                      className="rounded text-teal-600 focus:ring-teal-500"
+                    />
+                    <Label htmlFor="existing-attr-filterable" className="text-gray-700">Use in filters</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="existing-attr-required"
+                      checked={newAttribute.required}
+                      onChange={(e) => setNewAttribute({...newAttribute, required: e.target.checked})}
+                      className="rounded text-teal-600 focus:ring-teal-500"
+                    />
+                    <Label htmlFor="existing-attr-required" className="text-gray-700">Required for products</Label>
+                  </div>
+                </div>
+
+                {/* Show existing values and allow adding new ones for SELECT type */}
+                {newAttribute.type === 'SELECT' && (
+                  <div className="space-y-3">
+                    <Label className="text-gray-700">Additional Values (Optional)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add additional values for this attribute"
+                        value={newValue}
+                        onChange={(e) => setNewValue(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            handleAddValueToNewAttribute();
+                          }
+                        }}
+                        className="flex-1"
+                      />
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-4 w-4 p-0 text-teal-700 hover:text-teal-900 hover:bg-teal-200"
-                        onClick={() => handleRemoveValueFromNewAttribute(index)}
+                        onClick={handleAddValueToNewAttribute}
+                        className="bg-teal-600 hover:bg-teal-700"
+                        disabled={!newValue.trim()}
                       >
-                        <X className="h-3 w-3" />
+                        <Plus className="h-4 w-4" />
                       </Button>
                     </div>
-                  ))}
-                </div>
-              </div>
+                    
+                    {existingAttributeValues.length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="text-sm text-gray-600">Additional values to add ({existingAttributeValues.length}):</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {existingAttributeValues.map((value, index) => (
+                            <div key={index} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                              <span>{value}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-4 w-4 p-0 text-blue-700 hover:text-blue-900 hover:bg-blue-200"
+                                onClick={() => handleRemoveValueFromAttribute(index)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show existing values from the selected attribute */}
+                    {(() => {
+                      const selectedAttr = allAttributes.find(attr => attr.id === selectedExistingAttribute);
+                      return selectedAttr?.values && selectedAttr.values.length > 0 && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                          <Label className="text-sm font-medium text-gray-700">
+                            Existing values in "{selectedAttr.name}" ({selectedAttr.values.length}):
+                          </Label>
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {selectedAttr.values.map(value => (
+                              <span key={value.id} className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs">
+                                {value.value}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
         
+        {/* Action Button */}
         <Button 
           className="bg-teal-600 hover:bg-teal-700"
-          onClick={handleCreateAttribute}
+          onClick={handleCreateOrLinkAttribute}
           disabled={
-            !newAttribute.name.trim() || 
             !selectedChildId || 
-            (newAttribute.type === 'SELECT' && newAttribute.values.length === 0)
+            (isCreatingNew && (
+              !newAttribute.name.trim() || 
+              (newAttribute.type === 'SELECT' && newAttribute.values.length === 0)
+            )) ||
+            (!isCreatingNew && !selectedExistingAttribute)
           }
         >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Attribute{newAttribute.values.length > 0 ? ` with ${newAttribute.values.length} values` : ''}
+          {isCreatingNew ? (
+            <>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Attribute{newAttribute.values.length > 0 ? ` with ${newAttribute.values.length} values` : ''}
+            </>
+          ) : (
+            <>
+              <Link className="h-4 w-4 mr-2" />
+              Link Attribute{existingAttributeValues.length > 0 ? ` with ${existingAttributeValues.length} additional values` : ''}
+            </>
+          )}
         </Button>
 
-        {newAttribute.type === 'SELECT' && newAttribute.values.length === 0 && (
+        {/* Help text */}
+        {isCreatingNew && newAttribute.type === 'SELECT' && newAttribute.values.length === 0 && (
           <p className="text-sm text-amber-600">
             Please add at least one value for SELECT type attributes
           </p>
         )}
+        
+        {!isCreatingNew && !selectedExistingAttribute && availableAttributes.length > 0 && (
+          <p className="text-sm text-blue-600">
+            Select an existing attribute to link it to this category
+          </p>
+        )}
+
+      
       </div>
     </div>
   );

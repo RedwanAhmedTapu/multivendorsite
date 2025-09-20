@@ -1,14 +1,17 @@
+// src/components/layouts/AdminProtectedLayout.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, ReactNode } from "react";
 import { AdminSidebar } from "./sidebar/AdminSidebar";
-// import { AdminNavbar } from "./navbar/page";
+import PrivateRoute from "@/components/privateroute/PrivateRoute";
+
 import {
   User,
+  UserPlus,
+  Users,
   Layers,
   Box,
   Store,
-  Users,
   Shield,
   Tag,
   Layout,
@@ -18,11 +21,21 @@ import {
   Mail,
   HelpCircle,
   Database,
-  UserPlus,
+  CreditCard,
+  BarChart2,
+  AlertTriangle,
+  Home,
+  ShoppingCart,
+  Truck,
+  MapPin,
+  Bell,
+  Calendar,
+  Star,
+  FileText,
 } from "lucide-react";
 
 type AdminLayoutProps = {
-  main: React.ReactNode;
+  main: ReactNode;
 };
 
 type Icon = React.ComponentType<React.SVGProps<SVGSVGElement>>;
@@ -40,9 +53,8 @@ type SidebarSection = {
   items: MenuItem[];
 };
 
-export default function AdminLayout({ main }: AdminLayoutProps) {
+function AdminLayout({ main }: AdminLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const toggleMobileSidebar = () => setMobileSidebarOpen((prev) => !prev);
 
   const logo = {
     icon: Layers,
@@ -52,149 +64,174 @@ export default function AdminLayout({ main }: AdminLayoutProps) {
   };
 
   const sections: SidebarSection[] = [
-  {
-    title: "Management",
-    items: [
-      {
-        title: "Categories",
-        href: "#",
-        icon: Layers,
-        color: "text-teal-300",
-        subItems: [
-          {
-            title: "All Categories",
-            href: "/admin/categories/list",
-            icon: Database,
-            color: "text-teal-300",
-          },
-          {
-            title: "Add New",
-            href: "/admin-dashboard/category-manage",
-            icon: PlusCircle,
-            color: "text-teal-300",
-          },
-        ],
-      },
-      {
-        title: "Products",
-        href: "#",
-        icon: Box,
-        color: "text-teal-300",
-        subItems: [
-          {
-            title: "All Products",
-            href: "/admin/products/list",
-            icon: Database,
-            color: "text-teal-300",
-          },
-          {
-            title: "Add New",
-            href: "/admin/products/add",
-            icon: PlusCircle,
-            color: "text-teal-300",
-          },
-        ],
-      },
-      {
-        title: "Vendors",
-        href: "#",
-        icon: Store,
-        color: "text-teal-300",
-        subItems: [
-          {
-            title: "All Vendors",
-            href: "/admin/vendors/list",
-            icon: Users,
-            color: "text-teal-300",
-          },
-          {
-            title: "Add Vendor",
-            href: "/admin/vendors/add",
-            icon: UserPlus,
-            color: "text-teal-300",
-          },
-        ],
-      },
-      {
-        title: "Users",
-        href: "#",
-        icon: Users,
-        color: "text-teal-300",
-        subItems: [
-          {
-            title: "All Users",
-            href: "/admin/users/list",
-            icon: User,
-            color: "text-teal-300",
-          },
-          {
-            title: "Roles & Permissions",
-            href: "/admin/users/roles",
-            icon: Shield,
-            color: "text-teal-300",
-          },
-        ],
-      },
-      {
-        title: "Offers",
-        href: "#",
-        icon: Tag,
-        color: "text-teal-300",
-        subItems: [
-          {
-            title: "All Offers",
-            href: "/admin/offers/list",
-            icon: Database,
-            color: "text-teal-300",
-          },
-          {
-            title: "Add Offer",
-            href: "/admin/offers/add",
-            icon: PlusCircle,
-            color: "text-teal-300",
-          },
-        ],
-      },
-      {
-        title: "Design Layout",
-        href: "#",
-        icon: Layout,
-        color: "text-teal-300",
-        subItems: [
-          {
-            title: "Homepage Layout",
-            href: "/admin/design/homepage",
-            icon: Monitor,
-            color: "text-teal-300",
-          },
-          {
-            title: "Theme Settings",
-            href: "/admin/design/theme",
-            icon: Settings,
-            color: "text-teal-300",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    title: "Support",
-    items: [
-      {
-        title: "Help Center",
-        href: "/admin/help",
-        icon: HelpCircle,
-        color: "text-teal-300",
-      },
-      {
-        title: "Contact Support",
-        href: "/admin/contact",
-        icon: Mail,
-        color: "text-teal-300",
-      },
-    ],
-  },
-];
+    {
+      title: "Dashboard",
+      items: [
+        { title: "Dashboard", href: "/admin/dashboard", icon: Home, color: "text-teal-300" },
+        { title: "POS", href: "/admin/pos", icon: ShoppingCart },
+      ],
+    },
+    {
+      title: "Vendor Management",
+      items: [
+        {
+          title: "Vendors",
+          href: "#",
+          icon: Store,
+          subItems: [
+            { title: "All Vendors", href: "/admin-dashboard/vendormanage/vendor-approval", icon: Users },
+            // { title: "Add Vendor", href: "/admin/vendors/add", icon: UserPlus },
+            { title: "Payouts & Commissions", href: "/admin-dashboard/vendormanage/payout-commission", icon: CreditCard },
+            { title: "Performance", href: "/admin-dashboard/vendormanage/performance", icon: BarChart2 },
+            { title: "Promotional Offers", href: "/admin-dashboard/vendormanage/promotions", icon: Tag },
+            { title: "Monthly Charges", href: "/admin-dashboard/vendormanage/monthly-charges", icon: Calendar },
+          ],
+        },
+      ],
+    },
+    {
+      title: "Customer Management",
+      items: [
+        {
+          title: "Customers",
+          href: "#",
+          icon: Users,
+          subItems: [
+            { title: "All Customers", href: "/admin-dashboard/customer-manage/accountmanage", icon: User },
+            { title: "Wallet & Loyalty", href: "/admin-dashboard/customer-manage/wallet-loyalty", icon: CreditCard },
+            { title: "Feedback & Reviews", href: "/admin-dashboard/customer-manage/customer-review", icon: Star },
+            { title: "Complaints", href: "/admin/customers/complaints", icon: HelpCircle },
+          ],
+        },
+      ],
+    },
+    {
+      title: "Delivery Management",
+      items: [
+        {
+          title: "Delivery Personnel",
+          href: "#",
+          icon: Truck,
+          subItems: [
+            { title: "All Delivery Men", href: "/admin/delivery/list", icon: Users },
+            { title: "Add Delivery Man", href: "/admin/delivery/add", icon: UserPlus },
+            { title: "Performance Tracking", href: "/admin/delivery/performance", icon: BarChart2 },
+            { title: "Payouts & Incentives", href: "/admin/delivery/payouts", icon: CreditCard },
+            { title: "Customer Ratings", href: "/admin/delivery/ratings", icon: Star },
+          ],
+        },
+      ],
+    },
+    {
+      title: "Order Management",
+      items: [
+        {
+          title: "Orders",
+          href: "#",
+          icon: FileText,
+          subItems: [
+            { title: "All Orders", href: "/admin/orders/list", icon: Database },
+            { title: "Refunds & Returns", href: "/admin/orders/refunds", icon: CreditCard },
+            { title: "Order Notifications", href: "/admin/orders/notifications", icon: Bell },
+            { title: "Cancellations", href: "/admin/orders/cancellations", icon: Calendar },
+          ],
+        },
+      ],
+    },
+    {
+      title: "Product Management",
+      items: [
+        {
+          title: "Products",
+          href: "#",
+          icon: Box,
+          subItems: [
+            { title: "All Products", href: "/admin/products/list", icon: Database },
+            { title: "Add Product", href: "/admin/products/add", icon: PlusCircle },
+            { title: "Categories", href: "/admin-dashboard/category-manage", icon: Layers },
+            { title: "Brands", href: "/admin/brands/list", icon: Tag },
+            { title: "Stock Status", href: "/admin/products/stock", icon: AlertTriangle },
+          ],
+        },
+      ],
+    },
+    {
+      title: "Shipping & Delivery",
+      items: [
+        {
+          title: "Shipping",
+          href: "#",
+          icon: MapPin,
+          subItems: [
+            { title: "Methods", href: "/admin/shipping/methods", icon: Settings },
+            { title: "Coverage Areas", href: "/admin/shipping/areas", icon: MapPin },
+            { title: "Real-Time Tracking", href: "/admin/shipping/tracking", icon: Truck },
+          ],
+        },
+      ],
+    },
+    {
+      title: "Reports & Analytics",
+      items: [
+        { title: "Sales & Revenue", href: "/admin/reports/sales", icon: BarChart2 },
+        { title: "Product Analysis", href: "/admin/reports/products", icon: Box },
+        { title: "Customer Insights", href: "/admin/reports/customers", icon: Users },
+        { title: "Real-Time Monitoring", href: "/admin/reports/real-time", icon: Monitor },
+      ],
+    },
+    {
+      title: "Ads & Promotions",
+      items: [
+        {
+          title: "Offers & Coupons",
+          href: "#",
+          icon: Tag,
+          subItems: [
+            { title: "All Offers", href: "/admin/offers/list", icon: Database },
+            { title: "Add Offer", href: "/admin/offers/add", icon: PlusCircle },
+            { title: "Email & SMS Campaigns", href: "/admin/promotions/email-sms", icon: Mail },
+            { title: "Ad Spaces", href: "/admin/promotions/ads", icon: Monitor },
+          ],
+        },
+        { title: "Premium Membership", href: "/admin/promotions/premium", icon: Star },
+      ],
+    },
+    {
+      title: "Employee Management",
+      items: [
+        {
+          title: "Employees",
+          href: "#",
+          icon: Users,
+          subItems: [
+            { title: "All Employees", href: "/admin/employees/list", icon: User },
+            { title: "Add Employee", href: "/admin/employees/add", icon: PlusCircle },
+            { title: "Roles & Permissions", href: "/admin/employees/roles", icon: Shield },
+            { title: "Task Management", href: "/admin/employees/tasks", icon: Calendar },
+          ],
+        },
+      ],
+    },
+    {
+      title: "Settings",
+      items: [
+        { title: "Business Settings", href: "/admin/settings/business", icon: Settings },
+        { title: "Payment Gateways", href: "/admin/settings/payments", icon: CreditCard },
+        { title: "Themes & Layouts", href: "/admin/settings/themes", icon: Layout },
+        { title: "SEO & Marketing", href: "/admin/settings/seo-marketing", icon: BarChart2 },
+        { title: "Backup & Restore", href: "/admin/settings/backup", icon: Database },
+        { title: "Third-Party Integrations", href: "/admin/settings/integrations", icon: Settings },
+      ],
+    },
+    {
+      title: "Content Management",
+      items: [
+        { title: "Banners", href: "/admin/content/banners", icon: Layout },
+        { title: "Blogs", href: "/admin/content/blogs", icon: FileText },
+        { title: "FAQ", href: "/admin/content/faq", icon: HelpCircle },
+      ],
+    },
+  ];
 
   const footer = {
     user: { name: "Admin User", email: "admin@acme.com" },
@@ -203,7 +240,6 @@ export default function AdminLayout({ main }: AdminLayoutProps) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
       <AdminSidebar
         logo={logo}
         sections={sections}
@@ -211,19 +247,20 @@ export default function AdminLayout({ main }: AdminLayoutProps) {
         mobileOpen={mobileSidebarOpen}
         onClose={() => setMobileSidebarOpen(false)}
       />
-
-      {/* Main content area (navbar + page) */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Navbar */}
-        {/* <div className="flex-shrink-0">
-          <AdminNavbar onMobileMenuClick={toggleMobileSidebar} />
-        </div> */}
-
-        {/* Page content */}
         <main className="flex-1 px-2 py-1 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {main}
         </main>
       </div>
     </div>
+  );
+}
+
+// Wrap AdminLayout inside PrivateRoute for admin role
+export default function AdminProtectedLayout({ main }: { main: ReactNode }) {
+  return (
+    <PrivateRoute allowedRoles={["ADMIN"]}>
+      <AdminLayout main={main} />
+    </PrivateRoute>
   );
 }
