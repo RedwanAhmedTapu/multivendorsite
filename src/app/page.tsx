@@ -14,7 +14,7 @@ export default function Home() {
    {/* <DailyDeals/> */}
    <ProductGrid/>
    {/* <FeaturedOffers/> */}
-   <CashbackBanner/>
+   {/* <CashbackBanner/> */}
    <Footer/>
    </>
   );
