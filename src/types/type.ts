@@ -5,7 +5,8 @@ import { ProductSpecificationValue } from "./product";
 // -------- Base Types --------
 export interface Vendor {
   id: string;
-  name: string;
+  storeName: string;
+  avatar:string,
   email: string;
   createdAt: string;
   updatedAt: string;
@@ -14,7 +15,8 @@ export interface Vendor {
 export interface Category {
   id: string;
   name: string;
-  slug: string; // ✅ Added missing slug
+  image?:string;
+  slug: string; 
   parentId?: string;
   parent?: Category;
   children?: Category[];
@@ -59,6 +61,9 @@ export interface AttributeValue {
 
 export interface CategoryAttribute {
   id: string;
+  name?: string;
+  type?: string;
+  values?: AttributeValue[]; // <-- fix here
   categoryId: string;
   category?: Category;
   attributeId: string;
@@ -90,6 +95,7 @@ export interface SpecificationOption {
   id: string;
   specificationId: string;
   value: string;
+  
   createdAt: string;
   updatedAt: string;
 }
@@ -98,16 +104,20 @@ export interface CreateSpecificationData {
   type: SpecificationType;
   unit?: string;
   filterable?: boolean;
-  required?: boolean;
+  isRequired?: boolean;
   categoryId: string;
   options?: string[];
 }
 export interface CategorySpecification {
   id: string;
+  name?:string;
+  type?:string;
+  unit?:string;
   categoryId: string;
   category?: Category;
   specificationId: string;
   specification?: Specification;
+  options?:SpecificationOption[];
   isRequired: boolean;
   filterable: boolean;
   createdAt: string;

@@ -5,14 +5,14 @@ import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/store/store';
 import { ChatList } from './ChatList';
-import { ChatBox } from './ChatBox';
 import { socketService } from '@/services/socketService';
 import type { Conversation } from '@/types/chat';
+import ChatBox from './ChatBox';
 
 export const ChatPage: React.FC = () => {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
-  const token = useSelector((state: RootState) => state.auth.token);
+  const token = useSelector((state: RootState) => state.auth.accessToken);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
 
   useEffect(() => {

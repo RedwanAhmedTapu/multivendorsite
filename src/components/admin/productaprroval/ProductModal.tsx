@@ -2,7 +2,52 @@
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-export default function ProductModal({ isOpen, onClose, product }) {
+// Define types for product
+interface ProductImage {
+  id: string;
+  url: string;
+  altText?: string;
+}
+
+interface ProductVariant {
+  id: string;
+  name: string;
+  sku: string;
+  price: number;
+  stock: number;
+  weight: number;
+}
+
+interface ProductWarranty {
+  packageWeightValue: number;
+  packageWeightUnit: string;
+  packageLength: number;
+  packageWidth: number;
+  packageHeight: number;
+  dangerousGoods: string;
+  duration: number;
+  unit: string;
+  policy: string;
+  type: string;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  category?: { name: string };
+  images: ProductImage[];
+  variants: ProductVariant[];
+  warranty?: ProductWarranty;
+}
+
+interface ProductModalProps {
+  isOpen: boolean;
+  onClose: (open: boolean) => void;
+  product: Product | null;
+}
+
+export default function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
   if (!product) return null;
 
   return (
@@ -71,10 +116,19 @@ export default function ProductModal({ isOpen, onClose, product }) {
             <div className="mt-4 border-t pt-2">
               <strong>Shipping & Warranty Details:</strong>
               <ul className="list-disc list-inside">
-                <li>Package Weight: {product.warranty.packageWeightValue} {product.warranty.packageWeightUnit}</li>
-                <li>Dimensions: {product.warranty.packageLength} x {product.warranty.packageWidth} x {product.warranty.packageHeight}</li>
+                <li>
+                  Package Weight: {product.warranty.packageWeightValue}{" "}
+                  {product.warranty.packageWeightUnit}
+                </li>
+                <li>
+                  Dimensions: {product.warranty.packageLength} x{" "}
+                  {product.warranty.packageWidth} x {product.warranty.packageHeight}
+                </li>
                 <li>Dangerous Goods: {product.warranty.dangerousGoods}</li>
-                <li>Warranty Duration: {product.warranty.duration} {product.warranty.unit}</li>
+                <li>
+                  Warranty Duration: {product.warranty.duration}{" "}
+                  {product.warranty.unit}
+                </li>
                 <li>Policy: {product.warranty.policy}</li>
                 <li>Type: {product.warranty.type}</li>
               </ul>

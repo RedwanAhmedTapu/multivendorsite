@@ -61,15 +61,18 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
     type: SPECIFICATION_TYPES.TEXT,
     unit: "",
     filterable: true,
-    required: false,
+    isRequired: false,
     categoryId: selectedChildId,
     options: [],
   });
 
-  const [selectedExistingSpecification, setSelectedExistingSpecification] = useState("");
-  const [existingSpecificationOptions, setExistingSpecificationOptions] = useState<string[]>([]);
+  const [selectedExistingSpecification, setSelectedExistingSpecification] =
+    useState("");
+  const [existingSpecificationOptions, setExistingSpecificationOptions] =
+    useState<string[]>([]);
   const [optionInput, setOptionInput] = useState("");
-  const [editingSpecification, setEditingSpecification] = useState<Specification | null>(null);
+  const [editingSpecification, setEditingSpecification] =
+    useState<Specification | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(true); // Toggle between creating new or using existing
 
   const {
@@ -91,21 +94,23 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
 
   // unwrap nested specifications for easier UI handling
   const currentSpecifications: Specification[] = categorySpecifications
-    .filter(
-      (cs: CategorySpecification) => cs.categoryId === selectedChildId
-    )
+    .filter((cs: CategorySpecification) => cs.categoryId === selectedChildId)
     .map((cs: CategorySpecification) => cs.specification)
     .filter((spec): spec is Specification => spec !== undefined); // Type guard to filter out undefined
 
   // Get specifications that are not already assigned to this category
   const availableSpecifications = useMemo(() => {
-    const currentSpecIds = currentSpecifications.map((spec: Specification) => spec.id);
-    return allSpecifications.filter(spec => !currentSpecIds.includes(spec.id));
+    const currentSpecIds = currentSpecifications.map(
+      (spec: Specification) => spec.id
+    );
+    return allSpecifications.filter(
+      (spec) => !currentSpecIds.includes(spec.id)
+    );
   }, [allSpecifications, currentSpecifications]);
 
   // Update the categoryId when selectedChildId changes
   useEffect(() => {
-    setNewSpecification(prev => ({
+    setNewSpecification((prev) => ({
       ...prev,
       categoryId: selectedChildId,
     }));
@@ -114,17 +119,18 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
   // Handle selection of existing specification
   const handleExistingSpecificationSelect = (specId: string) => {
     setSelectedExistingSpecification(specId);
-    const selectedSpec = allSpecifications.find(spec => spec.id === specId);
+    const selectedSpec = allSpecifications.find((spec) => spec.id === specId);
     if (selectedSpec) {
       setExistingSpecificationOptions([]);
       setNewSpecification({
-        name: selectedSpec.name,
-        type: selectedSpec.type,
+        name: selectedSpec.name ?? "",
+       type: selectedSpec.type ? (selectedSpec.type as SpecificationType) : SPECIFICATION_TYPES.TEXT,
+
         unit: selectedSpec.unit || "",
         filterable: true,
-        required: false,
+        isRequired: false,
         categoryId: selectedChildId,
-        options: []
+        options: [],
       });
     }
   };
@@ -132,14 +138,14 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
   // ---------------- Handlers ----------------
   const handleAddOption = () => {
     if (!optionInput.trim()) return;
-    
+
     if (isCreatingNew) {
       setNewSpecification((prev) => ({
         ...prev,
         options: [...prev.options, optionInput.trim()],
       }));
     } else {
-      setExistingSpecificationOptions(prev => [...prev, optionInput.trim()]);
+      setExistingSpecificationOptions((prev) => [...prev, optionInput.trim()]);
     }
     setOptionInput("");
   };
@@ -151,7 +157,9 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
         options: prev.options.filter((opt) => opt !== value),
       }));
     } else {
-      setExistingSpecificationOptions(prev => prev.filter(opt => opt !== value));
+      setExistingSpecificationOptions((prev) =>
+        prev.filter((opt) => opt !== value)
+      );
     }
   };
 
@@ -173,16 +181,22 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
         const categorySpec = await createSpecification({
           ...newSpecification,
           categoryId: selectedChildId,
+          filterable: newSpecification.filterable ?? false,
+          isRequired: newSpecification.isRequired ?? false,
         }).unwrap();
 
         // Handle the response properly
         const specification = categorySpec.specification;
         if (!specification) {
-          toast.error("Failed to create specification - no specification returned");
+          toast.error(
+            "Failed to create specification - no specification returned"
+          );
           return;
         }
 
-        toast.success(`Specification "${specification.name}" created successfully`);
+        toast.success(
+          `Specification "${specification.name}" created successfully`
+        );
 
         // Add options if it's a SELECT type
         if (
@@ -196,12 +210,14 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
                 value: opt,
               }).unwrap()
             );
-            
+
             await Promise.all(optionPromises);
             toast.success("Options added successfully");
           } catch (optionError) {
             console.error("Failed to add some options:", optionError);
-            toast.warning("Specification created but some options failed to add");
+            toast.warning(
+              "Specification created but some options failed to add"
+            );
           }
         }
 
@@ -211,11 +227,11 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
           type: SPECIFICATION_TYPES.TEXT,
           unit: "",
           filterable: true,
-          required: false,
+          isRequired: false,
           categoryId: selectedChildId,
           options: [],
         });
-        
+
         refetchSpecifications();
       } catch (error: any) {
         console.error("Failed to create specification:", error);
@@ -228,7 +244,9 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
         return;
       }
 
-      const selectedSpec = allSpecifications.find(spec => spec.id === selectedExistingSpecification);
+      const selectedSpec = allSpecifications.find(
+        (spec) => spec.id === selectedExistingSpecification
+      );
       if (!selectedSpec) {
         toast.error("Selected specification not found");
         return;
@@ -237,28 +255,27 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
       try {
         // Prepare the data in the same format as creating a new specification
         const specificationData = {
-          name: selectedSpec.name,
-          type: selectedSpec.type,
+          name: selectedSpec.name ?? "",
+          type: selectedSpec.type ?? "TEXT",
           unit: selectedSpec.unit || "",
-          filterable: newSpecification.filterable,
-          required: newSpecification.required,
+          filterable: !!newSpecification.filterable, // force boolean
+          isRequired: !!newSpecification.isRequired, // force boolean
           categoryId: selectedChildId,
-          // If it's a SELECT type and we have new options, add them
-          ...(selectedSpec.type === SPECIFICATION_TYPES.SELECT && 
-              existingSpecificationOptions.length > 0 && { 
-                options: existingSpecificationOptions 
-              })
+          ...(selectedSpec.type === SPECIFICATION_TYPES.SELECT &&
+            existingSpecificationOptions.length > 0 && {
+              options: existingSpecificationOptions,
+            }),
         };
 
         await createSpecification(specificationData).unwrap();
-        
+
         let successMessage = `Specification "${selectedSpec.name}" linked to category successfully`;
         if (existingSpecificationOptions.length > 0) {
           successMessage += ` with ${existingSpecificationOptions.length} additional options`;
         }
-        
+
         toast.success(successMessage);
-        
+
         // Reset form
         setSelectedExistingSpecification("");
         setExistingSpecificationOptions([]);
@@ -267,13 +284,12 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
           type: SPECIFICATION_TYPES.TEXT,
           unit: "",
           filterable: true,
-          required: false,
+          isRequired: false,
           categoryId: selectedChildId,
           options: [],
         });
-        
+
         refetchSpecifications();
-        
       } catch (error: any) {
         console.error("Failed to link specification:", error);
         toast.error(error?.data?.message || "Failed to link specification");
@@ -295,7 +311,9 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
 
       const updatedSpec = updatedCategorySpec.specification;
       if (!updatedSpec) {
-        toast.error("Failed to update specification - no specification returned");
+        toast.error(
+          "Failed to update specification - no specification returned"
+        );
         return;
       }
 
@@ -322,9 +340,12 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
 
   const handleAddOptionToSpec = async (specId: string, value: string) => {
     if (!value.trim()) return;
-    
+
     try {
-      await createOption({ specificationId: specId, value: value.trim() }).unwrap();
+      await createOption({
+        specificationId: specId,
+        value: value.trim(),
+      }).unwrap();
       refetchSpecifications();
       toast.success("Option added successfully");
       setOptionInput("");
@@ -355,7 +376,7 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
       type: SPECIFICATION_TYPES.TEXT,
       unit: "",
       filterable: true,
-      required: false,
+      isRequired: false,
       categoryId: selectedChildId,
       options: [],
     });
@@ -384,7 +405,9 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
       {/* Existing Specifications */}
       {currentSpecifications.length > 0 && (
         <div className="space-y-4">
-          <h3 className="font-medium text-gray-900">Existing Specifications ({currentSpecifications.length})</h3>
+          <h3 className="font-medium text-gray-900">
+            Existing Specifications ({currentSpecifications.length})
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {currentSpecifications.map((spec) => (
               <div
@@ -444,10 +467,18 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
                             <SelectValue placeholder="Select type" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value={SPECIFICATION_TYPES.TEXT}>Text</SelectItem>
-                            <SelectItem value={SPECIFICATION_TYPES.NUMBER}>Number</SelectItem>
-                            <SelectItem value={SPECIFICATION_TYPES.BOOLEAN}>Boolean</SelectItem>
-                            <SelectItem value={SPECIFICATION_TYPES.SELECT}>Select</SelectItem>
+                            <SelectItem value={SPECIFICATION_TYPES.TEXT}>
+                              Text
+                            </SelectItem>
+                            <SelectItem value={SPECIFICATION_TYPES.NUMBER}>
+                              Number
+                            </SelectItem>
+                            <SelectItem value={SPECIFICATION_TYPES.BOOLEAN}>
+                              Boolean
+                            </SelectItem>
+                            <SelectItem value={SPECIFICATION_TYPES.SELECT}>
+                              Select
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -475,10 +506,18 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
                           {spec.name}
                         </div>
                         <div className="text-sm text-gray-500 capitalize flex items-center gap-1">
-                          {spec.type === SPECIFICATION_TYPES.TEXT && <TypeIcon className="h-3 w-3" />}
-                          {spec.type === SPECIFICATION_TYPES.NUMBER && <Hash className="h-3 w-3" />}
-                          {spec.type === SPECIFICATION_TYPES.BOOOLEAN && <ToggleLeft className="h-3 w-3" />}
-                          {spec.type === SPECIFICATION_TYPES.SELECT && <List className="h-3 w-3" />}
+                          {spec.type === SPECIFICATION_TYPES.TEXT && (
+                            <TypeIcon className="h-3 w-3" />
+                          )}
+                          {spec.type === SPECIFICATION_TYPES.NUMBER && (
+                            <Hash className="h-3 w-3" />
+                          )}
+                          {spec.type === SPECIFICATION_TYPES.BOOLEAN && (
+                            <ToggleLeft className="h-3 w-3" />
+                          )}
+                          {spec.type === SPECIFICATION_TYPES.SELECT && (
+                            <List className="h-3 w-3" />
+                          )}
                           {spec.type.toLowerCase()}
                           {spec.unit && ` • ${spec.unit}`}
                         </div>
@@ -506,56 +545,57 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
                     </div>
 
                     {/* Options for SELECT type */}
-                    {spec.type === SPECIFICATION_TYPES.SELECT && spec.options && (
-                      <div className="mt-3">
-                        <h4 className="text-sm font-medium text-gray-700 mb-1">
-                          Options ({spec.options.length})
-                        </h4>
-                        <div className="space-y-1">
-                          {spec.options.map((opt: SpecificationOption) => (
-                            <div
-                              key={opt.id}
-                              className="flex items-center justify-between bg-white border px-2 py-1 rounded"
-                            >
-                              <span className="text-sm">{opt.value}</span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                                onClick={() =>
-                                  handleDeleteOptionFromSpec(opt.id)
-                                }
+                    {spec.type === SPECIFICATION_TYPES.SELECT &&
+                      spec.options && (
+                        <div className="mt-3">
+                          <h4 className="text-sm font-medium text-gray-700 mb-1">
+                            Options ({spec.options.length})
+                          </h4>
+                          <div className="space-y-1">
+                            {spec.options.map((opt: SpecificationOption) => (
+                              <div
+                                key={opt.id}
+                                className="flex items-center justify-between bg-white border px-2 py-1 rounded"
                               >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Input
-                            placeholder="New option"
-                            value={optionInput}
-                            onChange={(e) => setOptionInput(e.target.value)}
-                            className="bg-white"
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') {
-                                handleAddOptionToSpec(spec.id, optionInput);
+                                <span className="text-sm">{opt.value}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                  onClick={() =>
+                                    handleDeleteOptionFromSpec(opt.id)
+                                  }
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Input
+                              placeholder="New option"
+                              value={optionInput}
+                              onChange={(e) => setOptionInput(e.target.value)}
+                              className="bg-white"
+                              onKeyPress={(e) => {
+                                if (e.key === "Enter") {
+                                  handleAddOptionToSpec(spec.id, optionInput);
+                                }
+                              }}
+                            />
+                            <Button
+                              size="sm"
+                              className="bg-teal-600 hover:bg-teal-700"
+                              onClick={() =>
+                                handleAddOptionToSpec(spec.id, optionInput)
                               }
-                            }}
-                          />
-                          <Button
-                            size="sm"
-                            className="bg-teal-600 hover:bg-teal-700"
-                            onClick={() =>
-                              handleAddOptionToSpec(spec.id, optionInput)
-                            }
-                            disabled={!optionInput.trim()}
-                          >
-                            Add
-                          </Button>
+                              disabled={!optionInput.trim()}
+                            >
+                              Add
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </>
                 )}
               </div>
@@ -572,7 +612,11 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
             <Button
               variant={isCreatingNew ? "default" : "ghost"}
               size="sm"
-              className={`h-8 px-3 text-xs ${isCreatingNew ? 'bg-teal-600 hover:bg-teal-700 text-white' : 'text-gray-600'}`}
+              className={`h-8 px-3 text-xs ${
+                isCreatingNew
+                  ? "bg-teal-600 hover:bg-teal-700 text-white"
+                  : "text-gray-600"
+              }`}
               onClick={() => handleToggleMode(true)}
             >
               Create New
@@ -580,7 +624,11 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
             <Button
               variant={!isCreatingNew ? "default" : "ghost"}
               size="sm"
-              className={`h-8 px-3 text-xs ${!isCreatingNew ? 'bg-teal-600 hover:bg-teal-700 text-white' : 'text-gray-600'}`}
+              className={`h-8 px-3 text-xs ${
+                !isCreatingNew
+                  ? "bg-teal-600 hover:bg-teal-700 text-white"
+                  : "text-gray-600"
+              }`}
               onClick={() => handleToggleMode(false)}
               disabled={availableSpecifications.length === 0}
             >
@@ -593,7 +641,8 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
         {!isCreatingNew && availableSpecifications.length === 0 && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
             <p className="text-sm text-amber-700">
-              All available specifications are already assigned to this category. Create a new specification instead.
+              All available specifications are already assigned to this
+              category. Create a new specification instead.
             </p>
           </div>
         )}
@@ -630,10 +679,18 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={SPECIFICATION_TYPES.TEXT}>Text</SelectItem>
-                    <SelectItem value={SPECIFICATION_TYPES.NUMBER}>Number</SelectItem>
-                    <SelectItem value={SPECIFICATION_TYPES.BOOLEAN}>Boolean</SelectItem>
-                    <SelectItem value={SPECIFICATION_TYPES.SELECT}>Select</SelectItem>
+                    <SelectItem value={SPECIFICATION_TYPES.TEXT}>
+                      Text
+                    </SelectItem>
+                    <SelectItem value={SPECIFICATION_TYPES.NUMBER}>
+                      Number
+                    </SelectItem>
+                    <SelectItem value={SPECIFICATION_TYPES.BOOLEAN}>
+                      Boolean
+                    </SelectItem>
+                    <SelectItem value={SPECIFICATION_TYPES.SELECT}>
+                      Select
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -677,11 +734,11 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
                 <input
                   type="checkbox"
                   id="required"
-                  checked={newSpecification.required}
+                  checked={newSpecification.isRequired}
                   onChange={(e) =>
                     setNewSpecification({
                       ...newSpecification,
-                      required: e.target.checked,
+                      isRequired: e.target.checked,
                     })
                   }
                   className="rounded border-gray-300"
@@ -702,7 +759,7 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
                     value={optionInput}
                     onChange={(e) => setOptionInput(e.target.value)}
                     onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         handleAddOption();
                       }
                     }}
@@ -745,23 +802,33 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Select Existing Specification *</Label>
-              <Select 
-                value={selectedExistingSpecification} 
+              <Select
+                value={selectedExistingSpecification}
                 onValueChange={handleExistingSpecificationSelect}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a specification to link" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableSpecifications.map(spec => (
+                  {availableSpecifications.map((spec) => (
                     <SelectItem key={spec.id} value={spec.id}>
                       <div className="flex items-center gap-2">
-                        {spec.type === SPECIFICATION_TYPES.TEXT && <TypeIcon className="h-3 w-3" />}
-                        {spec.type === SPECIFICATION_TYPES.NUMBER && <Hash className="h-3 w-3" />}
-                        {spec.type === SPECIFICATION_TYPES.BOOLEAN && <ToggleLeft className="h-3 w-3" />}
-                        {spec.type === SPECIFICATION_TYPES.SELECT && <List className="h-3 w-3" />}
+                        {spec.type === SPECIFICATION_TYPES.TEXT && (
+                          <TypeIcon className="h-3 w-3" />
+                        )}
+                        {spec.type === SPECIFICATION_TYPES.NUMBER && (
+                          <Hash className="h-3 w-3" />
+                        )}
+                        {spec.type === SPECIFICATION_TYPES.BOOLEAN && (
+                          <ToggleLeft className="h-3 w-3" />
+                        )}
+                        {spec.type === SPECIFICATION_TYPES.SELECT && (
+                          <List className="h-3 w-3" />
+                        )}
                         <span>{spec.name}</span>
-                        <span className="text-xs text-gray-500">({spec.type.toLowerCase()})</span>
+                        <span className="text-xs text-gray-500">
+                          ({spec?.type?.toLowerCase()})
+                        </span>
                       </div>
                     </SelectItem>
                   ))}
@@ -793,11 +860,11 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
                     <input
                       type="checkbox"
                       id="existing-required"
-                      checked={newSpecification.required}
+                      checked={newSpecification.isRequired}
                       onChange={(e) =>
                         setNewSpecification({
                           ...newSpecification,
-                          required: e.target.checked,
+                          isRequired: e.target.checked,
                         })
                       }
                       className="rounded border-gray-300"
@@ -818,7 +885,7 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
                         value={optionInput}
                         onChange={(e) => setOptionInput(e.target.value)}
                         onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
+                          if (e.key === "Enter") {
                             handleAddOption();
                           }
                         }}
@@ -833,13 +900,19 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
                         Add
                       </Button>
                     </div>
-                    
+
                     {existingSpecificationOptions.length > 0 && (
                       <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">Additional options to add ({existingSpecificationOptions.length}):</Label>
+                        <Label className="text-sm text-gray-600">
+                          Additional options to add (
+                          {existingSpecificationOptions.length}):
+                        </Label>
                         <div className="flex flex-wrap gap-2">
                           {existingSpecificationOptions.map((option, index) => (
-                            <div key={index} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                            <div
+                              key={index}
+                              className="flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
+                            >
                               <span>{option}</span>
                               <Button
                                 type="button"
@@ -858,20 +931,29 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
 
                     {/* Show existing options from the selected specification */}
                     {(() => {
-                      const selectedSpec = allSpecifications.find(spec => spec.id === selectedExistingSpecification);
-                      return selectedSpec?.options && selectedSpec.options.length > 0 && (
-                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                          <Label className="text-sm font-medium text-gray-700">
-                            Existing options in "{selectedSpec.name}" ({selectedSpec.options.length}):
-                          </Label>
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {selectedSpec.options.map(option => (
-                              <span key={option.id} className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs">
-                                {option.value}
-                              </span>
-                            ))}
+                      const selectedSpec = allSpecifications.find(
+                        (spec) => spec.id === selectedExistingSpecification
+                      );
+                      return (
+                        selectedSpec?.options &&
+                        selectedSpec.options.length > 0 && (
+                          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                            <Label className="text-sm font-medium text-gray-700">
+                              Existing options in "{selectedSpec.name}" (
+                              {selectedSpec.options.length}):
+                            </Label>
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {selectedSpec.options.map((option) => (
+                                <span
+                                  key={option.id}
+                                  className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs"
+                                >
+                                  {option.value}
+                                </span>
+                              ))}
+                            </div>
                           </div>
-                        </div>
+                        )
                       );
                     })()}
                   </div>
@@ -880,12 +962,12 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
             )}
           </div>
         )}
-        
+
         <Button
           className="bg-teal-600 hover:bg-teal-700"
           onClick={handleCreateOrLinkSpecification}
           disabled={
-            !selectedChildId || 
+            !selectedChildId ||
             (isCreatingNew && !newSpecification.name) ||
             (!isCreatingNew && !selectedExistingSpecification)
           }
@@ -893,12 +975,18 @@ const SpecificationsTab: React.FC<SpecificationsTabProps> = ({
           {isCreatingNew ? (
             <>
               <Plus className="h-4 w-4 mr-2" />
-              Create Specification{newSpecification.options.length > 0 ? ` with ${newSpecification.options.length} options` : ''}
+              Create Specification
+              {newSpecification.options.length > 0
+                ? ` with ${newSpecification.options.length} options`
+                : ""}
             </>
           ) : (
             <>
               <Link className="h-4 w-4 mr-2" />
-              Link Specification{existingSpecificationOptions.length > 0 ? ` with ${existingSpecificationOptions.length} additional options` : ''}
+              Link Specification
+              {existingSpecificationOptions.length > 0
+                ? ` with ${existingSpecificationOptions.length} additional options`
+                : ""}
             </>
           )}
         </Button>

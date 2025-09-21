@@ -204,11 +204,11 @@ const ChatBox: React.FC<ChatBoxProps> = ({ conversation, onClose }) => {
               {isSender && (
                 <div className="flex items-end ml-2">
                   <Avatar className="w-8 h-8">
-                    {user.avatar ? (
-                      <AvatarImage src={user.avatar} alt={user.name} />
+                    {user?.avatar ? (
+                      <AvatarImage src={user?.avatar} alt={user.name} />
                     ) : (
                       <AvatarFallback>
-                        {user.name?.charAt(0) || 'U'}
+                        {user?.name?.charAt(0) || 'you'}
                       </AvatarFallback>
                     )}
                   </Avatar>

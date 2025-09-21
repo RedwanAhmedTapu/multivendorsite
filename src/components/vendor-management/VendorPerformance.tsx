@@ -178,7 +178,7 @@ export default function VendorPerformance() {
                     <TableCell>
                       <Badge
                         variant={
-                          vendor.status === 'APPROVED' || vendor.status === 'ACTIVE'
+                          vendor.status === 'ACTIVE'
                             ? 'default'
                             : vendor.status === 'PENDING'
                             ? 'secondary'

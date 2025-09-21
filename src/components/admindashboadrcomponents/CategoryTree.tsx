@@ -51,7 +51,7 @@ const CategoryTreeItem: React.FC<{
 
       {hasChildren && open && (
         <div className="ml-3 border-l border-gray-200">
-          {category.children.map((child) => (
+          {category?.children?.map((child) => (
             <CategoryTreeItem
               key={child.id}
               category={child}

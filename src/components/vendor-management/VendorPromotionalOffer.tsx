@@ -57,7 +57,7 @@ export default function VendorPromotionalOffer() {
   const { data: offersRes, isLoading: isLoadingOffers, refetch: refetchOffers } = useGetVendorOffersQuery(selectedVendorId!, {
     skip: !selectedVendorId,
   });
-  const offers= offersRes?.data || [];
+  const offers= offersRes;
 
   const [createOffer] = useCreateOfferMutation();
   const [toggleOfferStatus] = useToggleOfferStatusMutation();
@@ -328,7 +328,7 @@ export default function VendorPromotionalOffer() {
                     <TableCell>
                       <Badge
                         variant={
-                          vendor.status === 'APPROVED' || vendor.status === 'ACTIVE'
+                          vendor.status === 'ACTIVE'
                             ? 'default'
                             : vendor.status === 'PENDING'
                             ? 'secondary'

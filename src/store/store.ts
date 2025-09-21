@@ -12,8 +12,9 @@ import { productApi } from "../features/productApi";
 import { attrSpecSlice } from "@/features/attrSpecSlice";
 import { vendorManageApi } from "../features/vendorManageApi"; 
 import { customerManageApi } from "../features/customerManageApi";
-import { chatApi } from "../features/chatApi"; // ⬅️ NEW: Chat API
-import chatReducer from "../features/chatSlice"; // ⬅️ NEW: Chat slice
+import { chatApi } from "../features/chatApi"; 
+import chatReducer from "../features/chatSlice"; 
+import { termsApi } from "../features/termsApi"; // ⬅️ NEW: Terms API
 
 // --------------------
 // Persist configuration
@@ -29,7 +30,7 @@ const persistConfig = {
 // --------------------
 const rootReducer = combineReducers({
   auth: authReducer,
-  chat: chatReducer, // ⬅️ NEW: Chat reducer
+  chat: chatReducer,
   [apiSlice.reducerPath]: apiSlice.reducer,
   [authApi.reducerPath]: authApi.reducer,
   [sliderApi.reducerPath]: sliderApi.reducer,
@@ -37,7 +38,8 @@ const rootReducer = combineReducers({
   [attrSpecSlice.reducerPath]: attrSpecSlice.reducer,
   [vendorManageApi.reducerPath]: vendorManageApi.reducer,
   [customerManageApi.reducerPath]: customerManageApi.reducer,
-  [chatApi.reducerPath]: chatApi.reducer, // ⬅️ NEW: Chat API reducer
+  [chatApi.reducerPath]: chatApi.reducer,
+  [termsApi.reducerPath]: termsApi.reducer, // ⬅️ NEW: Terms API reducer
 });
 
 // --------------------
@@ -63,7 +65,8 @@ export const store = configureStore({
       attrSpecSlice.middleware,
       vendorManageApi.middleware,
       customerManageApi.middleware,
-      chatApi.middleware // ⬅️ NEW: Chat API middleware
+      chatApi.middleware,
+      termsApi.middleware // ⬅️ NEW: Terms API middleware
     ),
   devTools: process.env.NODE_ENV !== "production",
 });

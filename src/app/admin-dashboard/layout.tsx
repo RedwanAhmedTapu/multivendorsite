@@ -221,6 +221,7 @@ function AdminLayout({ main }: AdminLayoutProps) {
         { title: "SEO & Marketing", href: "/admin/settings/seo-marketing", icon: BarChart2 },
         { title: "Backup & Restore", href: "/admin/settings/backup", icon: Database },
         { title: "Third-Party Integrations", href: "/admin/settings/integrations", icon: Settings },
+        { title: "Terms & Conditions", href: "/admin-dashboard/settings/terms", icon: FileText },
       ],
     },
     {

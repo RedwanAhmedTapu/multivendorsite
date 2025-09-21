@@ -1,14 +1,7 @@
 "use client";
 
 import { useState, useRef, ChangeEvent, useEffect } from "react";
-import {
-  Menu,
-  Search,
-  Heart,
-  ShoppingBag,
-  ChevronDown,
-  X,
-} from "lucide-react";
+import { Menu, Search, Heart, ShoppingBag, ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { JSX } from "react";
@@ -97,24 +90,28 @@ export default function Navbar(): JSX.Element {
               >
                 <Menu size={16} />
               </Button>
-              <Image
-                src="/homesection/logo-light-short.svg"
-                alt="Motta Logo"
-                width={90}
-                height={36}
-                className="h-6 w-auto"
-              />
+              <Link href="/">
+                <Image
+                  src="/navlogo/IMG_3794.PNG"
+                  alt="FinixMart Logo"
+                  width={90}
+                  height={36}
+                  className=" w-auto"
+                />
+              </Link>
             </div>
 
             {/* Desktop Left */}
             <div className="hidden md:flex items-center gap-3 lg:gap-4">
-              <Image
-                src="/homesection/logo-light-short.svg"
-                alt="Motta Logo"
-                width={90}
-                height={36}
-                className="h-7 w-auto"
-              />
+              <Link href="/">
+                <Image
+                  src="/navlogo/IMG_3794.PNG"
+                  alt="FinixMart Logo"
+                  width={300}
+                  height={300}
+                  className=" w-auto"
+                />
+              </Link>
             </div>
 
             {/* Search Bar */}

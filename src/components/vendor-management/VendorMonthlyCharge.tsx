@@ -31,6 +31,14 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+interface VendorCharge {
+  id: string;
+  amount: number;
+  description?: string;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  createdAt: string;
+}
 
 export default function VendorMonthlyCharge() {
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
@@ -54,11 +62,10 @@ export default function VendorMonthlyCharge() {
   });
 
   // Vendor charges query
-  const { data: chargesRes, isLoading: isLoadingCharges, refetch: refetchCharges } =
+  const { data: charges, isLoading: isLoadingCharges, refetch: refetchCharges } =
     useGetVendorChargesQuery(selectedVendorId!, {
       skip: !selectedVendorId,
     });
-  const charges = chargesRes?.data || [];
 
   const [setMonthlyCharge] = useSetMonthlyChargeMutation();
   const [bulkSetMonthlyCharges] = useBulkSetMonthlyChargesMutation();
@@ -215,7 +222,7 @@ export default function VendorMonthlyCharge() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {charges.map((charge) => (
+                      {charges.map((charge: VendorCharge) => (
                         <TableRow key={charge.id}>
                           <TableCell>${charge.amount}</TableCell>
                           <TableCell>{charge.description || "-"}</TableCell>
@@ -321,7 +328,7 @@ export default function VendorMonthlyCharge() {
                     <TableCell>
                       <Badge
                         variant={
-                          vendor.status === "APPROVED" || vendor.status === "ACTIVE"
+                          vendor.status === "ACTIVE" 
                             ? "default"
                             : vendor.status === "PENDING"
                             ? "secondary"

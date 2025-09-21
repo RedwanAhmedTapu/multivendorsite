@@ -13,8 +13,8 @@ export default function Home() {
    <CategorySection/>
    {/* <DailyDeals/> */}
    <ProductGrid/>
-   <FeaturedOffers/>
-   <CashbackBanner/>
+   {/* <FeaturedOffers/> */}
+   {/* <CashbackBanner/> */}
    <Footer/>
    </>
   );

@@ -38,7 +38,7 @@ const ProductCard = ({ product }: { product: Product }) => {
   // Get first image or fallback
   const image = product.images?.[0];
 
-  const imageSrc = image?.url ? `http://localhost:5000${image?.url}` : "/placeholder-product.jpg";
+  const imageSrc = image?.url ? `https://api.finixmart.com.bd${image?.url}` : "/placeholder-product.jpg";
   console.log(imageSrc);
   const altText = image?.altText || product.name;
 
@@ -54,15 +54,10 @@ const ProductCard = ({ product }: { product: Product }) => {
         </button>
       </div>
 
-      {/* Sale Badge */}
-      <div className="absolute top-3 left-3 flex gap-2 z-10">
-        <Badge className="bg-red-500 text-white px-2 py-0.5 text-xs sm:px-3 sm:py-1">
-          Sale
-        </Badge>
-      </div>
+      
 
       <CardContent className="flex flex-col items-center p-0">
-        <div className="relative w-full h-32 sm:h-40 mb-3 flex items-center justify-center">
+        <div className="relative w-full h-28 sm:h-20 mb-3 flex items-center justify-center">
           <Image
             src={imageSrc}
             alt={altText}
@@ -105,7 +100,7 @@ const ProductSection = ({ title, products }: SectionProps) => {
   if (!products || products.length === 0) return null;
 
   return (
-    <section className="max-w-6xl mx-auto px-4 py-8">
+    <section className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl sm:text-2xl font-bold">{title}</h2>
         <a href="#" className="underline text-sm font-medium">
@@ -122,7 +117,7 @@ const ProductSection = ({ title, products }: SectionProps) => {
 };
 
 const ProductGrid = () => {
-  const { data: products = [], isLoading, error } = useGetProductsQuery({});
+  const { data: products = [], isLoading, error } = useGetProductsQuery();
 
   if (isLoading) return <p className="text-center py-10">Loading...</p>;
   if (error) return <p className="text-center py-10 text-red-500">Failed to load products.</p>;

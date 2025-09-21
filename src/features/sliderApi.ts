@@ -34,7 +34,7 @@ export interface UpdateSliderRequest extends Partial<CreateSliderRequest> {
 export const sliderApi = createApi({
   reducerPath: "sliderApi",
   baseQuery: fetchBaseQuery({
-    baseUrl: "http://localhost:5000/sliders",
+    baseUrl: "https://api.finixmart.com.bd/sliders",
   }),
   tagTypes: ["Slider"],
   endpoints: (builder) => ({

@@ -6,6 +6,7 @@ import {
   useGetCustomersQuery,
   useGetCustomerReviewsQuery,
   useModerateReviewMutation,
+  Customer,
 } from "@/features/customerManageApi";
 import {
   Card,
@@ -13,8 +14,6 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter,
-  CardHeaderProps,
 } from "@/components/ui/card";
 import {
   Table,
@@ -37,22 +36,27 @@ import {
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-/**
- * Customer Reviews Management
- *
- * - Shows a list of customers (paginated by the getCustomers query)
- * - Clicking "View Reviews" opens a dialog and fetches that customer's reviews
- * - Allows approving/rejecting/flagging reviews
- *
- * Notes:
- * - Backend returns reviews as an object { data, pagination } — this component
- *   normalizes that to an array before mapping.
- * - When moderating we call the moderateReview mutation with { reviewId, data: { action } }
- *   where action is 'approve' | 'reject' | 'flag' as expected by the server/service.
- */
+// ------------------------------
+// Review type
+// ------------------------------
+export interface Review {
+  id: string;
+  product?: { name?: string };
+  user?: { name?: string };
+  customerName?: string;
+  authorName?: string;
+  comment?: string;
+  body?: string;
+  rating?: number;
+  stars?: number;
+  createdAt?: string;
+}
 
+// ------------------------------
+// Component
+// ------------------------------
 export default function CustomerReviewManagement() {
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
 
   const { data, isLoading, error, refetch } = useGetCustomersQuery({
@@ -62,7 +66,8 @@ export default function CustomerReviewManagement() {
     sortOrder: "desc",
   });
 
-  // Reviews query will be skipped until a customer is selected
+  const customers: Customer[] = data?.data ?? [];
+
   const {
     data: reviewsRaw,
     isLoading: reviewsLoading,
@@ -71,38 +76,27 @@ export default function CustomerReviewManagement() {
     skip: !selectedCustomer?.id,
   });
 
-  // moderateReview expects { reviewId, data }
-  const [moderateReview, { isLoading: isModerating }] =
-    useModerateReviewMutation();
+  const reviewsList: Review[] = reviewsRaw ?? [];
 
-  // Normalize reviews: backend might return { data, pagination } or just an array
-  const reviewsList: any[] = Array.isArray(reviewsRaw)
-    ? reviewsRaw
-    : reviewsRaw?.data ?? [];
+  const [moderateReview, { isLoading: isModerating }] = useModerateReviewMutation();
 
-  // When the dialog opens (for a selected customer), fetch reviews
+  // Fetch reviews when dialog opens
   useEffect(() => {
-    if (reviewDialogOpen && selectedCustomer?.id && typeof refetchReviews === "function") {
-      refetchReviews().catch(() => {
-        // swallow; UI shows loading / no reviews
-      });
+    if (reviewDialogOpen && selectedCustomer?.id && refetchReviews) {
+      refetchReviews().catch(() => {});
     }
   }, [reviewDialogOpen, selectedCustomer?.id, refetchReviews]);
 
-  const handleOpenReviews = (customer: any) => {
+  const handleOpenReviews = (customer: Customer) => {
     setSelectedCustomer(customer);
     setReviewDialogOpen(true);
-    // don't call refetchReviews here — useEffect will call it when dialog opens
   };
 
-  // action: 'approve' | 'reject' | 'flag'
   const handleModeration = async (reviewId: string, action: "approve" | "reject" | "flag") => {
     try {
       await moderateReview({ reviewId, data: { action } }).unwrap();
       toast.success(`Review ${action}d successfully.`);
-      if (typeof refetchReviews === "function") {
-        await refetchReviews();
-      }
+      if (refetchReviews) await refetchReviews();
     } catch (err) {
       console.error(err);
       toast.error("Failed to moderate review");
@@ -127,12 +121,13 @@ export default function CustomerReviewManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Customers Table */}
       <Card>
         <CardHeader>
           <div>
             <CardTitle>Customer Reviews</CardTitle>
             <CardDescription>
-              Manage customer feedback — approve, reject or flag suspicious reviews.
+              Manage customer feedback — approve, reject, or flag suspicious reviews.
             </CardDescription>
           </div>
         </CardHeader>
@@ -156,14 +151,14 @@ export default function CustomerReviewManagement() {
                       Loading customers...
                     </TableCell>
                   </TableRow>
-                ) : data?.data?.length === 0 ? (
+                ) : customers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-6">
                       No customers found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  data?.data?.map((customer: any) => {
+                  customers.map((customer) => {
                     const status = customer.isActive ? "ACTIVE" : "SUSPENDED";
                     return (
                       <TableRow key={customer.id}>
@@ -214,7 +209,7 @@ export default function CustomerReviewManagement() {
       </Card>
 
       {/* Reviews Dialog */}
-      <Dialog open={reviewDialogOpen} onOpenChange={(open) => setReviewDialogOpen(open)}>
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Reviews for {selectedCustomer?.name ?? "Customer"}</DialogTitle>
@@ -229,13 +224,16 @@ export default function CustomerReviewManagement() {
               Loading reviews...
             </div>
           ) : reviewsList.length === 0 ? (
-            <div className="py-6 text-center text-muted-foreground">No reviews found for this customer.</div>
+            <div className="py-6 text-center text-muted-foreground">
+              No reviews found for this customer.
+            </div>
           ) : (
             <div className="space-y-4 max-h-[60vh] overflow-y-auto py-2">
-              {reviewsList.map((review: any) => {
+              {reviewsList.map((review) => {
                 const reviewerName =
                   review.user?.name ?? review.customerName ?? review.authorName ?? "Anonymous";
                 const rating = review.rating ?? review.stars ?? "-";
+
                 return (
                   <Card key={review.id} className="border">
                     <CardHeader className="flex items-start justify-between">

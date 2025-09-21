@@ -17,6 +17,7 @@ import {
   ProductSpecificationInput,
   ProductVariantInput,
 } from "@/types/product";
+// Remove the duplicate import from ShippingWarrantyForm
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import ProductDescriptionEditor from "@/components/productdescription/ProductDescriptionl";
@@ -95,7 +96,6 @@ export default function AddProductForm() {
     }));
   };
 
-  console.log(description, "description in form");
   // Convert uploaded image URLs to ProductImageInput[]
   const convertImages = (): ProductImageInput[] =>
     images.map((url, index) => ({
@@ -103,8 +103,10 @@ export default function AddProductForm() {
       altText: `${name} image ${index + 1}`,
       sortOrder: index,
     }));
+
   const { user } = useSelector((state: RootState) => state.auth);
   const vendorId = user?.vendorId;
+
   // Handle submit
   const handleSubmit = async () => {
     if (!name || !categoryId || !isLeafCategory) {
@@ -121,9 +123,17 @@ export default function AddProductForm() {
       specifications: specInputs,
       variants: variantInputs.map((v) => ({
         ...v,
-        images: v.images?.map((img) =>
-          typeof img === "string" ? img : img.url
-        ), // ensure string
+        // Fix: Ensure proper type handling for variant images
+        images: v.images?.map((img) => {
+          if (typeof img === "string") {
+            return img;
+          }
+          // If img is an object with url property
+          if (img && typeof img === "object" && "url" in img) {
+            return (img as { url: string }).url;
+          }
+          return img;
+        }),
       })),
       attributeSettings,
       shippingWarranty: shippingWarranty || undefined,
@@ -154,7 +164,7 @@ export default function AddProductForm() {
   };
 
   return (
-    <Card className="w-full  mx-auto shadow-none border-none md:p-6">
+    <Card className="w-full mx-auto shadow-none border-none md:p-6">
       <CardHeader>
         <CardTitle>Add New Product</CardTitle>
       </CardHeader>
@@ -207,6 +217,7 @@ export default function AddProductForm() {
             </p>
           </div>
         )}
+        
         <div>
           <label className="block font-medium mb-2">Description</label>
           <ProductDescriptionEditor
@@ -214,8 +225,8 @@ export default function AddProductForm() {
             onChange={setDescription}
           />
         </div>
+        
         <ShippingWarrantyForm value={shippingWarranty} onChange={setShippingWarranty} />
-
 
         <div className="flex gap-4">
           <Button

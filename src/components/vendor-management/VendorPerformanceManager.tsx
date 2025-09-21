@@ -20,7 +20,7 @@ export default function VendorPerformanceManager({
   onBackToList 
 }: VendorPerformanceManagerProps) {
   const { data: vendorResp, isLoading, error, refetch } = useGetVendorByIdQuery(vendorId);
-const vendor = vendorResp?.data;
+const vendor = vendorResp;
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -63,7 +63,7 @@ const vendor = vendorResp?.data;
             </Avatar>
             <div>
               <h1 className="text-3xl font-bold">{vendor.storeName}</h1>
-              <Badge variant={vendor.status === 'APPROVED' || vendor.status === 'ACTIVE' ? 'default' : 'secondary'}>
+              <Badge variant={ vendor.status === 'ACTIVE' ? 'default' : 'secondary'}>
                 {vendor.status}
               </Badge>
             </div>

@@ -39,8 +39,8 @@ const commissionFormSchema = z.object({
     message: 'Commission rate must be between 0 and 100.',
   }),
   note: z.string().optional(),
-  effectiveFrom: z.date({
-    required_error: 'Effective from date is required.',
+  effectiveFrom: z.date().refine((date) => date instanceof Date && !isNaN(date.getTime()), {
+    message: "Effective from date is required.",
   }),
   effectiveTo: z.date().optional(),
 });
@@ -56,9 +56,7 @@ const payoutFormSchema = z.object({
     message: 'Period is required.',
   }),
   note: z.string().optional(),
-  effectiveDate: z.date({
-    required_error: 'Payout date is required.',
-  }),
+  effectiveDate: z.date(), 
 });
 
 interface VendorPayoutCommissionManagerProps {
@@ -79,10 +77,10 @@ export default function VendorPayoutCommissionManager({
   const { data: payoutSummaryResp } = useGetPayoutSummaryQuery(vendorId);
 
   // unwrap responses
-  const vendor = vendorResp?.data;
-  const commissionHistory = commissionHistoryResp?.data || [];
-  const payouts = payoutsResp?.data || [];
-  const payoutSummary = payoutSummaryResp?.data;
+  const vendor = vendorResp;
+  const commissionHistory = commissionHistoryResp || [];
+  const payouts = payoutsResp || [];
+  const payoutSummary = payoutSummaryResp;
 
   // Mutations
   const [setCommissionRate] = useSetCommissionRateMutation();
@@ -117,57 +115,58 @@ export default function VendorPayoutCommissionManager({
   }, [vendor, commissionForm]);
 
   // Handlers
-  const onCommissionUpdate = async (values: z.infer<typeof commissionFormSchema>) => {
-    try {
-      await setCommissionRate({
-        vendorId,
-        data: {
-          rate: values.rate,
-          note: values.note,
-          effectiveFrom: values.effectiveFrom.toISOString(),
-          effectiveTo: values.effectiveTo?.toISOString(),
-        },
-      }).unwrap();
-
-      toast.success('Commission rate has been updated successfully.');
-      commissionForm.reset({
+ const onCommissionUpdate = async (values: z.infer<typeof commissionFormSchema>) => {
+  try {
+    await setCommissionRate({
+      vendorId,
+      data: {
         rate: values.rate,
-        note: '',
-        effectiveFrom: new Date(),
-        effectiveTo: undefined,
-      });
-      refetch();
-    } catch {
-      toast.error('Failed to update commission rate.');
-    }
-  };
+        note: values.note,
+        effectiveFrom: values.effectiveFrom.toISOString(),
+        effectiveTo: values.effectiveTo?.toISOString(),
+      },
+    }).unwrap();
 
-  const onPayoutCreate = async (values: z.infer<typeof payoutFormSchema>) => {
-    try {
-      await createPayout({
-        vendorId,
-        data: {
-          amount: values.amount,
-          method: values.method,
-          period: values.period,
-          note: values.note,
-          paidAt: values.effectiveDate.toISOString(),
-        },
-      }).unwrap();
+    toast.success('Commission rate has been updated successfully.');
+    commissionForm.reset({
+      rate: values.rate,
+      note: '',
+      effectiveFrom: new Date(),
+      effectiveTo: undefined,
+    });
+    refetch();
+  } catch {
+    toast.error('Failed to update commission rate.');
+  }
+};
 
-      toast.success('Payout has been created successfully.');
-      payoutForm.reset({
-        amount: 0,
-        method: '',
-        period: '',
-        note: '',
-        effectiveDate: new Date(),
-      });
-      refetch();
-    } catch {
-      toast.error('Failed to create payout.');
-    }
-  };
+
+ const onPayoutCreate = async (values: z.infer<typeof payoutFormSchema>) => {
+  try {
+    await createPayout({
+      vendorId,
+      data: {
+        amount: values.amount,
+        method: values.method,
+        period: values.period,
+        note: values.note,
+        paidAt: values.effectiveDate.toISOString(), // This is now properly typed
+      },
+    }).unwrap();
+
+    toast.success('Payout has been created successfully.');
+    payoutForm.reset({
+      amount: 0,
+      method: '',
+      period: '',
+      note: '',
+      effectiveDate: new Date(),
+    });
+    refetch();
+  } catch {
+    toast.error('Failed to create payout.');
+  }
+};
 
   // ========================
   // Render
@@ -221,7 +220,7 @@ export default function VendorPayoutCommissionManager({
               <h1 className="text-3xl font-bold">{vendor.storeName}</h1>
               <Badge
                 variant={
-                  vendor.status === 'APPROVED' || vendor.status === 'ACTIVE'
+                 vendor.status === 'ACTIVE'
                     ? 'default'
                     : 'secondary'
                 }

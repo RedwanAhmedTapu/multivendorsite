@@ -6,7 +6,6 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
 import { useCreateConversationMutation } from '@/features/chatApi';
 import { ChatList } from './ChatList';
-import { ChatBox } from './ChatBox';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import ChatBox from './ChatBox';
 
 export const ChatInterface: React.FC = () => {
   const [selectedConversation, setSelectedConversation] = useState<any>(null);

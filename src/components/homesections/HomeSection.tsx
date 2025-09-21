@@ -37,7 +37,7 @@ const HeroSlider = () => {
 
   return (
     <div className="w-full bg-gray-50">
-      <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-[90%] mx-auto md:px-4 sm:px-6 py-4">
+      <div className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto md:px-4 sm:px-6 py-4">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Left Section - Hero Slider */}
           <div
@@ -58,7 +58,7 @@ const HeroSlider = () => {
               >
                 <Image
                   src={`http://localhost:5000/${slide.imageUrl}`}
-                  alt={slide.title}
+                  alt={slide.title || "image"}
                   fill
                   style={{ objectFit: "cover" }}
                   priority={index === 0} // first slide loads immediately

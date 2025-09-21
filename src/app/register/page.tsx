@@ -364,7 +364,9 @@ export default function CustomerSignupPage() {
                     {otp.map((digit, idx) => (
                       <input
                         key={idx}
-                        ref={(el) => (otpRefs.current[idx] = el)}
+                        ref={(el) => {
+                          otpRefs.current[idx] = el;
+                        }}
                         type="text"
                         value={digit}
                         maxLength={1}

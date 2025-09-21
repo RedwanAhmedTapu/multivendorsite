@@ -1,22 +1,22 @@
 // components/vendor-management/VendorProfileManager.tsx
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { format } from 'date-fns';
-import { CalendarIcon, ArrowLeft } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { format } from "date-fns";
+import { CalendarIcon, ArrowLeft } from "lucide-react";
 
 // Shadcn/ui components
-import { Button } from '@/components/ui/button';
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -25,17 +25,17 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -43,16 +43,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Calendar } from '@/components/ui/calendar';
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
+} from "@/components/ui/popover";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // API hooks
 import {
@@ -64,34 +64,33 @@ import {
   useGetVendorPayoutsQuery,
   useGetPayoutSummaryQuery,
   useUpdateVendorStatusMutation,
-} from '@/features/vendorManageApi';
+} from "@/features/vendorManageApi";
+import { toast } from "sonner";
 
 // Form schemas
 const profileFormSchema = z.object({
   storeName: z.string().min(2, {
-    message: 'Store name must be at least 2 characters.',
+    message: "Store name must be at least 2 characters.",
   }),
-  avatar: z.string().url().optional().or(z.literal('')),
+  avatar: z.string().url().optional().or(z.literal("")),
 });
 
 const commissionFormSchema = z.object({
-  rate: z.number().min(0).max(100, {
-    message: 'Commission rate must be between 0 and 100.',
-  }),
+  rate: z.number(),
   note: z.string().optional(),
-  effectiveFrom: z.date().optional(),
-  effectiveTo: z.date().optional(),
+  effectiveFrom: z.string().datetime().optional(),
+  effectiveTo: z.string().datetime().optional(),
 });
 
 const payoutFormSchema = z.object({
   amount: z.number().min(0, {
-    message: 'Amount must be positive.',
+    message: "Amount must be positive.",
   }),
   method: z.string().min(1, {
-    message: 'Payment method is required.',
+    message: "Payment method is required.",
   }),
   period: z.string().min(1, {
-    message: 'Period is required.',
+    message: "Period is required.",
   }),
   note: z.string().optional(),
 });
@@ -101,14 +100,19 @@ interface VendorProfileManagerProps {
   onBackToList: () => void;
 }
 
-export default function VendorProfileManager({ 
-  vendorId, 
-  onBackToList 
+export default function VendorProfileManager({
+  vendorId,
+  onBackToList,
 }: VendorProfileManagerProps) {
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState("profile");
 
   // API queries
-  const { data: vendor, isLoading, error, refetch } = useGetVendorByIdQuery(vendorId);
+  const {
+    data: vendor,
+    isLoading,
+    error,
+    refetch,
+  } = useGetVendorByIdQuery(vendorId);
   const { data: commissionHistory } = useGetCommissionHistoryQuery(vendorId);
   const { data: payouts } = useGetVendorPayoutsQuery(vendorId);
   const { data: payoutSummary } = useGetPayoutSummaryQuery(vendorId);
@@ -123,8 +127,8 @@ export default function VendorProfileManager({
   const profileForm = useForm<z.infer<typeof profileFormSchema>>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
-      storeName: '',
-      avatar: '',
+      storeName: "",
+      avatar: "",
     },
   });
 
@@ -133,7 +137,7 @@ export default function VendorProfileManager({
     resolver: zodResolver(commissionFormSchema),
     defaultValues: {
       rate: 0,
-      note: '',
+      note: "",
     },
   });
 
@@ -142,9 +146,9 @@ export default function VendorProfileManager({
     resolver: zodResolver(payoutFormSchema),
     defaultValues: {
       amount: 0,
-      method: '',
-      period: '',
-      note: '',
+      method: "",
+      period: "",
+      note: "",
     },
   });
 
@@ -153,11 +157,11 @@ export default function VendorProfileManager({
     if (vendor) {
       profileForm.reset({
         storeName: vendor.storeName,
-        avatar: vendor.avatar || '',
+        avatar: vendor.avatar || "",
       });
-      
+
       if (vendor.currentCommissionRate) {
-        commissionForm.setValue('rate', vendor.currentCommissionRate);
+        commissionForm.setValue("rate", vendor.currentCommissionRate);
       }
     }
   }, [vendor, profileForm, commissionForm]);
@@ -169,27 +173,29 @@ export default function VendorProfileManager({
         id: vendorId,
         data: values,
       }).unwrap();
-      
-      toast.success('Vendor profile has been updated successfully.');
+
+      toast.success("Vendor profile has been updated successfully.");
       refetch();
     } catch (error) {
-      toast.error('Failed to update vendor profile.');
+      toast.error("Failed to update vendor profile.");
     }
   };
 
   // Handle commission rate update
-  const onCommissionUpdate = async (values: z.infer<typeof commissionFormSchema>) => {
+  const onCommissionUpdate = async (
+    values: z.infer<typeof commissionFormSchema>
+  ) => {
     try {
       await setCommissionRate({
         vendorId,
         data: values,
       }).unwrap();
-      
-      toast.success('Commission rate has been updated successfully.');
+
+      toast.success("Commission rate has been updated successfully.");
       commissionForm.reset();
       refetch();
     } catch (error) {
-      toast.error('Failed to update commission rate.');
+      toast.error("Failed to update commission rate.");
     }
   };
 
@@ -200,11 +206,11 @@ export default function VendorProfileManager({
         vendorId,
         data: values,
       }).unwrap();
-      
-      toast.success('Payout has been created successfully.');
+
+      toast.success("Payout has been created successfully.");
       payoutForm.reset();
     } catch (error) {
-      toast.error('Failed to create payout.');
+      toast.error("Failed to create payout.");
     }
   };
 
@@ -215,7 +221,7 @@ export default function VendorProfileManager({
       toast.success(`Vendor status updated to ${newStatus.toLowerCase()}`);
       refetch();
     } catch (error) {
-      toast.error('Failed to update vendor status');
+      toast.error("Failed to update vendor status");
     }
   };
 
@@ -258,11 +264,10 @@ export default function VendorProfileManager({
 
   // Status badge color mapping
   const statusVariant = {
-    PENDING: 'secondary',
-    APPROVED: 'default',
-    ACTIVE: 'default',
-    SUSPENDED: 'destructive',
-    DEACTIVATED: 'outline',
+    PENDING: "secondary",
+    ACTIVE: "default",
+    SUSPENDED: "destructive",
+    DEACTIVATED: "outline",
   } as const;
 
   return (
@@ -297,15 +302,19 @@ export default function VendorProfileManager({
         </div>
         <div className="text-right">
           <p className="text-sm text-muted-foreground">Joined</p>
-         <p className="font-medium">
-  {vendor?.createdAt
-    ? format(new Date(vendor.createdAt), "PP")
-    : "N/A"}
-</p>
+          <p className="font-medium">
+            {vendor?.createdAt
+              ? format(new Date(vendor.createdAt), "PP")
+              : "N/A"}
+          </p>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="commission">Commission</TabsTrigger>
@@ -386,28 +395,30 @@ export default function VendorProfileManager({
                   <div>
                     <p className="text-sm font-medium">Email</p>
                     <p className="text-sm text-muted-foreground">
-                      {vendor.user.email || 'Not provided'}
+                      {vendor.user.email || "Not provided"}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm font-medium">Phone</p>
                     <p className="text-sm text-muted-foreground">
-                      {vendor.user.phone || 'Not provided'}
+                      {vendor.user.phone || "Not provided"}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm font-medium">Status</p>
                     <div className="flex items-center">
                       <Badge
-                        variant={vendor.user.isActive ? 'default' : 'destructive'}
+                        variant={
+                          vendor.user.isActive ? "default" : "destructive"
+                        }
                       >
-                        {vendor.user.isActive ? 'Active' : 'Inactive'}
+                        {vendor.user.isActive ? "Active" : "Inactive"}
                       </Badge>
                       <Badge
-                        variant={vendor.user.isVerified ? 'default' : 'outline'}
+                        variant={vendor.user.isVerified ? "default" : "outline"}
                         className="ml-2"
                       >
-                        {vendor.user.isVerified ? 'Verified' : 'Unverified'}
+                        {vendor.user.isVerified ? "Verified" : "Unverified"}
                       </Badge>
                     </div>
                   </div>
@@ -426,7 +437,7 @@ export default function VendorProfileManager({
                 <CardDescription>
                   {vendor.currentCommissionRate !== undefined
                     ? `Current rate: ${vendor.currentCommissionRate}%`
-                    : 'No commission rate set'}
+                    : "No commission rate set"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -489,7 +500,7 @@ export default function VendorProfileManager({
                                     className="pl-3 text-left font-normal"
                                   >
                                     {field.value ? (
-                                      format(field.value, 'PPP')
+                                      format(field.value, "PPP")
                                     ) : (
                                       <span>Pick a date</span>
                                     )}
@@ -497,15 +508,24 @@ export default function VendorProfileManager({
                                   </Button>
                                 </FormControl>
                               </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
+                              <PopoverContent
+                                className="w-auto p-0"
+                                align="start"
+                              >
                                 <Calendar
                                   mode="single"
-                                  selected={field.value}
-                                  onSelect={field.onChange}
+                                  selected={
+                                    field.value
+                                      ? new Date(field.value)
+                                      : undefined
+                                  } // <-- convert here
+                                  onSelect={(date) =>
+                                    field.onChange(date?.toISOString())
+                                  } // <-- store as string in form
                                   disabled={(date) =>
-                                    date < new Date() || date < new Date('1900-01-01')
+                                    date < new Date() ||
+                                    date < new Date("1900-01-01")
                                   }
-                                  initialFocus
                                 />
                               </PopoverContent>
                             </Popover>
@@ -527,7 +547,7 @@ export default function VendorProfileManager({
                                     className="pl-3 text-left font-normal"
                                   >
                                     {field.value ? (
-                                      format(field.value, 'PPP')
+                                      format(field.value, "PPP")
                                     ) : (
                                       <span>Pick a date</span>
                                     )}
@@ -535,13 +555,23 @@ export default function VendorProfileManager({
                                   </Button>
                                 </FormControl>
                               </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
+                              <PopoverContent
+                                className="w-auto p-0"
+                                align="start"
+                              >
                                 <Calendar
                                   mode="single"
-                                  selected={field.value}
-                                  onSelect={field.onChange}
+                                  selected={
+                                    field.value
+                                      ? new Date(field.value)
+                                      : undefined
+                                  } // convert string to Date
+                                  onSelect={(date) =>
+                                    field.onChange(date?.toISOString())
+                                  } // convert Date back to string
                                   disabled={(date) =>
-                                    date < new Date() || date < new Date('1900-01-01')
+                                    date < new Date() ||
+                                    date < new Date("1900-01-01")
                                   }
                                   initialFocus
                                 />
@@ -582,12 +612,12 @@ export default function VendorProfileManager({
                             {commission.rate}%
                           </TableCell>
                           <TableCell>
-                            {format(new Date(commission.effectiveFrom), 'PP')}
+                            {format(new Date(commission.effectiveFrom), "PP")}
                           </TableCell>
                           <TableCell>
                             {commission.effectiveTo
-                              ? format(new Date(commission.effectiveTo), 'PP')
-                              : 'Ongoing'}
+                              ? format(new Date(commission.effectiveTo), "PP")
+                              : "Ongoing"}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -755,9 +785,9 @@ export default function VendorProfileManager({
                           {payoutSummary?.lastPayoutDate
                             ? format(
                                 new Date(payoutSummary.lastPayoutDate),
-                                'PP'
+                                "PP"
                               )
-                            : 'Never'}
+                            : "Never"}
                         </p>
                       </div>
                     </div>
@@ -791,18 +821,18 @@ export default function VendorProfileManager({
                             <TableCell>
                               <Badge
                                 variant={
-                                  payout.status === 'PAID'
-                                    ? 'default'
-                                    : payout.status === 'PENDING'
-                                    ? 'secondary'
-                                    : 'destructive'
+                                  payout.status === "PAID"
+                                    ? "default"
+                                    : payout.status === "PENDING"
+                                    ? "secondary"
+                                    : "destructive"
                                 }
                               >
                                 {payout?.status}
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              {format(new Date(payout.createdAt), 'PP')}
+                              {format(new Date(payout.createdAt), "PP")}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -882,7 +912,9 @@ export default function VendorProfileManager({
               <CardContent>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="text-center">
-                    <p className="text-2xl font-bold">{vendor._count.products}</p>
+                    <p className="text-2xl font-bold">
+                      {vendor._count.products}
+                    </p>
                     <p className="text-sm text-muted-foreground">Products</p>
                   </div>
                   <div className="text-center">
@@ -910,35 +942,35 @@ export default function VendorProfileManager({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {vendor.status !== 'APPROVED' && (
+                {vendor.status !== "ACTIVE" && (
                   <Button
-                    onClick={() => handleStatusChange('APPROVED')}
+                    onClick={() => handleStatusChange("ACTIVE")}
                     variant="outline"
                   >
                     Approve Vendor
                   </Button>
                 )}
-                {vendor.status !== 'SUSPENDED' && (
+                {vendor.status !== "SUSPENDED" && (
                   <Button
-                    onClick={() => handleStatusChange('SUSPENDED')}
+                    onClick={() => handleStatusChange("SUSPENDED")}
                     variant="outline"
                     className="border-yellow-500 text-yellow-600 hover:bg-yellow-50"
                   >
                     Suspend Vendor
                   </Button>
                 )}
-                {vendor.status !== 'DEACTIVATED' && (
+                {vendor.status !== "DEACTIVATED" && (
                   <Button
-                    onClick={() => handleStatusChange('DEACTIVATED')}
+                    onClick={() => handleStatusChange("DEACTIVATED")}
                     variant="outline"
                     className="border-red-500 text-red-600 hover:bg-red-50"
                   >
                     Deactivate Vendor
                   </Button>
                 )}
-                {vendor.status !== 'ACTIVE' && (
+                {vendor.status !== "ACTIVE" && (
                   <Button
-                    onClick={() => handleStatusChange('ACTIVE')}
+                    onClick={() => handleStatusChange("ACTIVE")}
                     variant="outline"
                     className="border-green-500 text-green-600 hover:bg-green-50"
                   >

@@ -111,15 +111,16 @@ export interface ProductAttributeSettingInput {
   isVariant?: boolean;
 }
 export interface ProductShippingWarrantyInput {
-  packageWeight: number;            // in kg
-  packageLength: number;            // in cm
-  packageWidth: number;             // in cm
-  packageHeight: number;            // in cm
-  dangerousGoods: "none" | "contains"; // dangerous goods info
-  warrantyType: string;             // manufacturer, seller, none
-  warrantyPeriodValue: number;      // numeric value
-  warrantyPeriodUnit: "days" | "months" | "years"; // unit
-  warrantyDetails: string;          // warranty description
+  packageWeightValue: number;
+  packageWeightUnit: "kg" | "g";
+  packageLength: number;
+  packageWidth: number;
+  packageHeight: number;
+  dangerousGoods: "none" | "contains";
+  warrantyType: string;
+  warrantyPeriodValue: number;
+  warrantyPeriodUnit: "days" | "months" | "years";
+  warrantyDetails: string;
 }
 
 export interface CreateProductData {
@@ -127,7 +128,7 @@ export interface CreateProductData {
   description?: string;
   categoryId: string;
   vendorId: string;
-  images: ProductImageInput[];
+  images: (string | { url: string; altText?: string })[];
   specifications: ProductSpecificationInput[];
   variants: ProductVariantInput[];
   attributeSettings: ProductAttributeSettingInput[];

@@ -10,7 +10,7 @@ export interface Vendor {
   id: string;
   storeName: string;
   avatar?: string;
-  status: 'PENDING' | 'APPROVED' | 'SUSPENDED' | 'DEACTIVATED';
+  status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
   currentCommissionRate?: number;
   createdAt: string;
   updatedAt: string;
@@ -31,6 +31,8 @@ export interface Vendor {
     products: number;
     orders: number;
     flags: number;
+    monthlyCharges?: number;
+    offers?:[]
   };
 }
 
@@ -81,6 +83,7 @@ export interface VendorPayoutRequest {
   method: string;
   period: string;
   note?: string;
+  paidAt?: string; 
 }
 
 export interface VendorMonthlyChargeRequest {
@@ -99,7 +102,7 @@ export interface VendorOfferRequest {
 
 export interface VendorFlagRequest {
   reason: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   meta?: any;
 }
 
@@ -113,7 +116,7 @@ export interface VendorFilterQuery {
   page?: number;
   limit?: number;
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
 }
 
 export interface VendorPerformanceMetrics {
@@ -177,6 +180,32 @@ export interface VendorPaginationResponse {
     pages: number;
   };
 }
+export interface VendorCharge {
+  id: string;
+  amount: number;
+  description?: string;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  createdAt: string;
+}
+export interface PayoutRecord {
+  id: string;
+  amount: number;
+  method: string;
+  status: "PENDING" | "PAID" | "FAILED" | "CANCELLED";
+  note?: string;
+  createdAt: string;
+  paidAt?: string;
+  period: string;
+}
+export interface CommissionHistory {
+  id: string;
+  rate: number;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  note?: string;
+  createdAt: string;
+}
 
 // ================================
 // VENDOR MANAGEMENT API
@@ -185,7 +214,15 @@ export interface VendorPaginationResponse {
 export const vendorManageApi = createApi({
   reducerPath: "vendorManageApi",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Vendor", "VendorCommission", "VendorPayout", "VendorCharge", "VendorOffer", "VendorFlag", "VendorPerformance"],
+  tagTypes: [
+    "Vendor",
+    "VendorCommission",
+    "VendorPayout",
+    "VendorCharge",
+    "VendorOffer",
+    "VendorFlag",
+    "VendorPerformance",
+  ],
   endpoints: (builder) => ({
     // ================================
     // VENDOR CRUD OPERATIONS
@@ -218,7 +255,10 @@ export const vendorManageApi = createApi({
     }),
 
     // Update vendor profile
-    updateVendorProfile: builder.mutation<Vendor, { id: string; data: UpdateVendorProfileRequest }>({
+    updateVendorProfile: builder.mutation<
+      Vendor,
+      { id: string; data: UpdateVendorProfileRequest }
+    >({
       query: ({ id, data }) => ({
         url: `/vendormanagement/${id}/profile`,
         method: "PATCH",
@@ -228,7 +268,10 @@ export const vendorManageApi = createApi({
     }),
 
     // Update vendor status
-    updateVendorStatus: builder.mutation<Vendor, { id: string; status: string }>({
+    updateVendorStatus: builder.mutation<
+      Vendor,
+      { id: string; status: string }
+    >({
       query: ({ id, status }) => ({
         url: `/vendormanagement/${id}/${status.toLowerCase()}`,
         method: "PATCH",
@@ -250,7 +293,10 @@ export const vendorManageApi = createApi({
     // ================================
 
     // Set commission rate
-    setCommissionRate: builder.mutation<Vendor, { vendorId: string; data: VendorCommissionRequest }>({
+    setCommissionRate: builder.mutation<
+      Vendor,
+      { vendorId: string; data: VendorCommissionRequest }
+    >({
       query: ({ vendorId, data }) => ({
         url: `/vendormanagement/${vendorId}/commission`,
         method: "POST",
@@ -265,11 +311,16 @@ export const vendorManageApi = createApi({
     // Get commission history
     getCommissionHistory: builder.query<any[], string>({
       query: (vendorId) => `/vendormanagement/${vendorId}/commission/history`,
-      providesTags: (result, error, vendorId) => [{ type: "VendorCommission", id: vendorId }],
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorCommission", id: vendorId },
+      ],
     }),
 
     // Bulk update commissions
-    bulkUpdateCommissions: builder.mutation<{ updated: number }, BulkCommissionUpdateRequest>({
+    bulkUpdateCommissions: builder.mutation<
+      { updated: number },
+      BulkCommissionUpdateRequest
+    >({
       query: (data) => ({
         url: "/vendormanagement/bulk/commission",
         method: "POST",
@@ -283,7 +334,10 @@ export const vendorManageApi = createApi({
     // ================================
 
     // Create payout
-    createPayout: builder.mutation<any, { vendorId: string; data: VendorPayoutRequest }>({
+    createPayout: builder.mutation<
+      any,
+      { vendorId: string; data: VendorPayoutRequest }
+    >({
       query: ({ vendorId, data }) => ({
         url: `/vendormanagement/${vendorId}/payouts`,
         method: "POST",
@@ -296,7 +350,10 @@ export const vendorManageApi = createApi({
     }),
 
     // Update payout status
-    updatePayoutStatus: builder.mutation<any, { payoutId: string; status: string; paidAt?: string }>({
+    updatePayoutStatus: builder.mutation<
+      any,
+      { payoutId: string; status: string; paidAt?: string }
+    >({
       query: ({ payoutId, status, paidAt }) => ({
         url: `/vendormanagement/payouts/${payoutId}/status`,
         method: "PATCH",
@@ -308,13 +365,17 @@ export const vendorManageApi = createApi({
     // Get vendor payouts
     getVendorPayouts: builder.query<any[], string>({
       query: (vendorId) => `/vendormanagement/${vendorId}/payouts`,
-      providesTags: (result, error, vendorId) => [{ type: "VendorPayout", id: vendorId }],
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorPayout", id: vendorId },
+      ],
     }),
 
     // Get payout summary
     getPayoutSummary: builder.query<PayoutSummary, string>({
       query: (vendorId) => `/vendormanagement/${vendorId}/payouts/summary`,
-      providesTags: (result, error, vendorId) => [{ type: "VendorPayout", id: vendorId }],
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorPayout", id: vendorId },
+      ],
     }),
 
     // ================================
@@ -322,7 +383,10 @@ export const vendorManageApi = createApi({
     // ================================
 
     // Set monthly charge
-    setMonthlyCharge: builder.mutation<any, { vendorId: string; data: VendorMonthlyChargeRequest }>({
+    setMonthlyCharge: builder.mutation<
+      any,
+      { vendorId: string; data: VendorMonthlyChargeRequest }
+    >({
       query: ({ vendorId, data }) => ({
         url: `/vendormanagement/${vendorId}/charges`,
         method: "POST",
@@ -345,17 +409,21 @@ export const vendorManageApi = createApi({
     }),
 
     // Get vendor charges
-    getVendorCharges: builder.query<any[], string>({
+    getVendorCharges: builder.query<VendorCharge[], string>({
       query: (vendorId) => `/vendormanagement/${vendorId}/charges`,
-      providesTags: (result, error, vendorId) => [{ type: "VendorCharge", id: vendorId }],
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorCharge", id: vendorId },
+      ],
     }),
-
     // ================================
     // PROMOTIONAL OFFERS
     // ================================
 
     // Create offer
-    createOffer: builder.mutation<any, { vendorId: string; data: VendorOfferRequest }>({
+    createOffer: builder.mutation<
+      any,
+      { vendorId: string; data: VendorOfferRequest }
+    >({
       query: ({ vendorId, data }) => ({
         url: `/vendormanagement/${vendorId}/offers`,
         method: "POST",
@@ -370,11 +438,16 @@ export const vendorManageApi = createApi({
     // Get vendor offers
     getVendorOffers: builder.query<any[], string>({
       query: (vendorId) => `/vendormanagement/${vendorId}/offers`,
-      providesTags: (result, error, vendorId) => [{ type: "VendorOffer", id: vendorId }],
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorOffer", id: vendorId },
+      ],
     }),
 
     // Toggle offer status
-    toggleOfferStatus: builder.mutation<any, { offerId: string; isActive: boolean }>({
+    toggleOfferStatus: builder.mutation<
+      any,
+      { offerId: string; isActive: boolean }
+    >({
       query: ({ offerId, isActive }) => ({
         url: `/vendormanagement/offers/${offerId}/toggle`,
         method: "PATCH",
@@ -390,7 +463,9 @@ export const vendorManageApi = createApi({
     // Get vendor performance
     getVendorPerformance: builder.query<VendorPerformanceMetrics, string>({
       query: (vendorId) => `/vendormanagement/${vendorId}/performance`,
-      providesTags: (result, error, vendorId) => [{ type: "VendorPerformance", id: vendorId }],
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorPerformance", id: vendorId },
+      ],
     }),
 
     // Update vendor performance
@@ -399,7 +474,9 @@ export const vendorManageApi = createApi({
         url: `/vendormanagement/${vendorId}/performance/update`,
         method: "POST",
       }),
-      invalidatesTags: (result, error, vendorId) => [{ type: "VendorPerformance", id: vendorId }],
+      invalidatesTags: (result, error, vendorId) => [
+        { type: "VendorPerformance", id: vendorId },
+      ],
     }),
 
     // ================================
@@ -409,7 +486,9 @@ export const vendorManageApi = createApi({
     // Detect fraud
     detectFraud: builder.query<FraudDetectionResult, string>({
       query: (vendorId) => `/vendormanagement/${vendorId}/fraud-detection`,
-      providesTags: (result, error, vendorId) => [{ type: "Vendor", id: vendorId }],
+      providesTags: (result, error, vendorId) => [
+        { type: "Vendor", id: vendorId },
+      ],
     }),
 
     // ================================
@@ -417,7 +496,10 @@ export const vendorManageApi = createApi({
     // ================================
 
     // Flag vendor
-    flagVendor: builder.mutation<any, { vendorId: string; data: VendorFlagRequest }>({
+    flagVendor: builder.mutation<
+      any,
+      { vendorId: string; data: VendorFlagRequest }
+    >({
       query: ({ vendorId, data }) => ({
         url: `/vendormanagement/${vendorId}/flags`,
         method: "POST",
@@ -432,7 +514,9 @@ export const vendorManageApi = createApi({
     // Get vendor flags
     getVendorFlags: builder.query<any[], string>({
       query: (vendorId) => `/vendormanagement/${vendorId}/flags`,
-      providesTags: (result, error, vendorId) => [{ type: "VendorFlag", id: vendorId }],
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorFlag", id: vendorId },
+      ],
     }),
 
     // ================================
@@ -440,7 +524,10 @@ export const vendorManageApi = createApi({
     // ================================
 
     // Get vendor conversations
-    getVendorConversations: builder.query<any[], { vendorId?: string; userId?: string }>({
+    getVendorConversations: builder.query<
+      any[],
+      { vendorId?: string; userId?: string }
+    >({
       query: (params) => ({
         url: "/vendormanagement/conversations",
         method: "GET",
@@ -451,18 +538,26 @@ export const vendorManageApi = createApi({
 
     // Get conversation messages
     getConversationMessages: builder.query<any[], string>({
-      query: (conversationId) => `/vendormanagement/conversations/${conversationId}/messages`,
-      providesTags: (result, error, conversationId) => [{ type: "Vendor", id: conversationId }],
+      query: (conversationId) =>
+        `/vendormanagement/conversations/${conversationId}/messages`,
+      providesTags: (result, error, conversationId) => [
+        { type: "Vendor", id: conversationId },
+      ],
     }),
 
     // Send message
-    sendMessage: builder.mutation<any, { conversationId: string; content: string; metadata?: any }>({
+    sendMessage: builder.mutation<
+      any,
+      { conversationId: string; content: string; metadata?: any }
+    >({
       query: ({ conversationId, content, metadata }) => ({
         url: `/vendormanagement/conversations/${conversationId}/messages`,
         method: "POST",
         body: { content, metadata },
       }),
-      invalidatesTags: (result, error, { conversationId }) => [{ type: "Vendor", id: conversationId }],
+      invalidatesTags: (result, error, { conversationId }) => [
+        { type: "Vendor", id: conversationId },
+      ],
     }),
 
     // ================================

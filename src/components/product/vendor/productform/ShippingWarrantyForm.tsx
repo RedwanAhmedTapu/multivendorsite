@@ -4,19 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-
-export interface ProductShippingWarrantyInput {
-  packageWeightValue: number;            // numeric weight
-  packageWeightUnit: "kg" | "g";         // weight unit
-  packageLength: number;                  // in cm
-  packageWidth: number;                   // in cm
-  packageHeight: number;                  // in cm
-  dangerousGoods: "none" | "contains";   // dangerous goods info
-  warrantyType: string;                   // manufacturer, seller, none
-  warrantyPeriodValue: number;            // numeric value of warranty
-  warrantyPeriodUnit: "days" | "months" | "years"; // warranty unit
-  warrantyDetails: string;                // warranty description
-}
+import { ProductShippingWarrantyInput } from "@/types/product";
 
 interface Props {
   value: ProductShippingWarrantyInput | null;

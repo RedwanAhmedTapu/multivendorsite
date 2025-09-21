@@ -10,6 +10,7 @@ import {
   Instagram, 
   MessageCircle 
 } from 'lucide-react';
+import Link from 'next/link';
 
 const Footer: React.FC = () => {
   return (
@@ -77,7 +78,7 @@ const Footer: React.FC = () => {
           <div className="col-span-2 md:col-span-1">
             <div className="mb-4 md:mb-6">
               <h2 className="text-xl md:text-2xl font-bold text-gray-900">
-                Motta<span className="text-red-500">.</span><span className="text-blue-500">.</span><span className="text-yellow-500">.</span>
+                FinixMart<span className="text-red-500">.</span><span className="text-blue-500">.</span><span className="text-yellow-500">.</span>
               </h2>
             </div>
             <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">Best For Shopping</h3>
@@ -135,7 +136,14 @@ const Footer: React.FC = () => {
             <ul className="space-y-2 md:space-y-4">
               <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Track Order</a></li>
               <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Shipping & Delivery</a></li>
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Return & Exchange</a></li>
+              <li>
+                <Link 
+                  href="/terms-condition" 
+                  className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  Terms & Conditions
+                </Link>
+              </li>
               <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Price Match Guarantee</a></li>
             </ul>
           </div>
@@ -145,15 +153,24 @@ const Footer: React.FC = () => {
         <div className="flex flex-col lg:flex-row justify-between items-center pt-6 md:pt-8 border-t border-gray-200">
           {/* Legal Links */}
           <div className="flex flex-wrap justify-center lg:justify-start gap-4 md:gap-6 mb-4 lg:mb-0">
-            <a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">
+            <Link 
+              href="/terms-condition?type=PRIVACY_POLICY" 
+              className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
               Privacy Policy
-            </a>
-            <a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">
+            </Link>
+            <Link 
+              href="/terms-condition?type=GENERAL" 
+              className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
               Terms of Use
-            </a>
-            <a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">
+            </Link>
+            <Link 
+              href="/terms-condition" 
+              className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
               Legal
-            </a>
+            </Link>
             <a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">
               Site Map
             </a>

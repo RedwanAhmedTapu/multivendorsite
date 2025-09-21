@@ -1,7 +1,7 @@
 // components/vendor-management/VendorList.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   useGetVendorsQuery,
@@ -52,6 +52,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { MoreHorizontal, Search, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
+type VendorStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
+
 interface VendorListProps {
   onManageVendor: (vendorId: string) => void;
 }
@@ -61,7 +63,7 @@ export default function VendorList({ onManageVendor }: VendorListProps) {
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   const [filters, setFilters] = useState({
-    status: undefined as string | undefined,
+    status: undefined as VendorStatus | undefined,
     search: '',
     sortBy: 'createdAt',
     sortOrder: 'desc' as const,
@@ -75,10 +77,10 @@ export default function VendorList({ onManageVendor }: VendorListProps) {
 
   const [updateVendorStatus] = useUpdateVendorStatusMutation();
 
-  const handleStatusChange = async (vendorId: string, newStatus: string) => {
+  const handleStatusChange = async (vendorId: string, newStatus: VendorStatus) => {
     try {
       await updateVendorStatus({ id: vendorId, status: newStatus }).unwrap();
-      toast.success(`Vendor status updated to ${newStatus.toLowerCase()}`);
+      toast.success(`Vendor status updated to ${newStatus}`);
       refetch();
     } catch (error) {
       toast.error('Failed to update vendor status');
@@ -87,12 +89,11 @@ export default function VendorList({ onManageVendor }: VendorListProps) {
 
   const handleSearch = (value: string) => {
     setFilters({ ...filters, search: value });
-    setPage(1); // Reset to first page when searching
+    setPage(1);
   };
 
   const handleStatusFilter = (value: string) => {
-    // Use undefined instead of empty string for "all statuses"
-    const statusValue = value === 'all' ? undefined : value;
+    const statusValue = value === 'all' ? undefined : (value as VendorStatus);
     setFilters({ ...filters, status: statusValue });
     setPage(1);
   };
@@ -117,9 +118,7 @@ export default function VendorList({ onManageVendor }: VendorListProps) {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <CardTitle>Vendor Management</CardTitle>
-            <CardDescription>
-              Manage all vendors in the system
-            </CardDescription>
+            <CardDescription>Manage all vendors in the system</CardDescription>
           </div>
           <Button onClick={() => router.push('/vendors/new')}>
             <Plus className="h-4 w-4 mr-2" />
@@ -127,6 +126,7 @@ export default function VendorList({ onManageVendor }: VendorListProps) {
           </Button>
         </div>
       </CardHeader>
+
       <CardContent>
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1">
@@ -138,15 +138,14 @@ export default function VendorList({ onManageVendor }: VendorListProps) {
               onChange={(e) => handleSearch(e.target.value)}
             />
           </div>
+
           <Select onValueChange={handleStatusFilter}>
             <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
-              {/* Use 'all' instead of empty string */}
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="APPROVED">Approved</SelectItem>
               <SelectItem value="ACTIVE">Active</SelectItem>
               <SelectItem value="SUSPENDED">Suspended</SelectItem>
               <SelectItem value="DEACTIVATED">Deactivated</SelectItem>
@@ -167,37 +166,26 @@ export default function VendorList({ onManageVendor }: VendorListProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell>
-                      <Skeleton className="h-4 w-32" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-6 w-20" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-16" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-12" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-24" />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Skeleton className="h-8 w-24 ml-auto" />
+              {isLoading
+                ? Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                : data?.data.length === 0
+                ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center h-24">
+                      No vendors found.
                     </TableCell>
                   </TableRow>
-                ))
-              ) : data?.data.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center h-24">
-                    No vendors found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                data?.data.map((vendor) => (
+                )
+                : data?.data.map((vendor) => (
                   <TableRow key={vendor.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-3">
@@ -221,7 +209,7 @@ export default function VendorList({ onManageVendor }: VendorListProps) {
                     <TableCell>
                       <Badge
                         variant={
-                          vendor.status === 'APPROVED' || vendor.status === 'ACTIVE'
+                          vendor.status === 'ACTIVE'
                             ? 'default'
                             : vendor.status === 'PENDING'
                             ? 'secondary'
@@ -237,17 +225,10 @@ export default function VendorList({ onManageVendor }: VendorListProps) {
                         : 'N/A'}
                     </TableCell>
                     <TableCell>{vendor._count?.products || 0}</TableCell>
-                    <TableCell>
-                      {new Date(vendor.createdAt).toLocaleDateString()}
-                    </TableCell>
+                    <TableCell>{new Date(vendor.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => onManageVendor(vendor.id)}
-                        >
-                          Manage
-                        </Button>
+                        <Button size="sm" onClick={() => onManageVendor(vendor.id)}>Manage</Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm">
@@ -256,46 +237,23 @@ export default function VendorList({ onManageVendor }: VendorListProps) {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem
-                              onClick={() => onManageVendor(vendor.id)}
-                            >
-                              View Profile
-                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onManageVendor(vendor.id)}>View Profile</DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {vendor.status !== 'APPROVED' && (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleStatusChange(vendor.id, 'APPROVED')
-                                }
-                              >
-                                Approve
-                              </DropdownMenuItem>
+                            {vendor.status !== 'ACTIVE' && (
+                              <DropdownMenuItem onClick={() => handleStatusChange(vendor.id, 'ACTIVE')}>Activate</DropdownMenuItem>
                             )}
                             {vendor.status !== 'SUSPENDED' && (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleStatusChange(vendor.id, 'SUSPENDED')
-                                }
-                              >
-                                Suspend
-                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleStatusChange(vendor.id, 'SUSPENDED')}>Suspend</DropdownMenuItem>
                             )}
                             {vendor.status !== 'DEACTIVATED' && (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleStatusChange(vendor.id, 'DEACTIVATED')
-                                }
-                              >
-                                Deactivate
-                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleStatusChange(vendor.id, 'DEACTIVATED')}>Deactivate</DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
+                ))}
             </TableBody>
           </Table>
         </div>
@@ -306,34 +264,23 @@ export default function VendorList({ onManageVendor }: VendorListProps) {
               <PaginationItem>
                 <PaginationPrevious
                   onClick={() => setPage(Math.max(1, page - 1))}
-                  className={
-                    page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'
-                  }
+                  className={page === 1 ? 'pointer-events-none opacity-50' : ''}
                 />
               </PaginationItem>
-              {Array.from({ length: data.pagination.pages }, (_, i) => i + 1).map(
-                (pageNum) => (
-                  <PaginationItem key={pageNum}>
-                    <PaginationLink
-                      isActive={pageNum === page}
-                      onClick={() => setPage(pageNum)}
-                      className="cursor-pointer"
-                    >
-                      {pageNum}
-                    </PaginationLink>
-                  </PaginationItem>
-                )
-              )}
+              {Array.from({ length: data.pagination.pages }, (_, i) => i + 1).map((pageNum) => (
+                <PaginationItem key={pageNum}>
+                  <PaginationLink
+                    isActive={pageNum === page}
+                    onClick={() => setPage(pageNum)}
+                  >
+                    {pageNum}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
               <PaginationItem>
                 <PaginationNext
-                  onClick={() =>
-                    setPage(Math.min(data.pagination.pages, page + 1))
-                  }
-                  className={
-                    page === data.pagination.pages
-                      ? 'pointer-events-none opacity-50'
-                      : 'cursor-pointer'
-                  }
+                  onClick={() => setPage(Math.min(data.pagination.pages, page + 1))}
+                  className={page === data.pagination.pages ? 'pointer-events-none opacity-50' : ''}
                 />
               </PaginationItem>
             </PaginationContent>

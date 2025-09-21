@@ -123,7 +123,7 @@ export default function VendorPayoutCommission() {
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="APPROVED">Approved</SelectItem>
+              <SelectItem value="ACTIVE">ACTIVE</SelectItem>
               <SelectItem value="ACTIVE">Active</SelectItem>
             </SelectContent>
           </Select>
@@ -179,7 +179,7 @@ export default function VendorPayoutCommission() {
                     <TableCell>
                       <Badge
                         variant={
-                          vendor.status === 'APPROVED' || vendor.status === 'ACTIVE'
+                          vendor.status === 'ACTIVE' 
                             ? 'default'
                             : vendor.status === 'PENDING'
                             ? 'secondary'

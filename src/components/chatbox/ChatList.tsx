@@ -14,6 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 interface ChatListProps {
   onSelectConversation: (conversation: any) => void;
   onNewConversation: () => void;
+  selectedConversationId?: string;
 }
 
 export const ChatList: React.FC<ChatListProps> = ({
@@ -79,7 +80,7 @@ export const ChatList: React.FC<ChatListProps> = ({
                       {getParticipantName(participant)}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {conversation.lastMessage?.content || 'No messages yet'}
+                      {conversation.lastMessageAt || 'No messages yet'}
                     </p>
                   </div>
                   {conversation.unreadCount > 0 && (

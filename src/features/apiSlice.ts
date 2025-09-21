@@ -3,12 +3,23 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import {
   Category,
   AttributeValue,
-  CategoryAttribute,
   CategorySpecification,
   SpecificationOption,
 } from "../types/type";
 import baseQueryWithReauth from "./baseQueryWithReauth";
-
+import { Attribute } from "next-themes";
+ interface CategoryAttribute {
+  id: string;
+  categoryId: string;
+  category?: Category;
+  attributeId: string;
+  attribute?: Attribute;
+  isRequired: boolean;
+  isForVariant: boolean;
+  filterable: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 // API Slice Definition
 export const apiSlice = createApi({
   reducerPath: "api",
@@ -39,23 +50,22 @@ export const apiSlice = createApi({
       providesTags: (result, error, id) => [{ type: "Category", id }],
     }),
 
-    createCategory: builder.mutation<Category, { name: string; slug: string; parentId?: string }>({
-      query: (body) => ({
+    createCategory: builder.mutation<Category, FormData>({
+      query: (formData) => ({
         url: "/categories",
         method: "POST",
-        body,
+        body: formData,
       }),
       invalidatesTags: [{ type: "Category", id: "LIST" }],
     }),
 
-    updateCategory: builder.mutation<Category, { id: string; data: Partial<Category> }>({
-      query: ({ id, data }) => ({
-        url: `/categories/${id}`,
-        method: "PUT",
-        body: data,
-      }),
-      invalidatesTags: (result, error, { id }) => [{ type: "Category", id }],
-    }),
+   updateCategory: builder.mutation<Category, { id: string; formData: FormData }>({
+  query: ({ id, formData }) => ({
+    url: `/categories/${id}`,
+    method: "PUT",
+    body: formData,
+  }),
+}),
 
     deleteCategory: builder.mutation<{ message: string }, string>({
       query: (id) => ({
@@ -68,7 +78,10 @@ export const apiSlice = createApi({
       ],
     }),
 
-    bulkImportCategories: builder.mutation<{ success: boolean; message: string }, FormData>({
+    bulkImportCategories: builder.mutation<
+      { success: boolean; message: string },
+      FormData
+    >({
       query: (formData) => ({
         url: "/bulk-import-category",
         method: "POST",
@@ -130,7 +143,10 @@ export const apiSlice = createApi({
       invalidatesTags: (result, error, id) => [{ type: "Attribute", id }],
     }),
 
-    addAttributeValue: builder.mutation<AttributeValue, { attributeId: string; value: string }>({
+    addAttributeValue: builder.mutation<
+      AttributeValue,
+      { attributeId: string; value: string }
+    >({
       query: ({ attributeId, value }) => ({
         url: `/attributes/${attributeId}/values`,
         method: "POST",
@@ -190,7 +206,9 @@ export const apiSlice = createApi({
         method: "PUT",
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [{ type: "Specification", id }],
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Specification", id },
+      ],
     }),
 
     deleteSpecification: builder.mutation<{ message: string }, string>({

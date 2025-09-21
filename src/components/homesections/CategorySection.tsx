@@ -23,7 +23,7 @@ const categories: Category[] = [
 
 export default function CategorySection() {
   return (
-    <section className="max-w-6xl xl:max-w-7xl 2xl:max-w-[90%] mx-auto  px-4 sm:px-6  ">
+    <section className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto  px-4 sm:px-6  ">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl md:text-2xl font-bold">Shop by Category</h2>
         <Link

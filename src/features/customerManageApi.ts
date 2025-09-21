@@ -31,9 +31,8 @@ export interface Customer {
   };
 }
 
-export interface CustomerWithDetails extends Customer {
-  // extend if needed
-}
+// ✅ Changed from empty interface → type alias
+export type CustomerWithDetails = Customer;
 
 export interface CreateCustomerRequest {
   name: string;
