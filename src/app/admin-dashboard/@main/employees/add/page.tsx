@@ -134,7 +134,7 @@ export default function AddEmployeePage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/admin/employees">
+        <Link href="/admin-dashboard/employees">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Employees
@@ -366,7 +366,7 @@ export default function AddEmployeePage() {
 
           {/* Form Actions */}
           <div className="flex justify-end gap-4">
-            <Link href="/admin/employees">
+            <Link href="/admin-dashboard/employees">
               <Button type="button" variant="outline">
                 Cancel
               </Button>

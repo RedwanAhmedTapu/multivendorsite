@@ -105,23 +105,23 @@ function AdminLayout({ main }: AdminLayoutProps) {
         },
       ],
     },
-    {
-      title: "Delivery Management",
-      items: [
-        {
-          title: "Delivery Personnel",
-          href: "#",
-          icon: Truck,
-          subItems: [
-            { title: "All Delivery Men", href: "/admin/delivery/list", icon: Users },
-            { title: "Add Delivery Man", href: "/admin/delivery/add", icon: UserPlus },
-            { title: "Performance Tracking", href: "/admin/delivery/performance", icon: BarChart2 },
-            { title: "Payouts & Incentives", href: "/admin/delivery/payouts", icon: CreditCard },
-            { title: "Customer Ratings", href: "/admin/delivery/ratings", icon: Star },
-          ],
-        },
-      ],
-    },
+    // {
+    //   title: "Delivery Management",
+    //   items: [
+    //     {
+    //       title: "Delivery Personnel",
+    //       href: "#",
+    //       icon: Truck,
+    //       subItems: [
+    //         { title: "All Delivery Men", href: "/admin/delivery/list", icon: Users },
+    //         { title: "Add Delivery Man", href: "/admin/delivery/add", icon: UserPlus },
+    //         { title: "Performance Tracking", href: "/admin/delivery/performance", icon: BarChart2 },
+    //         { title: "Payouts & Incentives", href: "/admin/delivery/payouts", icon: CreditCard },
+    //         { title: "Customer Ratings", href: "/admin/delivery/ratings", icon: Star },
+    //       ],
+    //     },
+    //   ],
+    // },
     {
       title: "Order Management",
       items: [
@@ -149,7 +149,8 @@ function AdminLayout({ main }: AdminLayoutProps) {
             { title: "All Products", href: "/admin/products/list", icon: Database },
             { title: "Add Product", href: "/admin/products/add", icon: PlusCircle },
             { title: "Categories", href: "/admin-dashboard/category-manage", icon: Layers },
-            { title: "Brands", href: "/admin/brands/list", icon: Tag },
+            { title: "Bulk Categories", href: "/admin-dashboard/bulk-category-upload", icon: Layers },
+            // { title: "Brands", href: "/admin/brands/list", icon: Tag },
             { title: "Stock Status", href: "/admin/products/stock", icon: AlertTriangle },
           ],
         },
@@ -163,9 +164,9 @@ function AdminLayout({ main }: AdminLayoutProps) {
           href: "#",
           icon: MapPin,
           subItems: [
-            { title: "Methods", href: "/admin-dashboard/shippingapi", icon: Settings },
-            { title: "Coverage Areas", href: "/admin/shipping/areas", icon: MapPin },
-            { title: "Real-Time Tracking", href: "/admin/shipping/tracking", icon: Truck },
+            { title: "shippingprovider", href: "/admin-dashboard/shippingapi", icon: Settings },
+            // { title: "Coverage Areas", href: "/admin/shipping/areas", icon: MapPin },
+            // { title: "Real-Time Tracking", href: "/admin/shipping/tracking", icon: Truck },
           ],
         },
       ],
@@ -188,7 +189,7 @@ function AdminLayout({ main }: AdminLayoutProps) {
           icon: Tag,
           subItems: [
             { title: "All Offers", href: "/admin-dashboard/offer-manage", icon: Database },
-            { title: "Add Offer", href: "/admin/offers/add", icon: PlusCircle },
+            { title: "Add Offer", href: "/admin-dashboard/offer-manage/add-offer", icon: PlusCircle },
             { title: "Email & SMS Campaigns", href: "/admin/promotions/email-sms", icon: Mail },
             { title: "Ad Spaces", href: "/admin/promotions/ads", icon: Monitor },
           ],
@@ -215,11 +216,11 @@ function AdminLayout({ main }: AdminLayoutProps) {
     {
       title: "Settings",
       items: [
-        { title: "Business Settings", href: "/admin/settings/business", icon: Settings },
-        { title: "Payment Gateways", href: "/admin/settings/payments", icon: CreditCard },
+        // { title: "Business Settings", href: "/admin/settings/business", icon: Settings },
+        // { title: "Payment Gateways", href: "/admin/settings/payments", icon: CreditCard },
         { title: "Themes & Layouts", href: "/admin/settings/themes", icon: Layout },
         { title: "SEO & Marketing", href: "/admin/settings/seo-marketing", icon: BarChart2 },
-        { title: "Backup & Restore", href: "/admin/settings/backup", icon: Database },
+        // { title: "Backup & Restore", href: "/admin/settings/backup", icon: Database },
         { title: "Third-Party Integrations", href: "/admin/settings/integrations", icon: Settings },
         { title: "Terms & Conditions", href: "/admin-dashboard/settings/terms", icon: FileText },
       ],

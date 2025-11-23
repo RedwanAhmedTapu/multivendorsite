@@ -46,7 +46,7 @@ export default function AllEmployeesPage() {
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
-          <Link href="/admin/employees/add">
+          <Link href="/admin-dashboard/employees/add">
             <Button>
               <Plus className="w-4 h-4 mr-2" />
               Add Employee
