@@ -38,8 +38,6 @@ const ProductCard = ({ product }: { product: Product }) => {
   // Get first image or fallback
   const image = product.images?.[0];
 
-  const imageSrc = image?.url ? `https://api.finixmart.com.bd${image?.url}` : "/placeholder-product.jpg";
-  console.log(imageSrc);
   const altText = image?.altText || product.name;
 
   return (
@@ -59,7 +57,7 @@ const ProductCard = ({ product }: { product: Product }) => {
       <CardContent className="flex flex-col items-center p-0">
         <div className="relative w-full h-28 sm:h-20 mb-3 flex items-center justify-center">
           <Image
-            src={imageSrc}
+            src={image?.url || "/placeholder.png"}
             alt={altText}
             fill
             className="object-contain"

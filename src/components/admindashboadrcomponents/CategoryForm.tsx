@@ -23,25 +23,32 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
   onCancelEdit,
   selectedParentId,
 }) => {
-  const [newCategory, setNewCategory] = useState({ name: "", slug: "" });
+  const [formState, setFormState] = useState({ name: "", slug: "" });
   const [slugEdited, setSlugEdited] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
+  // ✅ Populate form when editing
   useEffect(() => {
-    if (!slugEdited && !editingCategory) {
-      setNewCategory(prev => ({
-        ...prev,
-        slug: prev.name.trim().toLowerCase().replace(/\s+/g, "-")
-      }));
-    }
-  }, [newCategory.name, slugEdited, editingCategory]);
-
-  useEffect(() => {
-    if (editingCategory?.image) {
-      setPreviewUrl(editingCategory.image);
+    if (editingCategory) {
+      setFormState({ name: editingCategory.name, slug: editingCategory.slug });
+      setPreviewUrl(editingCategory.image || null);
+    } else {
+      setFormState({ name: "", slug: "" });
+      setPreviewUrl(null);
+      setImageFile(null);
     }
   }, [editingCategory]);
+
+  // ✅ Auto-generate slug
+  useEffect(() => {
+    if (!slugEdited && !editingCategory) {
+      setFormState(prev => ({
+        ...prev,
+        slug: prev.name.trim().toLowerCase().replace(/\s+/g, "-"),
+      }));
+    }
+  }, [formState.name, slugEdited, editingCategory]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -53,19 +60,18 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
 
   const handleSubmit = () => {
     const formData = new FormData();
+    formData.append("name", formState.name);
+    formData.append("slug", formState.slug);
+
+    // ✅ Only append image if chosen
+    if (imageFile) formData.append("image", imageFile);
+
     if (editingCategory) {
-      formData.append("name", editingCategory.name);
-      formData.append("slug", editingCategory.slug);
-      if (imageFile) formData.append("image", imageFile);
       onUpdateCategory(editingCategory.id, formData);
     } else {
-      formData.append("name", newCategory.name);
-      formData.append("slug", newCategory.slug);
-      if (imageFile) formData.append("image", imageFile);
       if (selectedParentId) formData.append("parentId", selectedParentId);
       onCreateCategory(formData, selectedParentId || undefined);
-
-      setNewCategory({ name: "", slug: "" });
+      setFormState({ name: "", slug: "" });
       setSlugEdited(false);
       setImageFile(null);
       setPreviewUrl(null);
@@ -89,25 +95,17 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
           <Label>Category Name *</Label>
           <Input
             placeholder="Enter category name"
-            value={editingCategory ? editingCategory.name : newCategory.name}
-            onChange={(e) =>
-              editingCategory
-                ? (editingCategory.name = e.target.value)
-                : setNewCategory({ ...newCategory, name: e.target.value })
-            }
+            value={formState.name}
+            onChange={(e) => setFormState({ ...formState, name: e.target.value })}
           />
 
           <Label>Slug *</Label>
           <Input
             placeholder="Enter slug"
-            value={editingCategory ? editingCategory.slug : newCategory.slug}
+            value={formState.slug}
             onChange={(e) => {
-              if (editingCategory) {
-                editingCategory.slug = e.target.value;
-              } else {
-                setNewCategory({ ...newCategory, slug: e.target.value });
-                setSlugEdited(true);
-              }
+              setFormState({ ...formState, slug: e.target.value });
+              setSlugEdited(true);
             }}
           />
 
@@ -137,7 +135,7 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
               <Button
                 className="bg-teal-600 hover:bg-teal-700 flex-1"
                 onClick={handleSubmit}
-                disabled={!newCategory.name || !newCategory.slug}
+                disabled={!formState.name || !formState.slug}
               >
                 Add Category
               </Button>

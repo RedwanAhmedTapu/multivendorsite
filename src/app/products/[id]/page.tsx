@@ -20,6 +20,7 @@ import {
 import MoreInfoProduct from "@/components/product/moreinfoproduct/MoreInfoProduct";
 import { useGetProductByIdQuery } from "@/features/productApi";
 import { VendorChatButton } from "@/components/chatbox/VendorChatButton";
+import DeliveryLocation from "@/components/deleiverylocation/DeliveryLocation";
 
 // Custom image component with proper error handling
 const ProductImage = ({ src, alt, ...props }: any) => {
@@ -48,6 +49,43 @@ const ProductImage = ({ src, alt, ...props }: any) => {
   );
 };
 
+// Helper function to calculate product weight
+const calculateProductWeight = (product: any): number => {
+  if (product?.variants?.[0]?.weight) {
+    return product.variants[0].weight;
+  }
+  
+  // Default weights based on category
+  const defaultWeights: { [key: string]: number } = {
+    'electronics': 1000,
+    'clothing': 200,
+    'books': 300,
+    'home': 500,
+    'default': 500,
+  };
+  
+  return defaultWeights[product?.category?.toLowerCase()] || defaultWeights.default;
+};
+
+// Helper function to get product images
+const getProductImages = (product: any): string[] => {
+  const images: string[] = [];
+  
+  // Add main product images
+  product?.images?.forEach((img: any) => {
+    if (img.url) images.push(img.url);
+  });
+  
+  // Add variant images
+  product?.variants?.forEach((v: any) => {
+    v.images?.forEach((img: any) => {
+      if (img.url) images.push(img.url);
+    });
+  });
+  
+  return images.length > 0 ? images : ["/placeholder-product.jpg"];
+};
+
 const SingleProduct = () => {
   const params = useParams();
   const router = useRouter();
@@ -58,32 +96,29 @@ const SingleProduct = () => {
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const [deliveryCost, setDeliveryCost] = useState<number | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<{
+    city: any;
+    zone: any;
+    area: any;
+  } | null>(null);
 
-  const getProductImages = (product: any): string[] => {
-    const images: string[] = [];
-    
-    // Add main product images
-    product?.images?.forEach((img: any) => {
-      if (img.url) images.push(img.url);
-    });
-    
-    // Add variant images
-    product?.variants?.forEach((v: any) => {
-      v.images?.forEach((img: any) => {
-        if (img.url) images.push(img.url);
-      });
-    });
-    
-    return images.length > 0 ? images : ["/placeholder-product.jpg"];
-  };
-
+  const productWeight = product ? calculateProductWeight(product) : 500;
   const productImages = product ? getProductImages(product) : [];
 
   useEffect(() => {
     if (productImages.length > 0) {
       setSelectedImg(productImages[0]);
     }
-  }, [product]);
+  }, [product, productImages]);
+
+  const handleDeliveryCostCalculated = (cost: number | null) => {
+    setDeliveryCost(cost);
+  };
+
+  const handleLocationSelected = (location: any) => {
+    setSelectedLocation(location);
+  };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
@@ -216,11 +251,7 @@ const SingleProduct = () => {
                   {product.name}
                 </h2>
 
-                {/* Description */}
-                <p className="text-gray-600 text-sm">
-                  {product.description || "No description available"}
-                </p>
-
+               
                 {/* Ratings */}
                 <div className="flex items-center gap-2">
                   {[...Array(5)].map((_, i) => (
@@ -307,32 +338,21 @@ const SingleProduct = () => {
                 </div>
 
                
-                  <VendorChatButton
-                    vendorId={product.vendor.id}
-                    vendorName={product.vendor.storeName}
-                    vendorAvatar={product.vendor.avatar}
-                    productId={product.id}
-                    productName={product.name}
-                  />
               </div>
 
               {/* Right Column - Shipping & Seller Info */}
               <div className="space-y-5">
                 {/* Delivery Options */}
                 <div className="border rounded-lg p-4 space-y-3">
-                  <h3 className="font-semibold text-lg">Delivery Options</h3>
-                  <div className="flex items-start gap-2 text-sm text-gray-700">
-                    <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <div>
-                      <p>Dhaka, Faridpur, Engineering College</p>
-                      <button className="text-teal-700 text-xs underline mt-1">Change</button>
+                      <DeliveryLocation 
+                        productWeight={productWeight}
+                        onDeliveryCostCalculated={handleDeliveryCostCalculated}
+                        onLocationSelected={handleLocationSelected}
+                      />
+                     
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-700">
-                    <Truck className="w-4 h-4 flex-shrink-0" />
-                    <span>Standard Delivery ৳135 (2-3 days)</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-2">Cash on Delivery Available</p>
+                 
                 </div>
 
                 {/* Seller Information */}
@@ -346,10 +366,15 @@ const SingleProduct = () => {
                   </div>
                   <p className="text-sm text-gray-700">{product.vendor?.storeName || "Unknown Seller"}</p>
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" size="sm" className="flex items-center gap-1 text-xs">
-                      <MessageCircle className="w-4 h-4" />
-                      Chat
-                    </Button>
+                     {product.vendor && (
+                  <VendorChatButton
+                    vendorId={product.vendor.id}
+                    vendorName={product.vendor.storeName}
+                    vendorAvatar={product.vendor.avatar}
+                    productId={product.id}
+                    productName={product.name}
+                  />
+                )}
                     <Button variant="outline" size="sm" className="flex items-center gap-1 text-xs">
                       <Store className="w-4 h-4" />
                       Visit Store

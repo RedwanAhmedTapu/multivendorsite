@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import baseQueryWithReauth from "./baseQueryWithReauth";
 
 // Types
 export interface Slider {
@@ -33,20 +34,18 @@ export interface UpdateSliderRequest extends Partial<CreateSliderRequest> {
 // Slider API
 export const sliderApi = createApi({
   reducerPath: "sliderApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: "https://api.finixmart.com.bd/sliders",
-  }),
+  baseQuery: baseQueryWithReauth,
   tagTypes: ["Slider"],
   endpoints: (builder) => ({
     // Get all sliders
     getSliders: builder.query<Slider[], void>({
-      query: () => "/",
+      query: () => "/sliders",
       providesTags: ["Slider"],
     }),
 
     // Get single slider
     getSliderById: builder.query<Slider, string>({
-      query: (id) => `/${id}`,
+      query: (id) => `/silders/${id}`,
       providesTags: ["Slider"],
     }),
 
@@ -64,7 +63,7 @@ export const sliderApi = createApi({
         if (body.vendorId) formData.append("vendorId", body.vendorId.toString());
 
         return {
-          url: "/",
+          url: "/sliders",
           method: "POST",
           body: formData,
         };
@@ -86,7 +85,7 @@ export const sliderApi = createApi({
         if (body.vendorId) formData.append("vendorId", body.vendorId.toString());
 
         return {
-          url: `/${id}`,
+          url: `/sliders/${id}`,
           method: "PUT",
           body: formData,
         };
@@ -97,7 +96,7 @@ export const sliderApi = createApi({
     // Delete slider
     deleteSlider: builder.mutation<{ success: boolean }, string>({
       query: (id) => ({
-        url: `/${id}`,
+        url: `/sliders/${id}`,
         method: "DELETE",
       }),
       invalidatesTags: ["Slider"],

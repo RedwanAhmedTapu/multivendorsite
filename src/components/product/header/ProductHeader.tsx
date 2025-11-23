@@ -7,6 +7,7 @@ import {
   Grid2x2,
   List,
   Filter,
+  FolderTree,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,13 +17,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 export const ProductHeader: React.FC<{
   totalResults: number;
   viewMode: "grid" | "list";
   setViewMode: (mode: "grid" | "list") => void;
   onFilterClick: () => void;
-}> = ({ totalResults, viewMode, setViewMode, onFilterClick }) => {
+  selectedCategory?: string;
+  isLeafCategory?: boolean;
+}> = ({ 
+  totalResults, 
+  viewMode, 
+  setViewMode, 
+  onFilterClick, 
+  selectedCategory,
+  isLeafCategory = true 
+}) => {
   const [sortBy, setSortBy] = useState("Default");
 
   const sortOptions = [
@@ -38,11 +49,39 @@ export const ProductHeader: React.FC<{
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-4 mb-6 border-b bg-white rounded-lg px-4 sm:px-6">
       {/* Top section for mobile */}
       <div className="flex items-center justify-between w-full sm:w-auto">
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal className="w-4 h-4 text-gray-600" />
-          <span className="text-sm text-gray-600">
-            {totalResults} products found
-          </span>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="w-4 h-4 text-gray-600" />
+            <span className="text-sm text-gray-600">
+              {totalResults} {totalResults === 1 ? 'product' : 'products'} found
+            </span>
+          </div>
+          
+          {/* Category Info */}
+          {selectedCategory && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500 hidden sm:inline">in</span>
+              <div className="flex items-center gap-1">
+                <Badge 
+                  variant="secondary" 
+                  className="text-xs font-medium px-2 py-1"
+                >
+                  {selectedCategory}
+                </Badge>
+                {!isLeafCategory && (
+                  <Badge 
+                    variant="outline" 
+                    className="text-xs flex items-center gap-1 px-2 py-1"
+                    title="Includes subcategories"
+                  >
+                    <FolderTree className="w-3 h-3" />
+                    <span className="hidden xs:inline">Includes subcategories</span>
+                    <span className="xs:hidden">Subcats</span>
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Mobile Filter Button */}
@@ -99,6 +138,7 @@ export const ProductHeader: React.FC<{
             size="icon"
             className="h-8 w-8"
             onClick={() => setViewMode("grid")}
+            title="Grid view"
           >
             <Grid2x2 size={16} />
           </Button>
@@ -107,6 +147,7 @@ export const ProductHeader: React.FC<{
             size="icon"
             className="h-8 w-8"
             onClick={() => setViewMode("list")}
+            title="List view"
           >
             <List size={16} />
           </Button>

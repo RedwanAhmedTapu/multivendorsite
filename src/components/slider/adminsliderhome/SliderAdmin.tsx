@@ -250,7 +250,7 @@ const SliderAdmin: React.FC = () => {
                         >
                           <td className="px-6 py-4">
                             <img
-                              src={`http://localhost:5000/${slider.imageUrl}`}
+                              src={slider.imageUrl}
                               alt={slider.title || "Slider"}
                               className="w-20 h-12 object-cover rounded-lg shadow-sm border border-gray-200"
                             />
@@ -313,7 +313,7 @@ const SliderAdmin: React.FC = () => {
                     <div key={slider.id} className="p-2 sm:p-6 space-y-3 sm:space-y-4">
                       <div className="flex items-start gap-4">
                         <img
-                          src={`http://localhost:5000/${slider.imageUrl}`}
+                          src={slider.imageUrl}
                           alt={slider.title || "Slider"}
                           className="w-20 h-12 sm:w-24 sm:h-16 object-cover rounded-lg shadow-sm border border-gray-200 flex-shrink-0"
                         />

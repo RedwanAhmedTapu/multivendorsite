@@ -1,3 +1,4 @@
+// Update the imports and component usage in AddProductForm
 "use client";
 import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -6,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useCreateProductMutation } from "@/features/productApi";
 import CategoryTreeSelector from "./CategoryTreeSelector";
 import ImageUploader from "@/components/imageuploader/ImageUploader";
+import VideoUploader from "@/components/videouploader/VideoUploader"; // Updated import
 import SpecAttributeManager from "./SpecAttributeManager";
 import VariantManager from "./VariantManager";
 import type { Attribute, Specification, VariantNamePart } from "@/types/type";
@@ -17,7 +19,6 @@ import {
   ProductSpecificationInput,
   ProductVariantInput,
 } from "@/types/product";
-// Remove the duplicate import from ShippingWarrantyForm
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import ProductDescriptionEditor from "@/components/productdescription/ProductDescriptionl";
@@ -29,23 +30,21 @@ export default function AddProductForm() {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [isLeafCategory, setIsLeafCategory] = useState(false);
   const [categoryAttributes, setCategoryAttributes] = useState<Attribute[]>([]);
-  const [categorySpecifications, setCategorySpecifications] = useState<
-    Specification[]
-  >([]);
+  const [categorySpecifications, setCategorySpecifications] = useState<Specification[]>([]);
   const [images, setImages] = useState<string[]>([]);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   const [specInputs, setSpecInputs] = useState<ProductSpecificationInput[]>([]);
   const [variantInputs, setVariantInputs] = useState<ProductVariantInput[]>([]);
-  const [attributeSettings, setAttributeSettings] = useState<
-    ProductAttributeSettingInput[]
-  >([]);
-  const [variantNameParts, setVariantNameParts] = useState<
-    Record<string, VariantNamePart>
-  >({});
-  const [shippingWarranty, setShippingWarranty] =
-    useState<ProductShippingWarrantyInput | null>(null);
+  const [attributeSettings, setAttributeSettings] = useState<ProductAttributeSettingInput[]>([]);
+  const [variantNameParts, setVariantNameParts] = useState<Record<string, VariantNamePart>>({});
+  const [shippingWarranty, setShippingWarranty] = useState<ProductShippingWarrantyInput | null>(null);
 
   const [createProduct, { isLoading }] = useCreateProductMutation();
+
+  const { user } = useSelector((state: RootState) => state.auth);
+  const vendorId = user?.vendorId;
+  const userRole = user?.role as "VENDOR" | "ADMIN";
 
   // Handle category selection
   const handleCategorySelect = (
@@ -99,13 +98,10 @@ export default function AddProductForm() {
   // Convert uploaded image URLs to ProductImageInput[]
   const convertImages = (): ProductImageInput[] =>
     images.map((url, index) => ({
-      url, // string
+      url,
       altText: `${name} image ${index + 1}`,
       sortOrder: index,
     }));
-
-  const { user } = useSelector((state: RootState) => state.auth);
-  const vendorId = user?.vendorId;
 
   // Handle submit
   const handleSubmit = async () => {
@@ -120,15 +116,14 @@ export default function AddProductForm() {
       categoryId,
       vendorId: vendorId ? vendorId : "",
       images: convertImages(),
+      videoUrl: videoUrl || undefined,
       specifications: specInputs,
       variants: variantInputs.map((v) => ({
         ...v,
-        // Fix: Ensure proper type handling for variant images
         images: v.images?.map((img) => {
           if (typeof img === "string") {
             return img;
           }
-          // If img is an object with url property
           if (img && typeof img === "object" && "url" in img) {
             return (img as { url: string }).url;
           }
@@ -157,10 +152,12 @@ export default function AddProductForm() {
     setCategoryAttributes([]);
     setCategorySpecifications([]);
     setImages([]);
+    setVideoUrl(null);
     setSpecInputs([]);
     setVariantInputs([]);
     setAttributeSettings([]);
     setVariantNameParts({});
+    setShippingWarranty(null);
   };
 
   return (
@@ -169,6 +166,7 @@ export default function AddProductForm() {
         <CardTitle>Add New Product</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Product Name */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block font-medium mb-2">Product Name *</label>
@@ -181,13 +179,29 @@ export default function AddProductForm() {
           </div>
         </div>
 
+        {/* Category Selection */}
         <CategoryTreeSelector onSelect={handleCategorySelect} />
 
+        {/* Product Images */}
         <div>
           <label className="block font-medium mb-2">Product Images</label>
           <ImageUploader images={images} setImages={setImages} maxImages={10} />
         </div>
 
+        {/* Product Video */}
+        <div>
+          <label className="block font-medium mb-2">
+            Product Video <span className="text-sm text-gray-500">(Optional)</span>
+          </label>
+          <VideoUploader
+            videoUrl={videoUrl}
+            setVideoUrl={setVideoUrl}
+            vendorId={vendorId || ""}
+            userRole={userRole}
+          />
+        </div>
+
+        {/* Specifications and Attributes */}
         {isLeafCategory && (
           <SpecAttributeManager
             categoryId={categoryId}
@@ -201,6 +215,7 @@ export default function AddProductForm() {
           />
         )}
 
+        {/* Variants */}
         {isLeafCategory && (
           <VariantManager
             variants={variantInputs}
@@ -209,25 +224,25 @@ export default function AddProductForm() {
           />
         )}
 
+        {/* Warning for non-leaf categories */}
         {!isLeafCategory && categoryId && (
           <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
             <p className="text-yellow-800">
-              ⚠️ Please select a leaf category to add specifications and
-              variants.
+              ⚠️ Please select a leaf category to add specifications and variants.
             </p>
           </div>
         )}
-        
+
+        {/* Description */}
         <div>
           <label className="block font-medium mb-2">Description</label>
-          <ProductDescriptionEditor
-            value={description}
-            onChange={setDescription}
-          />
+          <ProductDescriptionEditor value={description} onChange={setDescription} />
         </div>
-        
+
+        {/* Shipping & Warranty */}
         <ShippingWarrantyForm value={shippingWarranty} onChange={setShippingWarranty} />
 
+        {/* Action Buttons */}
         <div className="flex gap-4">
           <Button
             onClick={handleSubmit}
@@ -239,8 +254,7 @@ export default function AddProductForm() {
           <Button
             variant="outline"
             onClick={() => {
-              if (confirm("Are you sure you want to reset the form?"))
-                resetForm();
+              if (confirm("Are you sure you want to reset the form?")) resetForm();
             }}
             disabled={isLoading}
           >

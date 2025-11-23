@@ -41,6 +41,11 @@ export interface VerifyOtpRequest {
   department?: string;
 }
 
+export interface SocialLoginRequest {
+  provider: "google" | "facebook";
+  token: string;
+}
+
 // --------- Response Types ---------
 export interface AuthResponse {
   user: {
@@ -51,12 +56,30 @@ export interface AuthResponse {
     role: string;
   };
   accessToken?: string;
+  message?: string;
+}
+export interface ForgotPasswordRequest {
+  email?: string;
+  phone?: string;
 }
 
+export interface VerifyResetTokenRequest {
+  token?: string;
+  phone?: string;
+  otp?: string;
+}
+
+export interface ResetPasswordRequest {
+  token?: string;
+  phone?: string;
+  otp?: string;
+  newPassword: string;
+  confirmPassword: string;
+}
 // --------- Auth API ---------
 export const authApi = createApi({
   reducerPath: "authApi",
-   baseQuery: baseQueryWithReauth,
+  baseQuery: baseQueryWithReauth,
   tagTypes: ["Auth"],
   endpoints: (builder) => ({
     register: builder.mutation<{ message: string }, RegisterRequest>({
@@ -95,6 +118,15 @@ export const authApi = createApi({
       invalidatesTags: ["Auth"],
     }),
 
+    socialLogin: builder.mutation<AuthResponse, SocialLoginRequest>({
+      query: (credentials) => ({
+        url: "/auth/social-login",
+        method: "POST",
+        body: credentials,
+      }),
+      invalidatesTags: ["Auth"],
+    }),
+
     refresh: builder.query<{ accessToken: string }, void>({
       query: () => ({
         url: "/auth/refresh",
@@ -109,6 +141,41 @@ export const authApi = createApi({
       }),
       invalidatesTags: ["Auth"],
     }),
+    forgotPassword: builder.mutation<
+      { message: string },
+      ForgotPasswordRequest
+    >({
+      query: (body) => ({
+        url: "/auth/forgot-password",
+        method: "POST",
+        body,
+      }),
+    }),
+
+    verifyResetToken: builder.mutation<
+      {
+        message: string;
+        email?: string;
+        phone?: string;
+        type: "email" | "phone";
+      },
+      VerifyResetTokenRequest
+    >({
+      query: (body) => ({
+        url: "/auth/verify-reset-token",
+        method: "POST",
+        body,
+      }),
+    }),
+
+    resetPassword: builder.mutation<{ message: string }, ResetPasswordRequest>({
+      query: (body) => ({
+        url: "/auth/reset-password",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Auth"],
+    }),
   }),
 });
 
@@ -118,6 +185,10 @@ export const {
   useVerifyEmailMutation,
   useVerifyOtpMutation,
   useLoginMutation,
+  useSocialLoginMutation,
   useRefreshQuery,
   useLogoutMutation,
+  useForgotPasswordMutation,
+  useVerifyResetTokenMutation,
+  useResetPasswordMutation,
 } = authApi;

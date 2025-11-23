@@ -66,6 +66,67 @@ import {
   useUpdateVendorStatusMutation,
 } from "@/features/vendorManageApi";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+// Type definitions
+interface VendorData {
+  id: string;
+  storeName: string;
+  avatar?: string;
+  status: string;
+  currentCommissionRate?: number;
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    email?: string;
+    phone?: string;
+    isActive: boolean;
+    isVerified: boolean;
+  };
+  performance?: {
+    totalSales: number;
+    totalOrders: number;
+    fulfillmentRatePct: number;
+    avgRating: number;
+  };
+  _count?: {
+    products: number;
+    orders: number;
+    flags: number;
+    payouts: number;
+  };
+}
+
+interface CommissionHistory {
+  id: string;
+  rate: number;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  note?: string;
+  categoryId: string;
+  category?: {
+    name: string;
+  };
+}
+
+interface Payout {
+  id: string;
+  amount: number;
+  method: string;
+  status: string;
+  period?: string;
+  note?: string;
+  paidAt?: string;
+  createdAt: string;
+}
+
+interface PayoutSummary {
+  totalPending: number;
+  totalPaid: number;
+  currentBalance: number;
+  lastPayoutDate?: string;
+}
 
 // Form schemas
 const profileFormSchema = z.object({
@@ -76,15 +137,20 @@ const profileFormSchema = z.object({
 });
 
 const commissionFormSchema = z.object({
-  rate: z.number(),
+  rate: z.number().min(0).max(100, {
+    message: "Commission rate must be between 0 and 100.",
+  }),
+  categoryId: z.string().min(1, {
+    message: "Category is required.",
+  }),
   note: z.string().optional(),
-  effectiveFrom: z.string().datetime().optional(),
-  effectiveTo: z.string().datetime().optional(),
+  effectiveFrom: z.date().optional(),
+  effectiveTo: z.date().optional(),
 });
 
 const payoutFormSchema = z.object({
-  amount: z.number().min(0, {
-    message: "Amount must be positive.",
+  amount: z.number().min(0.01, {
+    message: "Amount must be at least $0.01.",
   }),
   method: z.string().min(1, {
     message: "Payment method is required.",
@@ -108,14 +174,20 @@ export default function VendorProfileManager({
 
   // API queries
   const {
-    data: vendor,
+    data: vendorResponse,
     isLoading,
     error,
     refetch,
   } = useGetVendorByIdQuery(vendorId);
-  const { data: commissionHistory } = useGetCommissionHistoryQuery(vendorId);
-  const { data: payouts } = useGetVendorPayoutsQuery(vendorId);
-  const { data: payoutSummary } = useGetPayoutSummaryQuery(vendorId);
+  const { data: commissionHistoryResponse } = useGetCommissionHistoryQuery(vendorId);
+  const { data: payoutsResponse } = useGetVendorPayoutsQuery(vendorId);
+  const { data: payoutSummaryResponse } = useGetPayoutSummaryQuery(vendorId);
+
+  // Extract data with proper typing
+  const vendor = vendorResponse as VendorData | undefined;
+  const commissionHistory = (commissionHistoryResponse as CommissionHistory[]) || [];
+  const payouts = (payoutsResponse as Payout[]) || [];
+  const payoutSummary = payoutSummaryResponse as PayoutSummary | undefined;
 
   // API mutations
   const [updateVendorProfile] = useUpdateVendorProfileMutation();
@@ -137,6 +209,7 @@ export default function VendorProfileManager({
     resolver: zodResolver(commissionFormSchema),
     defaultValues: {
       rate: 0,
+      categoryId: "",
       note: "",
     },
   });
@@ -166,12 +239,19 @@ export default function VendorProfileManager({
     }
   }, [vendor, profileForm, commissionForm]);
 
-  // Handle profile update
+  // Handle profile update - Fixed to match API expectation
   const onProfileUpdate = async (values: z.infer<typeof profileFormSchema>) => {
     try {
+      // Create FormData as expected by the API
+      const formData = new FormData();
+      formData.append("storeName", values.storeName);
+      if (values.avatar) {
+        formData.append("avatar", values.avatar);
+      }
+
       await updateVendorProfile({
         id: vendorId,
-        data: values,
+        formData, // Use formData instead of data
       }).unwrap();
 
       toast.success("Vendor profile has been updated successfully.");
@@ -181,18 +261,30 @@ export default function VendorProfileManager({
     }
   };
 
-  // Handle commission rate update
+  // Handle commission rate update - Fixed to include categoryId
   const onCommissionUpdate = async (
     values: z.infer<typeof commissionFormSchema>
   ) => {
     try {
       await setCommissionRate({
         vendorId,
-        data: values,
+        data: {
+          rate: values.rate,
+          categoryId: values.categoryId,
+          note: values.note,
+          effectiveFrom: values.effectiveFrom?.toISOString(),
+          effectiveTo: values.effectiveTo?.toISOString(),
+        },
       }).unwrap();
 
       toast.success("Commission rate has been updated successfully.");
-      commissionForm.reset();
+      commissionForm.reset({
+        rate: values.rate,
+        categoryId: values.categoryId,
+        note: "",
+        effectiveFrom: undefined,
+        effectiveTo: undefined,
+      });
       refetch();
     } catch (error) {
       toast.error("Failed to update commission rate.");
@@ -204,11 +296,18 @@ export default function VendorProfileManager({
     try {
       await createPayout({
         vendorId,
-        data: values,
+        data: {
+          amount: values.amount,
+          method: values.method,
+          period: values.period,
+          note: values.note,
+          paidAt: new Date().toISOString(), // Add paidAt field
+        },
       }).unwrap();
 
       toast.success("Payout has been created successfully.");
       payoutForm.reset();
+      refetch();
     } catch (error) {
       toast.error("Failed to create payout.");
     }
@@ -288,7 +387,7 @@ export default function VendorProfileManager({
             <div>
               <h1 className="text-3xl font-bold">{vendor.storeName}</h1>
               <div className="flex items-center space-x-2 mt-1">
-                <Badge variant={statusVariant[vendor.status]}>
+                <Badge variant={statusVariant[vendor.status as keyof typeof statusVariant]}>
                   {vendor.status}
                 </Badge>
                 {vendor.user && (
@@ -433,7 +532,7 @@ export default function VendorProfileManager({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Current Commission Rate</CardTitle>
+                <CardTitle>Set Commission Rate</CardTitle>
                 <CardDescription>
                   {vendor.currentCommissionRate !== undefined
                     ? `Current rate: ${vendor.currentCommissionRate}%`
@@ -446,6 +545,31 @@ export default function VendorProfileManager({
                     onSubmit={commissionForm.handleSubmit(onCommissionUpdate)}
                     className="space-y-4"
                   >
+                    <FormField
+                      control={commissionForm.control}
+                      name="categoryId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Category *</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select category" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="default-category">Default Category</SelectItem>
+                              <SelectItem value="electronics">Electronics</SelectItem>
+                              <SelectItem value="fashion">Fashion</SelectItem>
+                              <SelectItem value="home">Home & Garden</SelectItem>
+                              <SelectItem value="beauty">Beauty</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                     <FormField
                       control={commissionForm.control}
                       name="rate"
@@ -461,7 +585,7 @@ export default function VendorProfileManager({
                               placeholder="Enter commission rate"
                               {...field}
                               onChange={(e) =>
-                                field.onChange(parseFloat(e.target.value))
+                                field.onChange(parseFloat(e.target.value) || 0)
                               }
                             />
                           </FormControl>
@@ -497,7 +621,10 @@ export default function VendorProfileManager({
                                 <FormControl>
                                   <Button
                                     variant="outline"
-                                    className="pl-3 text-left font-normal"
+                                    className={cn(
+                                      "pl-3 text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
                                   >
                                     {field.value ? (
                                       format(field.value, "PPP")
@@ -514,18 +641,12 @@ export default function VendorProfileManager({
                               >
                                 <Calendar
                                   mode="single"
-                                  selected={
-                                    field.value
-                                      ? new Date(field.value)
-                                      : undefined
-                                  } // <-- convert here
-                                  onSelect={(date) =>
-                                    field.onChange(date?.toISOString())
-                                  } // <-- store as string in form
+                                  selected={field.value}
+                                  onSelect={field.onChange}
                                   disabled={(date) =>
-                                    date < new Date() ||
                                     date < new Date("1900-01-01")
                                   }
+                                  initialFocus
                                 />
                               </PopoverContent>
                             </Popover>
@@ -544,7 +665,10 @@ export default function VendorProfileManager({
                                 <FormControl>
                                   <Button
                                     variant="outline"
-                                    className="pl-3 text-left font-normal"
+                                    className={cn(
+                                      "pl-3 text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
                                   >
                                     {field.value ? (
                                       format(field.value, "PPP")
@@ -561,16 +685,9 @@ export default function VendorProfileManager({
                               >
                                 <Calendar
                                   mode="single"
-                                  selected={
-                                    field.value
-                                      ? new Date(field.value)
-                                      : undefined
-                                  } // convert string to Date
-                                  onSelect={(date) =>
-                                    field.onChange(date?.toISOString())
-                                  } // convert Date back to string
+                                  selected={field.value}
+                                  onSelect={field.onChange}
                                   disabled={(date) =>
-                                    date < new Date() ||
                                     date < new Date("1900-01-01")
                                   }
                                   initialFocus
@@ -600,6 +717,7 @@ export default function VendorProfileManager({
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Category</TableHead>
                         <TableHead>Rate</TableHead>
                         <TableHead>Effective From</TableHead>
                         <TableHead>Effective To</TableHead>
@@ -608,6 +726,9 @@ export default function VendorProfileManager({
                     <TableBody>
                       {commissionHistory.slice(0, 5).map((commission) => (
                         <TableRow key={commission.id}>
+                          <TableCell className="font-medium">
+                            {commission.category?.name || 'N/A'}
+                          </TableCell>
                           <TableCell className="font-medium">
                             {commission.rate}%
                           </TableCell>
@@ -663,7 +784,7 @@ export default function VendorProfileManager({
                               placeholder="Enter payout amount"
                               {...field}
                               onChange={(e) =>
-                                field.onChange(parseFloat(e.target.value))
+                                field.onChange(parseFloat(e.target.value) || 0)
                               }
                             />
                           </FormControl>
@@ -764,19 +885,19 @@ export default function VendorProfileManager({
                       <div>
                         <p className="text-sm font-medium">Pending Payouts</p>
                         <p className="text-2xl font-bold">
-                          ${payoutSummary?.totalPending?.toFixed(2)}
+                          ${payoutSummary?.totalPending?.toFixed(2) || '0.00'}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm font-medium">Paid Payouts</p>
                         <p className="text-2xl font-bold">
-                          ${payoutSummary?.totalPaid?.toFixed(2)}
+                          ${payoutSummary?.totalPaid?.toFixed(2) || '0.00'}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm font-medium">Current Balance</p>
                         <p className="text-2xl font-bold">
-                          ${payoutSummary?.currentBalance?.toFixed(2)}
+                          ${payoutSummary?.currentBalance?.toFixed(2) || '0.00'}
                         </p>
                       </div>
                       <div>
@@ -808,6 +929,7 @@ export default function VendorProfileManager({
                       <TableHeader>
                         <TableRow>
                           <TableHead>Amount</TableHead>
+                          <TableHead>Method</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Date</TableHead>
                         </TableRow>
@@ -817,6 +939,9 @@ export default function VendorProfileManager({
                           <TableRow key={payout.id}>
                             <TableCell className="font-medium">
                               ${payout?.amount.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="capitalize">
+                              {payout.method.replace('_', ' ')}
                             </TableCell>
                             <TableCell>
                               <Badge
@@ -861,7 +986,7 @@ export default function VendorProfileManager({
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    ${vendor?.performance.totalSales?.toFixed(2)}
+                    ${vendor.performance.totalSales?.toFixed(2)}
                   </div>
                 </CardContent>
               </Card>
@@ -922,7 +1047,7 @@ export default function VendorProfileManager({
                     <p className="text-sm text-muted-foreground">Orders</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold">{vendor._count.flags}</p>
+                    <p className="text-2xl font-bold">{vendor._count.flags || 0}</p>
                     <p className="text-sm text-muted-foreground">Flags</p>
                   </div>
                 </div>

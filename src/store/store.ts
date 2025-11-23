@@ -3,32 +3,43 @@ import { configureStore, combineReducers } from "@reduxjs/toolkit";
 import { persistReducer, persistStore } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 
-// APIs & slices
+// Import all your APIs
 import { apiSlice } from "../features/apiSlice";
 import { authApi } from "../features/authApi";
 import authReducer from "../features/authSlice";
 import { sliderApi } from "../features/sliderApi";
 import { productApi } from "../features/productApi";
 import { attrSpecSlice } from "@/features/attrSpecSlice";
-import { vendorManageApi } from "../features/vendorManageApi"; 
+import { vendorManageApi } from "../features/vendorManageApi";
 import { customerManageApi } from "../features/customerManageApi";
-import { chatApi } from "../features/chatApi"; 
-import chatReducer from "../features/chatSlice"; 
-import { termsApi } from "../features/termsApi"; // ⬅️ NEW: Terms API
+import { chatApi } from "../features/chatApi";
+import chatReducer from "../features/chatSlice";
+import { termsApi } from "../features/termsApi"; 
+import { shippingProviderApi } from "../features/shippingProviderApi";
+import { offerApi } from "../features/offerApi"; 
+import { employeeApi } from "@/features/employeeApi";
+import { storeEditorApi } from "@/features/storeEditorApi";
 
 // --------------------
-// Persist configuration
+// All API imports in one array for easier management
 // --------------------
-const persistConfig = {
-  key: "root",
-  storage,
-  whitelist: ["auth"], // persist only the auth slice
-};
+const apiMiddlewares = [
+  apiSlice.middleware,
+  authApi.middleware,
+  sliderApi.middleware,
+  productApi.middleware,
+  attrSpecSlice.middleware,
+  vendorManageApi.middleware,
+  customerManageApi.middleware,
+  chatApi.middleware,
+  termsApi.middleware,
+  shippingProviderApi.middleware,
+  offerApi.middleware, 
+  employeeApi.middleware,
+  storeEditorApi.middleware,
+];
 
-// --------------------
-// Combine reducers
-// --------------------
-const rootReducer = combineReducers({
+const apiReducers = {
   auth: authReducer,
   chat: chatReducer,
   [apiSlice.reducerPath]: apiSlice.reducer,
@@ -39,12 +50,26 @@ const rootReducer = combineReducers({
   [vendorManageApi.reducerPath]: vendorManageApi.reducer,
   [customerManageApi.reducerPath]: customerManageApi.reducer,
   [chatApi.reducerPath]: chatApi.reducer,
-  [termsApi.reducerPath]: termsApi.reducer, // ⬅️ NEW: Terms API reducer
-});
+  [termsApi.reducerPath]: termsApi.reducer,
+  [shippingProviderApi.reducerPath]: shippingProviderApi.reducer,
+  [offerApi.reducerPath]: offerApi.reducer, 
+  [employeeApi.reducerPath]: employeeApi.reducer,
+  [storeEditorApi.reducerPath]: storeEditorApi.reducer,
+};
 
 // --------------------
-// Persisted reducer
+// Persist configuration
 // --------------------
+const persistConfig = {
+  key: "root",
+  storage,
+  whitelist: ["auth"],
+};
+
+// --------------------
+// Combine reducers
+// --------------------
+const rootReducer = combineReducers(apiReducers);
 const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 // --------------------
@@ -57,17 +82,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: ["persist/PERSIST", "persist/REHYDRATE"],
       },
-    }).concat(
-      apiSlice.middleware,
-      authApi.middleware,
-      sliderApi.middleware,
-      productApi.middleware,
-      attrSpecSlice.middleware,
-      vendorManageApi.middleware,
-      customerManageApi.middleware,
-      chatApi.middleware,
-      termsApi.middleware // ⬅️ NEW: Terms API middleware
-    ),
+    }).concat(...apiMiddlewares),
   devTools: process.env.NODE_ENV !== "production",
 });
 

@@ -11,25 +11,25 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useGetCategoriesQuery } from "@/features/apiSlice";
 
 export default function Navbar(): JSX.Element {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [search, setSearch] = useState<string>("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isNavbarFixed, setIsNavbarFixed] = useState<boolean>(false);
   const [popoverWidth, setPopoverWidth] = useState<number>(0);
-  const [isPopoverOpen, setIsPopoverOpen] = useState<boolean>(false); // ✅ control popover
+  const [isPopoverOpen, setIsPopoverOpen] = useState<boolean>(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   // ✅ Fetch categories
   const { data: categoriesData } = useGetCategoriesQuery();
-  const rootCategories =
-    categoriesData?.filter((cat: any) => !cat.parentId) || [];
+  const rootCategories = categoriesData?.filter((cat: any) => !cat.parentId) || [];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -57,14 +57,45 @@ export default function Navbar(): JSX.Element {
   // ✅ hide navbar if admin/vendor
   if (
     pathname.includes("admin-dashboard") ||
-    pathname.includes("vendor-dashboard")
+    pathname.includes("vendor-dashboard") ||
+    pathname.includes("register") ||
+    pathname.includes("reset-password") ||
+    pathname.includes("login") ||
+    pathname.includes("vendor-store-decoration")
   ) {
     return <></>;
   }
 
   const handleCategoryClick = (slug: string) => {
-    setIsPopoverOpen(false); // ✅ close popover after click
-    router.push(`/products?cat=${slug}`);
+    setIsPopoverOpen(false);
+    
+    // If we're already on products page, use replace to trigger navigation
+    if (pathname === '/products') {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('category', slug);
+      router.replace(`/products?${params.toString()}`, { scroll: false });
+    } else {
+      // If coming from other pages, use push
+      router.push(`/products?category=${slug}`);
+    }
+  };
+
+  const handleSearchSubmit = () => {
+    if (search.trim()) {
+      if (pathname === '/products') {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('search', search.trim());
+        router.replace(`/products?${params.toString()}`, { scroll: false });
+      } else {
+        router.push(`/products?search=${encodeURIComponent(search.trim())}`);
+      }
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearchSubmit();
+    }
   };
 
   return (
@@ -96,7 +127,7 @@ export default function Navbar(): JSX.Element {
                   alt="FinixMart Logo"
                   width={90}
                   height={36}
-                  className=" w-auto"
+                  className="w-auto"
                 />
               </Link>
             </div>
@@ -109,7 +140,7 @@ export default function Navbar(): JSX.Element {
                   alt="FinixMart Logo"
                   width={300}
                   height={300}
-                  className=" w-auto"
+                  className="w-auto"
                 />
               </Link>
             </div>
@@ -123,7 +154,7 @@ export default function Navbar(): JSX.Element {
                 {/* All Categories Button */}
                 <Popover
                   open={isPopoverOpen}
-                  onOpenChange={setIsPopoverOpen} // ✅ control popover
+                  onOpenChange={setIsPopoverOpen}
                 >
                   <PopoverTrigger asChild>
                     <Button
@@ -143,7 +174,6 @@ export default function Navbar(): JSX.Element {
                       <h3 className="font-semibold text-base">
                         Select Categories
                       </h3>
-                      {/* ✅ close popover when X clicked */}
                       <X
                         className="h-4 w-4 cursor-pointer"
                         onClick={() => setIsPopoverOpen(false)}
@@ -155,7 +185,7 @@ export default function Navbar(): JSX.Element {
                           <button
                             key={cat.id}
                             onClick={() => handleCategoryClick(cat.slug)}
-                            className="text-left hover:underline"
+                            className="text-left hover:underline cursor-pointer"
                           >
                             {cat.name}
                           </button>
@@ -173,12 +203,16 @@ export default function Navbar(): JSX.Element {
                 <Input
                   value={search}
                   onChange={handleSearchChange}
+                  onKeyPress={handleKeyPress}
                   placeholder="Search for anything"
                   className="h-9 lg:h-10 px-3 text-gray-700 flex-1 border-0 rounded-none text-xs focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
 
                 {/* Search Button */}
-                <Button className="bg-orange-500 hover:bg-orange-600 h-9 lg:h-10 px-3 min-w-[40px] rounded-none border-0">
+                <Button 
+                  onClick={handleSearchSubmit}
+                  className="bg-orange-500 hover:bg-orange-600 h-9 lg:h-10 px-3 min-w-[40px] rounded-none border-0"
+                >
                   <Search size={16} />
                 </Button>
               </div>
@@ -235,10 +269,14 @@ export default function Navbar(): JSX.Element {
             <Input
               value={search}
               onChange={handleSearchChange}
+              onKeyPress={handleKeyPress}
               placeholder="Search for anything"
               className="bg-white rounded-l-md border border-gray-300 text-gray-700 text-xs h-8 flex-1"
             />
-            <Button className="bg-orange-500 hover:bg-orange-600 rounded-r-md px-2 h-8 min-w-[36px]">
+            <Button 
+              onClick={handleSearchSubmit}
+              className="bg-orange-500 hover:bg-orange-600 rounded-r-md px-2 h-8 min-w-[36px]"
+            >
               <Search size={14} />
             </Button>
           </div>

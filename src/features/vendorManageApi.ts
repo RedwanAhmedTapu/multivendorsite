@@ -32,7 +32,7 @@ export interface Vendor {
     orders: number;
     flags: number;
     monthlyCharges?: number;
-    offers?:[]
+    offers?: [];
   };
 }
 
@@ -72,6 +72,7 @@ export interface UpdateVendorProfileRequest {
 }
 
 export interface VendorCommissionRequest {
+  categoryId: string;
   rate: number;
   note?: string;
   effectiveFrom?: string;
@@ -83,7 +84,7 @@ export interface VendorPayoutRequest {
   method: string;
   period: string;
   note?: string;
-  paidAt?: string; 
+  paidAt?: string;
 }
 
 export interface VendorMonthlyChargeRequest {
@@ -155,8 +156,7 @@ export interface FraudDetectionResult {
 export interface BulkCommissionUpdateRequest {
   vendorIds: string[];
   rate: number;
-  note?: string;
-  effectiveFrom?: string;
+  categoryId: string;
 }
 
 export interface BulkMonthlyChargeRequest {
@@ -206,7 +206,291 @@ export interface CommissionHistory {
   note?: string;
   createdAt: string;
 }
+// ================================
+// NEW TYPES FOR EXTENDED FUNCTIONALITY
+// ================================
 
+export interface VendorPersonalInfoRequest {
+  // Individual-specific fields
+  idNumber?: string;
+  idName?: string;
+  // Business-specific fields  
+  companyName?: string;
+  businessRegNo?: string;
+  taxIdNumber?: string;
+}
+
+
+export interface VendorPersonalInfo {
+  id: string;
+  vendorId: string;
+  // Individual-specific fields
+  idNumber?: string | null;
+  idName?: string | null;
+  // Business-specific fields
+  companyName?: string | null;
+  businessRegNo?: string | null;
+  taxIdNumber?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VendorAddressRequest {
+  detailsAddress: string;
+  city: string;
+  zone?: string;
+  area?: string;
+}
+
+export interface VendorAddress {
+  id: string;
+  vendorId: string;
+  detailsAddress: string;
+  city: string;
+  zone?: string;
+  area?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VendorBankInfoRequest {
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+  branchName: string;
+}
+
+export interface VendorBankInfo {
+  id: string;
+  vendorId: string;
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+  branchName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VendorDocumentRequest {
+  type: 
+    | "NATIONAL_ID_FRONT" 
+    | "NATIONAL_ID_BACK" 
+    | "PASSPORT_FRONT" 
+    | "PASSPORT_BACK" 
+    | "TRADE_LICENSE"           // Updated to match Prisma enum
+    | "RJSC_REGISTRATION"       // Added
+    | "TIN_CERTIFICATE"         // Added
+    | "VAT_CERTIFICATE"         // Added
+    | "OTHER";                  // Added
+  title: string;
+  filePath: string;
+  fileSize?: number | null;     // Made nullable to match schema
+  mimeType?: string | null;     // Made nullable to match schema
+  verificationStatus?: "PENDING" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "EXPIRED";
+}
+
+
+export interface VendorDocument {
+  id: string;
+  vendorId: string;
+  type: string;
+  title: string;
+  filePath: string;
+  fileSize?: number | null;    
+  mimeType?: string | null;     
+  verificationStatus: string;
+  rejectionReason?: string | null;  // Added and made nullable
+  createdAt: string;
+  updatedAt: string;
+}
+
+
+export interface VendorSubscriptionRequest {
+  planType: "FREE" | "BASIC" | "PRO" | "ENTERPRISE";
+  isActive: boolean;
+}
+
+export interface VendorSubscription {
+  id: string;
+  vendorId: string;
+  planType: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VendorSettingsRequest {
+  emailNotifications: boolean;
+}
+
+export interface VendorSettings {
+  id: string;
+  vendorId: string;
+  emailNotifications: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VendorOnboardingStatus {
+  id: string;
+  vendorId: string;
+  personalInfoComplete: boolean;
+  addressComplete: boolean;
+  bankInfoComplete: boolean;
+  documentsComplete: boolean; 
+  overallComplete: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VendorVerificationRequest {
+  rejectionReason?: string;
+}
+
+export interface CompleteVendorProfile extends VendorWithDetails {
+  personalInfo?: VendorPersonalInfo | null;
+  bankInfo?: VendorBankInfo | null;
+  documents?: VendorDocument[]; 
+  pickupAddress?: VendorAddress | null;
+  settings?: VendorSettings | null;
+  subscription?: VendorSubscription | null;
+  onboarding?: VendorOnboardingStatus | null;
+  accountType: "INDIVIDUAL" | "BUSINESS";
+  businessType?: "PROPRIETORSHIP" | "LIMITED_COMPANY" | "PARTNERSHIP_FIRM" | null; 
+}
+
+export interface RequiredDocumentTypes {
+  required: Array<{
+    type: string;
+    label: string;
+  }>;
+  alternatives: Array<{
+    type: string;
+    label: string;
+  }>;
+}
+
+export interface DocumentUploadData {
+  // Individual account documents
+  nidFront?: File;
+  nidBack?: File;
+  passportFront?: File;
+  passportBack?: File;
+  
+  // Business account documents - Updated to match schema
+  tradeLicense?: File;
+  rjscRegistration?: File;
+  tinCertificate?: File;
+  vatCertificate?: File;
+  otherDocument?: File;
+}
+
+
+export interface OnboardingProgress {
+  personalInfo: boolean;
+  address: boolean;
+  bankInfo: boolean;
+  documents: boolean;
+  overall: boolean;
+  progressPercentage: number;
+}
+// ================================
+// STORAGE RELATED TYPES
+// ================================
+
+// Types
+export interface StorageFile {
+  id: string;
+  fileName: string;
+  fileKey: string;
+  fileSize: number;
+  mimeType: string;
+  fileType: "IMAGE" | "DOCUMENT";
+  url: string;
+  r2Url: string;
+  productId?: string;
+  variantId?: string;
+  createdAt: string;
+}
+
+export interface StorageStats {
+  // Raw bytes (for calculations)
+  usedBytes: number;
+  totalBytes: number;
+  remainingBytes: number;
+
+  // Readable size formats
+  usedSize: string; // e.g. "251.56"
+  usedUnit: string; // e.g. "KB", "MB", or "GB"
+  usedMB: number;
+  usedGB: number;
+  totalGB: number;
+  remainingGB: number;
+
+  // Percentage of used space
+  usagePercent: number;
+
+  // Quota breakdown
+  freeQuotaGB: number;
+  paidQuotaGB: number;
+
+  // File counts
+  totalFiles: number;
+  imageFiles: number;
+  documentFiles: number;
+}
+
+export interface QuotaCheckResponse {
+  success: boolean;
+  available: boolean;
+  currentUsage: string;
+  totalQuota: string;
+  availableSpace: string;
+  requiredSpace: number;
+  reason?: string;
+}
+
+export interface UploadFileResponse {
+  success: boolean;
+  file?: {
+    id: string;
+    fileName: string;
+    url: string;
+    fileSize: number;
+    mimeType: string;
+  };
+  files?: Array<{
+    id: string;
+    fileName: string;
+    url: string;
+    path: string;
+    fileSize: number;
+    mimeType: string;
+  }>;
+  totalFiles?: number;
+  totalSize?: number;
+}
+
+export interface PaginatedFilesResponse {
+  success: boolean;
+  files: StorageFile[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+// Folder interface
+export interface Folder {
+  id: string;
+  name: string;
+  path: string;
+  parentPath?: string;
+  fileCount: number;
+  createdAt: string;
+}
 // ================================
 // VENDOR MANAGEMENT API
 // ================================
@@ -222,6 +506,16 @@ export const vendorManageApi = createApi({
     "VendorOffer",
     "VendorFlag",
     "VendorPerformance",
+    "VendorPersonalInfo",
+    "VendorAddress",
+    "VendorBankInfo",
+    "VendorDocument",
+    "VendorSubscription",
+    "VendorSettings",
+    "VendorOnboarding",
+    "VendorStorage",
+    "VendorFile",
+    "Folders",
   ],
   endpoints: (builder) => ({
     // ================================
@@ -231,7 +525,7 @@ export const vendorManageApi = createApi({
     // Create new vendor (Admin only)
     createVendor: builder.mutation<Vendor, CreateVendorRequest>({
       query: (body) => ({
-        url: "/vendormangement",
+        url: "/vendormanagement",
         method: "POST",
         body,
       }),
@@ -257,12 +551,13 @@ export const vendorManageApi = createApi({
     // Update vendor profile
     updateVendorProfile: builder.mutation<
       Vendor,
-      { id: string; data: UpdateVendorProfileRequest }
+      { id: string; formData: FormData }
     >({
-      query: ({ id, data }) => ({
+      query: ({ id, formData }) => ({
         url: `/vendormanagement/${id}/profile`,
         method: "PATCH",
-        body: data,
+        body: formData,
+        // Don't set Content-Type - let browser set it with boundary
       }),
       invalidatesTags: (result, error, { id }) => [{ type: "Vendor", id }],
     }),
@@ -289,10 +584,9 @@ export const vendorManageApi = createApi({
     }),
 
     // ================================
-    // COMMISSION MANAGEMENT
+    // COMMISSION MANAGEMENT (Category-based)
     // ================================
 
-    // Set commission rate
     setCommissionRate: builder.mutation<
       Vendor,
       { vendorId: string; data: VendorCommissionRequest }
@@ -308,21 +602,22 @@ export const vendorManageApi = createApi({
       ],
     }),
 
-    // Get commission history
+    // Get commission history (category-wise)
     getCommissionHistory: builder.query<any[], string>({
       query: (vendorId) => `/vendormanagement/${vendorId}/commission/history`,
+      
       providesTags: (result, error, vendorId) => [
         { type: "VendorCommission", id: vendorId },
       ],
     }),
 
-    // Bulk update commissions
+    // Bulk update (category-based commissions)
     bulkUpdateCommissions: builder.mutation<
       { updated: number },
       BulkCommissionUpdateRequest
     >({
       query: (data) => ({
-        url: "/vendormanagement/bulk/commission",
+        url: "/vendormanagement/set/bulk/commission",
         method: "POST",
         body: data,
       }),
@@ -572,6 +867,486 @@ export const vendorManageApi = createApi({
         params: data,
       }),
     }),
+   // Create or update personal info - UPDATED
+    createOrUpdatePersonalInfo: builder.mutation<
+      VendorPersonalInfo,
+      { vendorId: string; data: VendorPersonalInfoRequest }
+    >({
+      query: ({ vendorId, data }) => ({
+        url: `/vendormanagement/${vendorId}/personal-info`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { vendorId }) => [
+        { type: "VendorPersonalInfo", id: vendorId },
+        { type: "VendorOnboarding", id: vendorId },
+        { type: "Vendor", id: vendorId },
+      ],
+    }),
+
+    // Get personal info - UPDATED
+    getPersonalInfo: builder.query<VendorPersonalInfo, string>({
+      query: (vendorId) => `/vendormanagement/${vendorId}/personal-info`,
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorPersonalInfo", id: vendorId },
+      ],
+    }),
+
+    // ================================
+    // ADDRESS MANAGEMENT
+    // ================================
+
+    // Create or update address
+    createOrUpdateAddress: builder.mutation<
+      VendorAddress,
+      { vendorId: string; data: VendorAddressRequest }
+    >({
+      query: ({ vendorId, data }) => ({
+        url: `/vendormanagement/${vendorId}/address`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { vendorId }) => [
+        { type: "VendorAddress", id: vendorId },
+        { type: "VendorOnboarding", id: vendorId },
+        { type: "Vendor", id: vendorId },
+      ],
+    }),
+
+    // Get address
+    getAddress: builder.query<VendorAddress, string>({
+      query: (vendorId) => `/vendormanagement/${vendorId}/address`,
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorAddress", id: vendorId },
+      ],
+    }),
+
+    // ================================
+    // BANK INFO MANAGEMENT
+    // ================================
+
+    // Create or update bank info
+    createOrUpdateBankInfo: builder.mutation<
+      VendorBankInfo,
+      { vendorId: string; data: VendorBankInfoRequest }
+    >({
+      query: ({ vendorId, data }) => ({
+        url: `/vendormanagement/${vendorId}/bank-info`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { vendorId }) => [
+        { type: "VendorBankInfo", id: vendorId },
+        { type: "VendorOnboarding", id: vendorId },
+        { type: "Vendor", id: vendorId },
+      ],
+    }),
+
+    // Get bank info
+    getBankInfo: builder.query<VendorBankInfo, string>({
+      query: (vendorId) => `/vendormanagement/${vendorId}/bank-info`,
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorBankInfo", id: vendorId },
+      ],
+    }),
+
+    // ================================
+    // DOCUMENT MANAGEMENT
+    // ================================
+
+    uploadDocuments: builder.mutation<
+      {
+        success: boolean;
+        message: string;
+        data: Array<{
+          fieldName: string;
+          documentType: string;
+          document: VendorDocument;
+          uploadUrl: string;
+        }>;
+        errors?: Array<{ field: string; message: string }>;
+      },
+      { vendorId: string; files: FormData }
+    >({
+      query: ({ vendorId, files }) => ({
+        url: `/vendormanagement/${vendorId}/documents`,
+        method: 'POST',
+        body: files,
+        // Don't set Content-Type - let browser handle it for FormData
+      }),
+      invalidatesTags: (result, error, { vendorId }) => [
+        { type: 'VendorDocument', id: vendorId },
+        { type: 'VendorOnboarding', id: vendorId },
+        { type: 'Vendor', id: vendorId },
+      ],
+    }),
+
+    // Get documents - UPDATED (returns array now)
+    getDocuments: builder.query<VendorDocument[], string>({
+  query: (vendorId) => `/vendormanagement/${vendorId}/documents`,
+  transformResponse: (response: any) => {
+    // Handle different response structures
+    if (Array.isArray(response)) {
+      return response;
+    } else if (response?.data && Array.isArray(response.data)) {
+      return response.data;
+    } else if (response?.documents && Array.isArray(response.documents)) {
+      return response.documents;
+    }
+    return [];
+  },
+  providesTags: (result, error, vendorId) => [
+    { type: "VendorDocument", id: vendorId },
+  ],
+}),
+
+    // Update document status - UPDATED
+    updateDocumentStatus: builder.mutation<
+      VendorDocument,
+      { 
+        documentId: string; 
+        status: "PENDING" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "EXPIRED"; 
+        rejectionReason?: string 
+      }
+    >({
+      query: ({ documentId, status, rejectionReason }) => ({
+        url: `/vendormanagement/documents/${documentId}/status`,
+        method: "PATCH",
+        body: { status, rejectionReason },
+      }),
+      invalidatesTags: (result, error, { documentId }) => [
+        { type: "VendorDocument", id: documentId },
+      ],
+    }),
+    // Delete a document
+    deleteDocument: builder.mutation<
+      { success: boolean; message: string },
+      string
+    >({
+      query: (documentId) => ({
+        url: `/vendormanagement/documents/${documentId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, documentId) => [
+        'VendorDocument',
+      ],
+    }),
+  // Get required document types
+    getRequiredDocumentTypes: builder.query<RequiredDocumentTypes, string>({
+      query: (vendorId) => `/vendormanagement/${vendorId}/required-document-types`,
+      providesTags: (result, error, vendorId) => [
+        { type: "Vendor", id: vendorId },
+      ],
+    }),
+
+    // Check document completion status
+    checkDocumentsComplete: builder.query<{ complete: boolean }, string>({
+      query: (vendorId) => `/vendormanagement/${vendorId}/documents-complete`,
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorDocument", id: vendorId },
+        { type: "VendorOnboarding", id: vendorId },
+      ],
+    }),
+    // ================================
+    // SUBSCRIPTION MANAGEMENT
+    // ================================
+
+    // Create or update subscription
+    createOrUpdateSubscription: builder.mutation<
+      VendorSubscription,
+      { vendorId: string; data: VendorSubscriptionRequest }
+    >({
+      query: ({ vendorId, data }) => ({
+        url: `/vendormanagement/${vendorId}/subscription`,
+        method: "PUT",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { vendorId }) => [
+        { type: "VendorSubscription", id: vendorId },
+        { type: "Vendor", id: vendorId },
+      ],
+    }),
+
+    // Get subscription
+    getSubscription: builder.query<VendorSubscription, string>({
+      query: (vendorId) => `/vendormanagement/${vendorId}/subscription`,
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorSubscription", id: vendorId },
+      ],
+    }),
+
+    // Cancel subscription
+    cancelSubscription: builder.mutation<VendorSubscription, string>({
+      query: (vendorId) => ({
+        url: `/vendormanagement/${vendorId}/subscription/cancel`,
+        method: "PATCH",
+      }),
+      invalidatesTags: (result, error, vendorId) => [
+        { type: "VendorSubscription", id: vendorId },
+        { type: "Vendor", id: vendorId },
+      ],
+    }),
+
+    // ================================
+    // ONBOARDING MANAGEMENT
+    // ================================
+
+    // Get onboarding status
+      getOnboardingStatus: builder.query<VendorOnboardingStatus, string>({
+      query: (vendorId) => `/vendormanagement/${vendorId}/onboarding-status`,
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorOnboarding", id: vendorId },
+      ],
+    }),
+
+    // ================================
+    // SETTINGS MANAGEMENT
+    // ================================
+
+    // Get settings
+    getSettings: builder.query<VendorSettings, string>({
+      query: (vendorId) => `/vendormanagement/${vendorId}/settings`,
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorSettings", id: vendorId },
+      ],
+    }),
+
+    // Update settings
+    updateSettings: builder.mutation<
+      VendorSettings,
+      { vendorId: string; data: VendorSettingsRequest }
+    >({
+      query: ({ vendorId, data }) => ({
+        url: `/vendormanagement/${vendorId}/settings`,
+        method: "PATCH",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { vendorId }) => [
+        { type: "VendorSettings", id: vendorId },
+        { type: "Vendor", id: vendorId },
+      ],
+    }),
+
+    // ================================
+    // VERIFICATION MANAGEMENT
+    // ================================
+
+    // Verify vendor (Admin only)
+    verifyVendor: builder.mutation<Vendor, string>({
+      query: (vendorId) => ({
+        url: `/vendormanagement/${vendorId}/verify`,
+        method: "PATCH",
+      }),
+      invalidatesTags: (result, error, vendorId) => [
+        { type: "Vendor", id: vendorId },
+      ],
+    }),
+
+    // Reject vendor (Admin only) - FIXED VERSION
+    rejectVendor: builder.mutation<
+      Vendor,
+      { vendorId: string; data: VendorVerificationRequest }
+    >({
+      query: ({ vendorId, data }) => ({
+        url: `/vendormanagement/${vendorId}/reject`,
+        method: "PATCH",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { vendorId }) => [
+        { type: "Vendor", id: vendorId },
+      ],
+    }),
+
+    // Request re-verification
+    requestReVerification: builder.mutation<Vendor, string>({
+      query: (vendorId) => ({
+        url: `/vendormanagement/${vendorId}/request-reverification`,
+        method: "PATCH",
+      }),
+      invalidatesTags: (result, error, vendorId) => [
+        { type: "Vendor", id: vendorId },
+      ],
+    }),
+
+    // ================================
+    // COMPLETE PROFILE MANAGEMENT
+    // ================================
+
+    // Get complete vendor profile
+    getCompleteVendorProfile: builder.query<CompleteVendorProfile, string>({
+      query: (vendorId) => `/vendormanagement/${vendorId}/complete-profile`,
+      providesTags: (result, error, vendorId) => [
+        { type: "Vendor", id: vendorId },
+        { type: "VendorPersonalInfo", id: vendorId },
+        { type: "VendorAddress", id: vendorId },
+        { type: "VendorBankInfo", id: vendorId },
+        { type: "VendorDocument", id: vendorId },
+        { type: "VendorSubscription", id: vendorId },
+        { type: "VendorSettings", id: vendorId },
+        { type: "VendorOnboarding", id: vendorId },
+      ],
+    }),
+    // ================================
+    // STORAGE MANAGEMENT
+    // ================================
+
+    // Upload single file
+    uploadFile: builder.mutation<UploadFileResponse, FormData>({
+      query: (formData) => ({
+        url: "/vendor-storage/upload",
+        method: "POST",
+        body: formData,
+      }),
+      invalidatesTags: ["VendorFile", "VendorStorage"],
+    }),
+
+    // Upload multiple files
+    uploadMultipleFiles: builder.mutation<UploadFileResponse, FormData>({
+      query: (formData) => ({
+        url: "/vendor-storage/upload-multiple",
+        method: "POST",
+        body: formData,
+      }),
+      invalidatesTags: ["VendorFile", "VendorStorage"],
+    }),
+
+    // Delete file
+    deleteFile: builder.mutation<{ success: boolean; message: string }, string>(
+      {
+        query: (fileId) => ({
+          url: `/vendor-storage/files/${fileId}`,
+          method: "DELETE",
+        }),
+        invalidatesTags: ["VendorFile", "VendorStorage"],
+      }
+    ),
+
+    // Get storage stats
+    getStorageStats: builder.query<StorageStats, string>({
+      query: (vendorId) => `/vendor-storage/stats?vendorId=${vendorId}`,
+      transformResponse: (response: {
+        success: boolean;
+        stats: StorageStats;
+      }) => response.stats,
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorStorage", id: vendorId },
+      ],
+    }),
+
+    // Check quota
+    checkQuota: builder.mutation<
+      QuotaCheckResponse,
+      { vendorId: string; requiredSpace: number }
+    >({
+      query: ({ vendorId, requiredSpace }) => ({
+        url: "/vendor-storage/check-quota",
+        method: "POST",
+        body: { vendorId, requiredSpace },
+      }),
+    }),
+
+    // Purchase additional storage
+    purchaseStorage: builder.mutation<
+      { success: boolean; message: string; additionalGB: number },
+      { vendorId: string; additionalGB: number }
+    >({
+      query: ({ vendorId, additionalGB }) => ({
+        url: "/vendor-storage/purchase",
+        method: "POST",
+        body: { vendorId, additionalGB },
+      }),
+      invalidatesTags: ["VendorStorage"],
+    }),
+
+    // Get vendor files
+    getVendorFiles: builder.query<
+      PaginatedFilesResponse,
+      {
+        vendorId: string;
+        category?: string;
+        page?: number;
+        limit?: number;
+        fileType?: "IMAGE" | "DOCUMENT";
+      }
+    >({
+      query: (params) => ({
+        url: "/vendor-storage/files",
+        method: "GET",
+        params,
+      }),
+      providesTags: (result, error, { vendorId }) => [
+        { type: "VendorFile", id: vendorId },
+      ],
+    }),
+    // ================================
+    // FOLDER MANAGEMENT
+    // ================================
+
+    // Get all folders
+    getFolders: builder.query<Folder[], void>({
+      query: () => "/filemanager/folders",
+      providesTags: (result) =>
+        result && result.length > 0
+          ? [
+              ...result.map(({ id }) => ({
+                type: "Folders" as const,
+                id: id.toString(),
+              })),
+              { type: "Folders", id: "LIST" },
+            ]
+          : [{ type: "Folders", id: "LIST" }],
+    }),
+
+    // Create a new folder
+    createFolder: builder.mutation<
+      { success: boolean; folder: Folder },
+      { name: string; parentPath?: string }
+    >({
+      query: ({ name, parentPath }) => ({
+        url: "/filemanager/folders",
+        method: "POST",
+        body: { name, parentPath },
+      }),
+      invalidatesTags: [{ type: "Folders", id: "LIST" }],
+    }),
+
+    // Rename folder
+    renameFolder: builder.mutation<
+      { success: boolean; newPath: string },
+      { folderId: string; newName: string }
+    >({
+      query: ({ folderId, newName }) => ({
+        url: `/filemanager/folders/${folderId}/rename`,
+        method: "PUT",
+        body: { newName },
+      }),
+      invalidatesTags: [{ type: "Folders", id: "LIST" }],
+    }),
+
+    // Delete folder
+    deleteFolder: builder.mutation<
+      { success: boolean; message: string },
+      { folderId: string }
+    >({
+      query: ({ folderId }) => ({
+        url: `/filemanager/folders/${folderId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "Folders", id: "LIST" }],
+    }),
+
+    // Move files to folder
+    moveFilesToFolder: builder.mutation<
+      { success: boolean; movedCount: number },
+      { fileIds: string[]; targetFolderPath: string }
+    >({
+      query: ({ fileIds, targetFolderPath }) => ({
+        url: "/filemanager/files/move",
+        method: "POST",
+        body: { fileIds, targetFolderPath },
+      }),
+      invalidatesTags: [{ type: "Folders", id: "LIST" }],
+    }),
   }),
 });
 
@@ -580,6 +1355,36 @@ export const vendorManageApi = createApi({
 // ================================
 
 export const {
+  // personalifo
+  useCreateOrUpdatePersonalInfoMutation,
+  useGetPersonalInfoQuery,
+  // vendor address
+  useCreateOrUpdateAddressMutation,
+  useGetAddressQuery,
+  // vendor bank info
+  useCreateOrUpdateBankInfoMutation,
+  useGetBankInfoQuery,
+  // vendor document
+  useUploadDocumentsMutation,
+  useGetDocumentsQuery,
+  useDeleteDocumentMutation,  
+  useUpdateDocumentStatusMutation,
+  useGetRequiredDocumentTypesQuery,
+  useCheckDocumentsCompleteQuery,
+  // vendor subscription
+  useCreateOrUpdateSubscriptionMutation,
+  useGetSubscriptionQuery,
+  useCancelSubscriptionMutation,
+  // vendor settings
+  useGetOnboardingStatusQuery,
+  useGetSettingsQuery,
+  useUpdateSettingsMutation,
+  // vendor verification
+  useVerifyVendorMutation,
+  useRejectVendorMutation,
+  useRequestReVerificationMutation,
+  // vendor complete profile where need
+  useGetCompleteVendorProfileQuery,
   // Vendor CRUD
   useCreateVendorMutation,
   useGetVendorsQuery,
@@ -627,4 +1432,18 @@ export const {
 
   // Export
   useExportVendorsMutation,
+  // Storage Management
+  useUploadFileMutation,
+  useUploadMultipleFilesMutation,
+  useDeleteFileMutation,
+  useGetStorageStatsQuery,
+  useCheckQuotaMutation,
+  usePurchaseStorageMutation,
+  useGetVendorFilesQuery,
+  // Folder Management
+  useGetFoldersQuery,
+  useCreateFolderMutation,
+  useRenameFolderMutation,
+  useDeleteFolderMutation,
+  useMoveFilesToFolderMutation,
 } = vendorManageApi;

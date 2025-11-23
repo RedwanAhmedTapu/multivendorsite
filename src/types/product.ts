@@ -6,6 +6,7 @@ export interface Product {
   name: string;
   description?: string;
   slug: string;
+  videoUrl?: string;  
   vendorId: number;
   vendor: Vendor;
   categoryId: string;
@@ -17,7 +18,23 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
 }
-
+export interface BulkProductData {
+  id: string;
+  name: string;
+  description: string;
+  sku: string;
+  price: number;
+  stock: number;
+  variantGroupNo?: number;
+  images: string[];
+  videoUrl?: string;
+  specInputs: ProductSpecificationInput[];
+  attributeSettings: ProductAttributeSettingInput[];
+  variantInputs: ProductVariantInput[];
+  shippingWarranty?: ProductShippingWarrantyInput;
+  errors: Record<string, string>;
+  status: 'draft' | 'processing' | 'success' | 'error';
+}
 // -------- ProductVariant --------
 export interface ProductVariant {
   id: string;
@@ -126,6 +143,7 @@ export interface ProductShippingWarrantyInput {
 export interface CreateProductData {
   name: string;
   description?: string;
+  videoUrl?: string;
   categoryId: string;
   vendorId: string;
   images: (string | { url: string; altText?: string })[];
@@ -140,6 +158,7 @@ export interface CreateProductData {
 export interface UpdateProductData {
   name?: string;
   description?: string;
+  videoUrl?: string;  
   vendorId?: number;
   categoryId?: string;
   images?: ProductImageInput[];
@@ -160,6 +179,7 @@ export interface ProductFilter {
   searchQuery?: string;
 }
 
+
 // -------- Product List Item for Efficient Queries --------
 export interface ProductListItem {
   id: string;
@@ -173,6 +193,7 @@ export interface ProductListItem {
     id: string;
     name: string;
   };
+  videoUrl?: string;
   images: ProductImage[];
   variants: {
     id: string;

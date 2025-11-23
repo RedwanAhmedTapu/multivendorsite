@@ -163,7 +163,7 @@ function AdminLayout({ main }: AdminLayoutProps) {
           href: "#",
           icon: MapPin,
           subItems: [
-            { title: "Methods", href: "/admin/shipping/methods", icon: Settings },
+            { title: "Methods", href: "/admin-dashboard/shippingapi", icon: Settings },
             { title: "Coverage Areas", href: "/admin/shipping/areas", icon: MapPin },
             { title: "Real-Time Tracking", href: "/admin/shipping/tracking", icon: Truck },
           ],
@@ -187,7 +187,7 @@ function AdminLayout({ main }: AdminLayoutProps) {
           href: "#",
           icon: Tag,
           subItems: [
-            { title: "All Offers", href: "/admin/offers/list", icon: Database },
+            { title: "All Offers", href: "/admin-dashboard/offer-manage", icon: Database },
             { title: "Add Offer", href: "/admin/offers/add", icon: PlusCircle },
             { title: "Email & SMS Campaigns", href: "/admin/promotions/email-sms", icon: Mail },
             { title: "Ad Spaces", href: "/admin/promotions/ads", icon: Monitor },
@@ -204,10 +204,10 @@ function AdminLayout({ main }: AdminLayoutProps) {
           href: "#",
           icon: Users,
           subItems: [
-            { title: "All Employees", href: "/admin/employees/list", icon: User },
-            { title: "Add Employee", href: "/admin/employees/add", icon: PlusCircle },
-            { title: "Roles & Permissions", href: "/admin/employees/roles", icon: Shield },
-            { title: "Task Management", href: "/admin/employees/tasks", icon: Calendar },
+            { title: "All Employees", href: "/admin-dashboard/employees", icon: User },
+            { title: "Add Employee", href: "/admin-dashboard/employees/add", icon: PlusCircle },
+            { title: "Roles & Permissions", href: "/admin-dashboard/employees/roles-permissions", icon: Shield },
+            { title: "Task Management", href: "/admin-board/employees/tasks", icon: Calendar },
           ],
         },
       ],
@@ -227,7 +227,7 @@ function AdminLayout({ main }: AdminLayoutProps) {
     {
       title: "Content Management",
       items: [
-        { title: "Banners", href: "/admin/content/banners", icon: Layout },
+        { title: "Banners", href: "/admin-dashboard/banners", icon: Layout },
         { title: "Blogs", href: "/admin/content/blogs", icon: FileText },
         { title: "FAQ", href: "/admin/content/faq", icon: HelpCircle },
       ],

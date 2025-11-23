@@ -57,7 +57,7 @@ const HeroSlider = () => {
                 }`}
               >
                 <Image
-                  src={`http://localhost:5000/${slide.imageUrl}`}
+                  src={slide.imageUrl}
                   alt={slide.title || "image"}
                   fill
                   style={{ objectFit: "cover" }}

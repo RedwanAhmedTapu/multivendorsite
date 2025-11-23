@@ -8,7 +8,12 @@ import {
 } from "../types/type";
 import baseQueryWithReauth from "./baseQueryWithReauth";
 import { Attribute } from "next-themes";
- interface CategoryAttribute {
+
+// ===========================
+// TYPE DEFINITIONS
+// ===========================
+
+interface CategoryAttribute {
   id: string;
   categoryId: string;
   category?: Category;
@@ -20,7 +25,93 @@ import { Attribute } from "next-themes";
   createdAt: string;
   updatedAt: string;
 }
-// API Slice Definition
+
+// Filter API Response Types
+export interface FilterableAttributeValue {
+  id: string;
+  value: string;
+  productCount: number;
+}
+
+export interface FilterableAttribute {
+  id: string;
+  name: string;
+  slug: string;
+  type: 'TEXT' | 'NUMBER' | 'BOOLEAN' | 'SELECT';
+  values: FilterableAttributeValue[];
+}
+
+export interface FilterableSpecificationValue {
+  value: string | number;
+  productCount: number;
+}
+
+export interface FilterableSpecification {
+  id: string;
+  name: string;
+  slug: string;
+  type: 'TEXT' | 'NUMBER' | 'BOOLEAN' | 'SELECT';
+  unit?: string;
+  values: FilterableSpecificationValue[];
+  options?: Array<{ id: string; value: string }>;
+}
+
+export interface PriceRange {
+  min: number;
+  max: number;
+}
+
+export interface CategoryHierarchy {
+  id: string;
+  name: string;
+  slug: string;
+  level: number;
+}
+
+export interface CategoryFilterResponse {
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    breadcrumb: CategoryHierarchy[];
+  };
+  filters: {
+    attributes: FilterableAttribute[];
+    specifications: FilterableSpecification[];
+    priceRange: PriceRange;
+  };
+  meta: {
+    totalProducts: number;
+    hasFilters: boolean;
+  };
+}
+
+export interface MultipleCategoriesFilterResponse {
+  filters: {
+    attributes: FilterableAttribute[];
+    specifications: FilterableSpecification[];
+    priceRange: PriceRange;
+  };
+  meta: {
+    totalProducts: number;
+    categoriesProcessed: number;
+    hasFilters: boolean;
+  };
+}
+
+export interface FilterSummaryResponse {
+  attributeCount: number;
+  specificationCount: number;
+  totalFilterOptions: number;
+  priceRange: PriceRange;
+  totalProducts: number;
+  hasFilters: boolean;
+}
+
+// ===========================
+// API SLICE DEFINITION
+// ===========================
+
 export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
@@ -31,9 +122,13 @@ export const apiSlice = createApi({
     "SpecificationOption",
     "Product",
     "Auth",
+    "CategoryFilter",
   ],
   endpoints: (builder) => ({
-    // ---------- Category Endpoints ----------
+    // ==========================================
+    // CATEGORY ENDPOINTS
+    // ==========================================
+    
     getCategories: builder.query<Category[], void>({
       query: () => "/categories",
       providesTags: (result) =>
@@ -56,16 +151,23 @@ export const apiSlice = createApi({
         method: "POST",
         body: formData,
       }),
-      invalidatesTags: [{ type: "Category", id: "LIST" }],
+      invalidatesTags: [
+        { type: "Category", id: "LIST" },
+        { type: "CategoryFilter", id: "LIST" },
+      ],
     }),
 
-   updateCategory: builder.mutation<Category, { id: string; formData: FormData }>({
-  query: ({ id, formData }) => ({
-    url: `/categories/${id}`,
-    method: "PUT",
-    body: formData,
-  }),
-}),
+    updateCategory: builder.mutation<Category, { id: string; formData: FormData }>({
+      query: ({ id, formData }) => ({
+        url: `/categories/${id}`,
+        method: "PUT",
+        body: formData,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Category", id },
+        { type: "CategoryFilter", id },
+      ],
+    }),
 
     deleteCategory: builder.mutation<{ message: string }, string>({
       query: (id) => ({
@@ -75,6 +177,7 @@ export const apiSlice = createApi({
       invalidatesTags: (result, error, id) => [
         { type: "Category", id },
         { type: "Category", id: "LIST" },
+        { type: "CategoryFilter", id: "LIST" },
       ],
     }),
 
@@ -87,10 +190,84 @@ export const apiSlice = createApi({
         method: "POST",
         body: formData,
       }),
-      invalidatesTags: ["Category", "Attribute", "Specification"],
+      invalidatesTags: [
+        "Category",
+        "Attribute",
+        "Specification",
+        "CategoryFilter",
+      ],
     }),
 
-    // ---------- Attribute Endpoints ----------
+    // ==========================================
+    // CATEGORY FILTER ENDPOINTS
+    // ==========================================
+
+    /**
+     * Get filter data for a single category by ID
+     */
+    getCategoryFilters: builder.query<CategoryFilterResponse, string>({
+      query: (categoryId) => `/categories-filter/${categoryId}/filters`,
+      providesTags: (result, error, categoryId) => [
+        { type: "CategoryFilter", id: categoryId },
+      ],
+    }),
+
+    /**
+     * Get filter data for a single category by slug (SEO-friendly)
+     */
+    getCategoryFiltersBySlug: builder.query<CategoryFilterResponse, string>({
+      query: (slug) => `/categories-filter/slug/${slug}/filters`,
+      providesTags: (result) =>
+        result
+          ? [{ type: "CategoryFilter", id: result.category.id }]
+          : [{ type: "CategoryFilter", id: "LIST" }],
+    }),
+
+    /**
+     * Get combined filter data for multiple categories by IDs
+     */
+    getMultipleCategoriesFilters: builder.query<
+      MultipleCategoriesFilterResponse,
+      string[]
+    >({
+      query: (categoryIds) => ({
+        url: "/categories-filter/filters/multiple",
+        params: { categoryIds: categoryIds.join(",") },
+      }),
+      providesTags: (result, error, categoryIds) => [
+        ...categoryIds.map((id) => ({ type: "CategoryFilter" as const, id })),
+        { type: "CategoryFilter", id: "MULTIPLE" },
+      ],
+    }),
+
+    /**
+     * Get combined filter data for multiple categories by slugs
+     */
+    getMultipleCategoriesFiltersBySlugs: builder.query<
+      MultipleCategoriesFilterResponse,
+      string[]
+    >({
+      query: (categorySlugs) => ({
+        url: "/categories-filter/filters/multiple-slugs",
+        params: { categorySlugs: categorySlugs.join(",") },
+      }),
+      providesTags: [{ type: "CategoryFilter", id: "MULTIPLE" }],
+    }),
+
+    /**
+     * Get filter summary (lightweight endpoint)
+     */
+    getCategoryFilterSummary: builder.query<FilterSummaryResponse, string>({
+      query: (categoryId) => `/categories-filter/${categoryId}/filters/summary`,
+      providesTags: (result, error, categoryId) => [
+        { type: "CategoryFilter", id: `${categoryId}-summary` },
+      ],
+    }),
+
+    // ==========================================
+    // ATTRIBUTE ENDPOINTS
+    // ==========================================
+    
     getAttributes: builder.query<CategoryAttribute[], string>({
       query: (categoryId) => `/attributes/${categoryId}`,
       providesTags: ["Attribute"],
@@ -103,7 +280,7 @@ export const apiSlice = createApi({
         name: string;
         type: string;
         filterable: boolean;
-        isRequired: boolean; // ✅ fixed naming
+        isRequired: boolean;
         values?: string[];
       }
     >({
@@ -112,7 +289,7 @@ export const apiSlice = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Attribute"],
+      invalidatesTags: ["Attribute", { type: "CategoryFilter", id: "LIST" }],
     }),
 
     updateAttribute: builder.mutation<
@@ -123,7 +300,7 @@ export const apiSlice = createApi({
           name: string;
           type: string;
           filterable: boolean;
-          isRequired: boolean; // ✅ fixed naming
+          isRequired: boolean;
         }>;
       }
     >({
@@ -132,7 +309,10 @@ export const apiSlice = createApi({
         method: "PUT",
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [{ type: "Attribute", id }],
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Attribute", id },
+        { type: "CategoryFilter", id: "LIST" },
+      ],
     }),
 
     deleteAttribute: builder.mutation<{ message: string }, string>({
@@ -140,7 +320,10 @@ export const apiSlice = createApi({
         url: `/attributes/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: (result, error, id) => [{ type: "Attribute", id }],
+      invalidatesTags: (result, error, id) => [
+        { type: "Attribute", id },
+        { type: "CategoryFilter", id: "LIST" },
+      ],
     }),
 
     addAttributeValue: builder.mutation<
@@ -152,7 +335,7 @@ export const apiSlice = createApi({
         method: "POST",
         body: { value },
       }),
-      invalidatesTags: ["Attribute"],
+      invalidatesTags: ["Attribute", { type: "CategoryFilter", id: "LIST" }],
     }),
 
     deleteAttributeValue: builder.mutation<{ message: string }, string>({
@@ -160,10 +343,13 @@ export const apiSlice = createApi({
         url: `/attributes/values/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["Attribute"],
+      invalidatesTags: ["Attribute", { type: "CategoryFilter", id: "LIST" }],
     }),
 
-    // ---------- Specification Endpoints ----------
+    // ==========================================
+    // SPECIFICATION ENDPOINTS
+    // ==========================================
+    
     getSpecifications: builder.query<CategorySpecification[], string>({
       query: (categoryId) => `/specifications/${categoryId}`,
       providesTags: ["Specification"],
@@ -177,7 +363,7 @@ export const apiSlice = createApi({
         type: string;
         unit?: string;
         filterable: boolean;
-        isRequired: boolean; // ✅ fixed naming
+        isRequired: boolean;
       }
     >({
       query: (body) => ({
@@ -185,7 +371,7 @@ export const apiSlice = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Specification"],
+      invalidatesTags: ["Specification", { type: "CategoryFilter", id: "LIST" }],
     }),
 
     updateSpecification: builder.mutation<
@@ -208,6 +394,7 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: (result, error, { id }) => [
         { type: "Specification", id },
+        { type: "CategoryFilter", id: "LIST" },
       ],
     }),
 
@@ -216,10 +403,16 @@ export const apiSlice = createApi({
         url: `/specifications/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: (result, error, id) => [{ type: "Specification", id }],
+      invalidatesTags: (result, error, id) => [
+        { type: "Specification", id },
+        { type: "CategoryFilter", id: "LIST" },
+      ],
     }),
 
-    // ---------- SpecificationOption Endpoints ----------
+    // ==========================================
+    // SPECIFICATION OPTION ENDPOINTS
+    // ==========================================
+    
     getSpecificationOptions: builder.query<SpecificationOption[], string>({
       query: (specificationId) => `/specifications/${specificationId}/options`,
       providesTags: ["SpecificationOption"],
@@ -234,7 +427,10 @@ export const apiSlice = createApi({
         method: "POST",
         body: { value },
       }),
-      invalidatesTags: ["SpecificationOption"],
+      invalidatesTags: [
+        "SpecificationOption",
+        { type: "CategoryFilter", id: "LIST" },
+      ],
     }),
 
     deleteSpecificationOption: builder.mutation<void, string>({
@@ -242,12 +438,18 @@ export const apiSlice = createApi({
         url: `/specifications/options/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["SpecificationOption"],
+      invalidatesTags: [
+        "SpecificationOption",
+        { type: "CategoryFilter", id: "LIST" },
+      ],
     }),
   }),
 });
 
-// Export hooks for usage in components
+// ===========================
+// EXPORT HOOKS
+// ===========================
+
 export const {
   // ---------- Category hooks ----------
   useGetCategoriesQuery,
@@ -256,6 +458,13 @@ export const {
   useUpdateCategoryMutation,
   useDeleteCategoryMutation,
   useBulkImportCategoriesMutation,
+
+  // ---------- Category Filter hooks ----------
+  useGetCategoryFiltersQuery,
+  useGetCategoryFiltersBySlugQuery,
+  useGetMultipleCategoriesFiltersQuery,
+  useGetMultipleCategoriesFiltersBySlugsQuery,
+  useGetCategoryFilterSummaryQuery,
 
   // ---------- Attribute hooks ----------
   useGetAttributesQuery,

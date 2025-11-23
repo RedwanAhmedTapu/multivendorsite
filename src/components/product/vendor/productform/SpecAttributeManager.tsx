@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 import { 
   Specification, 
   Attribute, 
-  AttributeValue, 
 } from "@/types/type";
 import { ProductAttributeSettingInput, ProductSpecificationInput } from "@/types/product";
 
@@ -43,39 +42,47 @@ export default function SpecAttributeManager({
   // Initialize on category change
   useEffect(() => {
     if (categoryId) {
-      // Initialize attribute settings
+      // Initialize attribute settings - attributes are ALWAYS for variants
       const attributeSettings: ProductAttributeSettingInput[] = categoryAttributes.map(attr => ({
         attributeId: attr.id,
-        isVariant: true,
+        isVariant: true, // Always true for attributes
       }));
       setAttributes(attributeSettings);
 
-      // Initialize specs
-      const specInputs: ProductSpecificationInput[] = [];
-      setSpecs(specInputs);
+      // Initialize specs - empty by default
+      setSpecs([]);
 
       // Initialize field values
       const initialValues: Record<string, FieldValue> = {};
+      
+      // Specifications default to NOT included in variant (they're just specs)
       categorySpecifications.forEach(spec => {
         initialValues[spec.id] = { value: '', includeInVariant: false };
       });
+      
+      // Attributes default to included in variant (they define variants)
       categoryAttributes.forEach(attr => {
         initialValues[attr.id] = { value: '', includeInVariant: true };
       });
+      
       setFieldValues(initialValues);
     }
   }, [categoryId, categoryAttributes, categorySpecifications, setAttributes, setSpecs]);
 
   // Handle value change
   const handleValueChange = (id: string, name: string, value: any, isSpecification: boolean) => {
+    // First update field values
     setFieldValues((prev: Record<string, FieldValue>) => ({
       ...prev,
       [id]: { ...prev[id], value },
     }));
 
+    // Then handle specs update separately (outside of setState)
     if (isSpecification) {
-      const fv = fieldValues[id];
-      if (fv?.includeInVariant && value !== undefined && value !== null) {
+      // Get current includeInVariant value
+      const shouldInclude = fieldValues[id]?.includeInVariant ?? false;
+      
+      if (shouldInclude && value !== undefined && value !== null && value !== '') {
         const specInput: ProductSpecificationInput = {
           specificationId: id,
           valueString: typeof value === 'string' ? value : undefined,
@@ -83,10 +90,14 @@ export default function SpecAttributeManager({
         };
         const filtered = specs.filter(s => s.specificationId !== id);
         setSpecs([...filtered, specInput]);
+      } else if (!shouldInclude || value === undefined || value === null || value === '') {
+        setSpecs(specs.filter(s => s.specificationId !== id));
       }
     }
 
-    onVariantFieldChange(id, name, value, fieldValues[id]?.includeInVariant || false);
+    // Notify parent about variant field changes
+    const includeInVariant = fieldValues[id]?.includeInVariant || false;
+    onVariantFieldChange(id, name, value, includeInVariant);
   };
 
   // Handle Include in Variant toggle
@@ -97,6 +108,7 @@ export default function SpecAttributeManager({
     }));
 
     if (isSpecification) {
+      // For specifications: include/exclude from specs array based on toggle
       if (include && fieldValues[id]?.value) {
         const specInput: ProductSpecificationInput = {
           specificationId: id,
@@ -106,38 +118,44 @@ export default function SpecAttributeManager({
         const filtered = specs.filter(s => s.specificationId !== id);
         setSpecs([...filtered, specInput]);
       } else {
+        // Remove from specs if toggle is off
         setSpecs(specs.filter(s => s.specificationId !== id));
       }
     } else {
+      // For attributes: just update the isVariant flag (attributes always use attributeId, not specificationId)
       const updatedAttributes = attributes.map(attr =>
         attr.attributeId === id ? { ...attr, isVariant: include } : attr
       );
       setAttributes(updatedAttributes);
     }
 
+    // Notify parent
     onVariantFieldChange(id, name, fieldValues[id]?.value, include);
   };
 
   // Render input field based on type
-  const renderInputField = (item: Specification | Attribute) => {
+  const renderInputField = (item: Specification | Attribute, isSpecification: boolean) => {
     const currentValue = fieldValues[item.id]?.value || '';
-
-    const isSpec = !('attributeId' in item);
+    
+    // For specifications, use 'options' property; for attributes, use 'values'
+    const optionsList = isSpecification 
+      ? (item as Specification).options || [] 
+      : (item as Attribute).values || [];
 
     switch (item.type) {
       case 'SELECT':
         return (
           <Select
             value={currentValue}
-            onValueChange={(value) => handleValueChange(item.id, item.name, value, isSpec)}
+            onValueChange={(value) => handleValueChange(item.id, item.name, value, isSpecification)}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder={`Select ${item.name}`} />
             </SelectTrigger>
             <SelectContent>
-              {(item.values || []).map((value: any) => (
-                <SelectItem key={value.id} value={value.value}>
-                  {value.value}
+              {optionsList.map((option: any) => (
+                <SelectItem key={option.id} value={option.value}>
+                  {option.value}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -149,7 +167,7 @@ export default function SpecAttributeManager({
             <Checkbox
               id={`${item.id}-checkbox`}
               checked={!!currentValue}
-              onCheckedChange={(checked) => handleValueChange(item.id, item.name, checked, isSpec)}
+              onCheckedChange={(checked) => handleValueChange(item.id, item.name, checked, isSpecification)}
             />
             <label htmlFor={`${item.id}-checkbox`} className="text-sm">
               {currentValue ? 'Yes' : 'No'}
@@ -161,7 +179,7 @@ export default function SpecAttributeManager({
           <Input
             type="number"
             value={currentValue}
-            onChange={(e) => handleValueChange(item.id, item.name, parseFloat(e.target.value) || 0, isSpec)}
+            onChange={(e) => handleValueChange(item.id, item.name, parseFloat(e.target.value) || 0, isSpecification)}
             placeholder={`Enter ${item.name}`}
             className="w-full"
           />
@@ -171,7 +189,7 @@ export default function SpecAttributeManager({
         return (
           <Input
             value={currentValue}
-            onChange={(e) => handleValueChange(item.id, item.name, e.target.value, isSpec)}
+            onChange={(e) => handleValueChange(item.id, item.name, e.target.value, isSpecification)}
             placeholder={`Enter ${item.name}`}
             className="w-full"
           />
@@ -192,7 +210,7 @@ export default function SpecAttributeManager({
         <span className="text-sm font-medium">{item.name}</span>
         <div className="flex items-center gap-2">
           <span className={`text-xs ${isAttribute ? "text-blue-600" : "text-gray-500"}`}>
-            {isAttribute ? "Variant" : "Include"}
+            {isAttribute ? "Use for Variant" : "Include"}
           </span>
           <Switch
             checked={fieldValues[item.id]?.includeInVariant !== false}
@@ -203,12 +221,17 @@ export default function SpecAttributeManager({
         </div>
       </div>
       <div className="space-y-1">
-        {renderInputField(item)}
-        {item.values && item.values.length > 0 && (
-          <p className="text-xs text-gray-500">
-            {item.values.length} option{item.values.length !== 1 ? "s" : ""} available
-          </p>
-        )}
+        {renderInputField(item, !isAttribute)}
+        {(() => {
+          const optionsList = !isAttribute 
+            ? (item as Specification).options || [] 
+            : (item as Attribute).values || [];
+          return optionsList.length > 0 && (
+            <p className="text-xs text-gray-500">
+              {optionsList.length} option{optionsList.length !== 1 ? "s" : ""} available
+            </p>
+          );
+        })()}
       </div>
     </Card>
   );
@@ -230,6 +253,9 @@ export default function SpecAttributeManager({
             <h4 className="font-medium mb-3 text-md flex items-center">
               <span className="bg-gray-100 p-1 rounded mr-2">📋</span>
               Specifications
+              <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
+                Product Details
+              </span>
             </h4>
             {categorySpecifications.length === 0 ? (
               <div className="text-center py-4 bg-gray-50 rounded-lg">
@@ -254,7 +280,7 @@ export default function SpecAttributeManager({
               <span className="bg-blue-100 p-1 rounded mr-2 text-blue-600">🎨</span>
               Attributes
               <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                For Variants
+                For Product Variants
               </span>
             </h4>
             {categoryAttributes.length === 0 ? (
@@ -275,19 +301,19 @@ export default function SpecAttributeManager({
           {/* Summary */}
           <div className="bg-gray-50 p-4 rounded-lg">
             <h5 className="font-medium mb-2 text-sm">Summary</h5>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
               <div>
                 <span className="text-gray-600">Specifications: </span>
-                <span className="font-medium">{categorySpecifications.length}</span>
+                <span className="font-medium">{specs.length} selected</span>
               </div>
               <div>
                 <span className="text-gray-600">Attributes: </span>
-                <span className="font-medium">{categoryAttributes.length}</span>
+                <span className="font-medium">{categoryAttributes.length} total</span>
               </div>
               <div>
-                <span className="text-gray-600">Included in variants: </span>
+                <span className="text-gray-600">Active for variants: </span>
                 <span className="font-medium">
-                  {Object.values(fieldValues).filter(fv => fv.includeInVariant && fv.value).length}
+                  {attributes.filter(a => a.isVariant).length}
                 </span>
               </div>
             </div>

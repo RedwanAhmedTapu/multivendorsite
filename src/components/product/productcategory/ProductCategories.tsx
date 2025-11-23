@@ -1,4 +1,3 @@
-// components/product/productcategory/ProductCategories.tsx
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -14,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 
 interface Category {
+  id: string;
   name: string;
   image?: string;
   highlight?: boolean;
@@ -23,10 +23,11 @@ interface Category {
 
 interface Props {
   categories: Category[];
-  onSelectCategory?: (category: string) => void;
+  onSelectCategory?: (categoryId: string) => void;
+  selectedCategory?: string;
 }
 
-const categoryIcons: Record<string, React.JSX.Element> = {
+const categoryIcons: Record<string, React.ReactElement> = {
   Fashion: <Shirt className="w-4 h-4 text-gray-600" />,
   Electronics: <Laptop className="w-4 h-4 text-gray-600" />,
   "Home & Garden": <Home className="w-4 h-4 text-gray-600" />,
@@ -36,6 +37,7 @@ const categoryIcons: Record<string, React.JSX.Element> = {
 export default function ProductCategories({
   categories,
   onSelectCategory,
+  selectedCategory,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
@@ -70,6 +72,10 @@ export default function ProductCategories({
     };
   }, []);
 
+  const getCategoryIcon = (categoryName: string) => {
+    return categoryIcons[categoryName] || categoryIcons["Default"];
+  };
+
   return (
     <div className="relative inline-block text-left" ref={dropdownRef}>
       {/* Trigger Button */}
@@ -93,21 +99,21 @@ export default function ProductCategories({
             isMobile ? "w-full" : "w-64"
           )}>
             {categories.map((cat) => {
-              const Icon = categoryIcons[cat.name] ?? categoryIcons["Default"];
+              const Icon = getCategoryIcon(cat.name);
               return (
                 <div
-                  key={cat.name}
+                  key={cat.id}
                   onMouseEnter={isMobile ? undefined : () => setActiveCategory(cat)}
                   onClick={isMobile ? () => setActiveCategory(
-                    activeCategory?.name === cat.name ? null : cat
+                    activeCategory?.id === cat.id ? null : cat
                   ) : undefined}
                   className={cn(
                     "flex items-center justify-between px-4 py-3 cursor-pointer transition-all duration-200",
                     "hover:bg-gray-50 border-b border-gray-100 last:border-b-0",
-                    activeCategory?.name === cat.name && !isMobile
+                    activeCategory?.id === cat.id && !isMobile
                       ? "border-l-2 border-teal-700 bg-gray-50"
                       : "",
-                    activeCategory?.name === cat.name && isMobile
+                    activeCategory?.id === cat.id && isMobile
                       ? "bg-teal-50"
                       : ""
                   )}
@@ -116,10 +122,10 @@ export default function ProductCategories({
                     {Icon}
                     <span className="text-sm font-medium">{cat.name}</span>
                   </div>
-                  {isMobile && cat.children && (
+                  {isMobile && cat.children && cat.children.length > 0 && (
                     <ChevronDown className={cn(
                       "w-4 h-4 transition-transform duration-200",
-                      activeCategory?.name === cat.name ? "rotate-180" : ""
+                      activeCategory?.id === cat.id ? "rotate-180" : ""
                     )} />
                   )}
                 </div>
@@ -152,23 +158,22 @@ export default function ProductCategories({
                 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                   {activeCategory.children?.map((sub) => (
-                    <div key={sub.name} className="group">
+                    <div key={sub.id} className="group">
                       <h4 className="font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-200 group-hover:border-teal-300 transition-colors duration-200">
                         {sub.name}
                       </h4>
                       <ul className="space-y-2">
                         {sub.children?.map((child) => (
                           <li
-                            key={child.name}
+                            key={child.id}
                             className="text-sm text-gray-700 hover:text-teal-700 cursor-pointer transition-all duration-200 transform origin-left hover:scale-105"
                             onClick={() => {
-                              onSelectCategory?.(child.name);
+                              onSelectCategory?.(child.id);
                               setOpen(false);
                             }}
                           >
                             <div className="flex justify-between items-center">
                               <span className="py-1 hover:underline">{child.name}</span>
-                              
                             </div>
                           </li>
                         ))}
@@ -196,23 +201,22 @@ export default function ProductCategories({
               
               <div className="space-y-6">
                 {activeCategory.children?.map((sub) => (
-                  <div key={sub.name}>
+                  <div key={sub.id}>
                     <h4 className="font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-200">
                       {sub.name}
                     </h4>
                     <ul className="space-y-2 pl-2">
                       {sub.children?.map((child) => (
                         <li
-                          key={child.name}
+                          key={child.id}
                           className="text-sm text-gray-700 hover:text-teal-700 cursor-pointer py-2 border-b border-gray-100 last:border-b-0"
                           onClick={() => {
-                            onSelectCategory?.(child.name);
+                            onSelectCategory?.(child.id);
                             setOpen(false);
                           }}
                         >
                           <div className="flex justify-between items-center">
                             <span>{child.name}</span>
-                            
                           </div>
                         </li>
                       ))}

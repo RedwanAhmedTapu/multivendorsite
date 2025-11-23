@@ -16,6 +16,7 @@ export interface User {
 interface AuthState {
   user: User | null;
   accessToken: string | null;
+  
 }
 
 // -----------------

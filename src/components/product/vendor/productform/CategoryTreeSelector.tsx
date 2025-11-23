@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { ChevronDown, ChevronRight, Folder } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGetCategoriesQuery } from "@/features/apiSlice";
 import { Category } from "@/types/type";
@@ -14,19 +14,38 @@ const CategoryTreeSelectorItem: React.FC<{
   selectedCategoryId?: string | null;
   onSelectCategory: (id: string, path: string, isLeaf: boolean, attributes: any[], specifications: any[]) => void;
   parentPath?: string;
-}> = ({ category, selectedCategoryId, onSelectCategory, parentPath = "" }) => {
+  searchQuery?: string;
+}> = ({ category, selectedCategoryId, onSelectCategory, parentPath = "", searchQuery = "" }) => {
   const [open, setOpen] = useState(false);
   const hasChildren = Array.isArray(category.children) && category.children.length > 0;
   const isLeaf = !hasChildren;
   const currentPath = parentPath ? `${parentPath} > ${category.name}` : category.name;
 
+  // Search filter logic
+  const matchesSearch = category.name.toLowerCase().includes(searchQuery.toLowerCase());
+  const childMatchesSearch = hasChildren && category.children?.some((child: Category) => 
+    child.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Auto-expand if search matches
+  React.useEffect(() => {
+    if (searchQuery && (matchesSearch || childMatchesSearch)) {
+      setOpen(true);
+    }
+  }, [searchQuery, matchesSearch, childMatchesSearch]);
+
+  // Don't render if doesn't match search
+  if (searchQuery && !matchesSearch && !childMatchesSearch) {
+    return null;
+  }
+
   return (
-    <div className="ml-4">
+    <div>
       <div
-        className={`flex justify-between items-center p-1 cursor-pointer rounded text-sm ${
+        className={`flex items-center gap-1 px-2 py-1.5 cursor-pointer rounded text-xs hover:bg-gray-100 transition-colors ${
           selectedCategoryId === category.id
-            ? "bg-teal-50 border border-teal-200 text-teal-800"
-            : "hover:bg-gray-100"
+            ? "bg-teal-50 border-l-2 border-teal-500 text-teal-800 font-medium"
+            : ""
         }`}
         onClick={() => onSelectCategory(
           category.id, 
@@ -37,32 +56,45 @@ const CategoryTreeSelectorItem: React.FC<{
         )}
       >
         {/* Expand/Collapse Arrow */}
-        <div
-          className="flex items-center gap-1"
+        <button
+          className="p-0.5 hover:bg-gray-200 rounded"
           onClick={(e) => {
             e.stopPropagation();
             if (hasChildren) setOpen(!open);
           }}
         >
           {hasChildren ? (
-            <ChevronDown
-              className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
-            />
+            open ? (
+              <ChevronDown className="h-3 w-3 text-gray-600" />
+            ) : (
+              <ChevronRight className="h-3 w-3 text-gray-600" />
+            )
           ) : (
-            <ChevronRight className="h-3 w-3 opacity-0" />
+            <div className="w-3 h-3" />
           )}
-        </div>
+        </button>
 
-        {/* Category Name */}
-        <div className="flex-1 flex items-center gap-1">
-          <Folder className="h-3 w-3" />
-          <span className="truncate">{category.name}</span>
-          {isLeaf && <span className="text-xs text-gray-500 ml-1">(Leaf)</span>}
-        </div>
+        {/* Category Icon & Name */}
+        <Folder className="h-3 w-3 text-gray-500 flex-shrink-0" />
+        <span className="flex-1 truncate">{category.name}</span>
+        
+        {/* Leaf Badge */}
+        {isLeaf && (
+          <span className="text-[10px] bg-green-100 text-green-700 px-1 py-0.5 rounded">
+            Leaf
+          </span>
+        )}
+        
+        {/* Child Count */}
+        {hasChildren && (
+          <span className="text-[10px] bg-gray-100 text-gray-600 px-1 py-0.5 rounded">
+            {category.children?.length}
+          </span>
+        )}
       </div>
 
       {hasChildren && open && (
-        <div className="ml-3 border-l border-gray-200">
+        <div className="ml-4 mt-0.5 border-l-2 border-gray-200 pl-1">
           {category.children?.map((child) => (
             <CategoryTreeSelectorItem
               key={child.id}
@@ -70,6 +102,7 @@ const CategoryTreeSelectorItem: React.FC<{
               selectedCategoryId={selectedCategoryId}
               onSelectCategory={onSelectCategory}
               parentPath={currentPath}
+              searchQuery={searchQuery}
             />
           ))}
         </div>
@@ -79,14 +112,22 @@ const CategoryTreeSelectorItem: React.FC<{
 };
 
 export default function CategoryTreeSelector({ onSelect }: Props) {
-  const { data: categories } = useGetCategoriesQuery();
+  const { data: categories, isLoading } = useGetCategoriesQuery();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string>("");
   const [isLeafCategory, setIsLeafCategory] = useState<boolean>(false);
   const [categoryAttributes, setCategoryAttributes] = useState<any[]>([]);
   const [categorySpecifications, setCategorySpecifications] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandAll, setExpandAll] = useState(false);
 
-  const handleSelectCategory = (id: string, path: string, isLeaf: boolean, attributes: any[], specifications: any[]) => {
+  const handleSelectCategory = (
+    id: string, 
+    path: string, 
+    isLeaf: boolean, 
+    attributes: any[], 
+    specifications: any[]
+  ) => {
     setSelectedId(id);
     setSelectedPath(path);
     setIsLeafCategory(isLeaf);
@@ -95,37 +136,130 @@ export default function CategoryTreeSelector({ onSelect }: Props) {
     onSelect(id, path, isLeaf, attributes, specifications);
   };
 
+  const handleClearSelection = () => {
+    setSelectedId(null);
+    setSelectedPath("");
+    setIsLeafCategory(false);
+    setCategoryAttributes([]);
+    setCategorySpecifications([]);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery("");
+  };
+
   return (
-    <div>
-      <h3 className="font-medium mb-2">Select Category</h3>
-      <div className="space-y-1 max-h-96 overflow-auto">
-        {categories ? (
-          categories.map((cat) => (
-            <CategoryTreeSelectorItem
-              key={cat.id}
-              category={cat}
-              selectedCategoryId={selectedId}
-              onSelectCategory={handleSelectCategory}
-            />
-          ))
-        ) : (
-          <p>Loading...</p>
-        )}
+    <div className="space-y-3">
+      {/* Header with Search */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">Select Category</h3>
+          {categories && (
+            <span className="text-xs text-gray-500">
+              {categories.length} categories
+            </span>
+          )}
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search categories..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={handleClearSearch}
+              className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* Selected Category Info (Compact) */}
       {selectedId && (
-        <div className="mt-4 p-3 border rounded-md bg-gray-50">
-          <p className="text-sm font-medium">Selected: {selectedPath}</p>
-          {isLeafCategory ? (
-            <div className="mt-2">
-              <p className="text-xs text-green-600">✓ Leaf category selected</p>
-             
+        <div className="p-2.5 border border-teal-200 rounded-lg bg-teal-50">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-teal-900 truncate">
+                {selectedPath}
+              </p>
+              <div className="flex items-center gap-2 mt-1">
+                {isLeafCategory ? (
+                  <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">
+                    ✓ Leaf Category
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-medium">
+                    ⚠ Has Subcategories
+                  </span>
+                )}
+                {categoryAttributes.length > 0 && (
+                  <span className="text-[10px] text-gray-600">
+                    {categoryAttributes.length} attributes
+                  </span>
+                )}
+              </div>
             </div>
-          ) : (
-            <p className="text-xs text-red-600 mt-1">
-              ⚠️ Please select a leaf category (no subcategories)
-            </p>
+            <button
+              onClick={handleClearSelection}
+              className="text-teal-600 hover:text-teal-800 p-1"
+              title="Clear selection"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Category Tree (Compact & Scrollable) */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+          <span className="text-xs font-medium text-gray-700">Categories</span>
+          {searchQuery && (
+            <span className="text-xs text-gray-500">
+              Search: "{searchQuery}"
+            </span>
           )}
+        </div>
+        
+        <div className="max-h-72 overflow-y-auto p-2 space-y-0.5">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+              <span className="ml-2 text-sm text-gray-600">Loading categories...</span>
+            </div>
+          ) : categories && categories.length > 0 ? (
+            categories.map((cat) => (
+              <CategoryTreeSelectorItem
+                key={cat.id}
+                category={cat}
+                selectedCategoryId={selectedId}
+                onSelectCategory={handleSelectCategory}
+                searchQuery={searchQuery}
+              />
+            ))
+          ) : (
+            <div className="text-center py-8 text-sm text-gray-500">
+              {searchQuery ? "No categories found" : "No categories available"}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Warning Message */}
+      {selectedId && !isLeafCategory && (
+        <div className="flex items-start gap-2 p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <span className="text-yellow-600 text-xs mt-0.5">⚠️</span>
+          <p className="text-xs text-yellow-800">
+            Please select a leaf category (one without subcategories) to continue.
+          </p>
         </div>
       )}
     </div>
