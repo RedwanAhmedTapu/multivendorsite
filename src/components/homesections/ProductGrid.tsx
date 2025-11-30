@@ -5,8 +5,15 @@ import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Eye, ShoppingCart } from "lucide-react";
+import { Heart, Eye, ShoppingCart, BadgeCheck } from "lucide-react";
 import { useGetProductsQuery } from "@/features/productApi";
+import Link from "next/link";
+import type { Product as ProductType } from "@/types/product"; // Import with alias
+
+// Taka Icon Component using FontAwesome
+const TakaIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <i className={`fa-solid fa-bangladeshi-taka-sign ${className}`} />
+);
 
 // Updated image type
 interface ProductImage {
@@ -14,82 +21,175 @@ interface ProductImage {
   altText?: string;
 }
 
-interface Product {
+interface Vendor {
   id: string;
-  name: string;
-  images: ProductImage[];
-  variants: {
-    id: string;
-    price: number;
-  }[];
+  storeName: string;
+  avatar: string;
+  verificationStatus: "PENDING" | "VERIFIED" | "REJECTED";
+}
+
+// Use the imported ProductType instead of redefining
+interface ProductCardProps {
+  product: ProductType;
 }
 
 interface SectionProps {
   title: string;
-  products: Product[];
+  products: ProductType[]; // Use ProductType here
 }
 
-const ProductCard = ({ product }: { product: Product }) => {
-  const variant = product.variants[0];
+const ProductCard = ({ product }: ProductCardProps) => {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  
+  const variant = product.variants?.[0];
   const price = variant?.price || 0;
-  const oldPrice = price * 1.2;
-  const rating = Math.floor(Math.random() * 2) + 4; // 4-5 stars
-  const reviews = Math.floor(Math.random() * 50) + 1;
+  const specialPrice = variant?.specialPrice || null;
+  const discount = variant?.discount || null;
+  
+  // Calculate average rating
+  const averageRating = product.reviews?.length
+    ? product.reviews.reduce((acc, review) => acc + review.rating, 0) / product.reviews.length
+    : 0;
+  const reviewCount = product.reviews?.length || 0;
+
+  // Check for free shipping
+  const hasFreeShipping = product.offerProducts?.length
+    ? product.offerProducts.some(op => op.offer.type === "FREE_SHIPPING")
+    : false;
+
+  // Check vendor verification - handle undefined case
+  const isVerified = product.vendor?.verificationStatus === "VERIFIED";
+  const storeName = product.vendor?.storeName || "Unknown Store";
+
   // Get first image or fallback
   const image = product.images?.[0];
-
   const altText = image?.altText || product.name;
 
   return (
-    <Card className="group relative p-3 sm:p-4 rounded-xl border flex flex-col justify-between transition-all duration-300 hover:shadow-lg">
-      {/* Top Right Icons */}
-      <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        <button className="bg-white rounded-full p-2 shadow-md hover:bg-gray-100">
-          <Heart size={16} className="text-gray-600" />
+    <Card className="group relative border border-gray-200 rounded-lg p-0 shadow-sm hover:shadow-lg transition-all duration-300 h-full flex flex-col bg-white overflow-hidden">
+      {/* Wishlist & View Icons */}
+      <div className="absolute top-3 right-3 z-20 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <button className="bg-white rounded-full p-2 shadow-lg hover:bg-pink-50 hover:text-pink-600 transition-all duration-200 transform hover:scale-110">
+          <Heart size={18} />
         </button>
-        <button className="bg-white rounded-full p-2 shadow-md hover:bg-gray-100">
-          <Eye size={16} className="text-gray-600" />
+        <button className="bg-white rounded-full p-2 shadow-lg hover:bg-teal-50 hover:text-teal-600 transition-all duration-200 transform hover:scale-110">
+          <Eye size={18} />
         </button>
       </div>
 
-      
-
-      <CardContent className="flex flex-col items-center p-0">
-        <div className="relative w-full h-28 sm:h-20 mb-3 flex items-center justify-center">
-          <Image
-            src={image?.url || "/placeholder.png"}
-            alt={altText}
-            fill
-            className="object-contain"
-            sizes="(max-width: 640px) 100vw, 200px"
-          />
+      {/* Image Container */}
+      <div className="relative w-full h-44 overflow-hidden bg-gray-50">
+        <div className="relative w-full h-full flex items-center justify-center">
+          {image?.url ? (
+            <Image
+              src={image.url}
+              alt={altText}
+              fill
+              className="object-contain"
+              sizes="(max-width: 640px) 100vw, 200px"
+            />
+          ) : (
+            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+              <span className="text-gray-400">No Image</span>
+            </div>
+          )}
         </div>
-        <h3 className="text-xs sm:text-sm font-medium text-center mb-1 line-clamp-2 h-8 sm:h-10">
+
+        {/* Top Left Badge - Free Shipping */}
+        <div className="absolute top-3 left-3 z-10">
+          {hasFreeShipping && (
+            <Badge className="bg-[#00A9E0] hover:bg-[#0095C9] text-white px-3 py-1 text-xs font-semibold flex items-center gap-1 shadow-md">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="1" y="3" width="15" height="13"/>
+                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+                <circle cx="5.5" cy="18.5" r="2.5"/>
+                <circle cx="18.5" cy="18.5" r="2.5"/>
+              </svg>
+              FREE DELIVERY
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Content */}
+      <CardContent className="flex flex-col px-4 py-1 flex-grow">
+        {/* Product Name */}
+        <h3 
+          className={`text-sm font-medium text-gray-800 mb-2 leading-tight cursor-pointer hover:text-teal-700 transition-colors ${
+            isExpanded ? '' : 'overflow-hidden text-ellipsis'
+          }`}
+          style={{
+            display: isExpanded ? 'block' : '-webkit-box',
+            WebkitLineClamp: isExpanded ? 'unset' : 2,
+            WebkitBoxOrient: 'vertical'
+          }}
+          onClick={() => setIsExpanded(!isExpanded)}
+          title={product.name}
+        >
           {product.name}
         </h3>
-        <div className="flex text-yellow-500 text-xs sm:text-sm mb-1">
-          {"★".repeat(rating)}{"☆".repeat(5 - rating)}
+
+        {/* Price Section */}
+        <div className="mb-2">
+          {specialPrice ? (
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5 mb-1">
+                <div className="flex items-center gap-1">
+                  <TakaIcon className="text-teal-600 text-lg" />
+                  <span className="text-xl font-bold text-teal-600">
+                    {specialPrice.toLocaleString()}
+                  </span>
+                </div>
+                {discount && (
+                  <Badge className="bg-pink-50 text-teal-600 px-2 py-0.5 text-xs font-bold border border-teal-200">
+                    -{discount}%
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <TakaIcon className="text-gray-400 text-base" />
+                <span className="text-sm text-gray-400 line-through">
+                  {price.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <TakaIcon className="text-gray-800 text-lg" />
+              <span className="text-xl font-bold text-gray-800">
+                {price.toLocaleString()}
+              </span>
+            </div>
+          )}
         </div>
-        <p className="text-xs text-gray-500 mb-2">
-          ({reviews} review{reviews !== 1 ? "s" : ""})
-        </p>
-        <div className="flex gap-2 items-center">
-          <span className="text-base sm:text-lg font-semibold text-black">
-            ${price.toFixed(2)}
+
+        {/* Rating Section */}
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex text-orange-400">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <span key={i} className="text-sm">
+                {i < Math.floor(averageRating) ? "★" : "☆"}
+              </span>
+            ))}
+          </div>
+          <span className="text-sm text-gray-600 font-medium">
+            {averageRating > 0 ? averageRating.toFixed(1) : "0.0"} ({reviewCount})
           </span>
-          <span className="text-xs sm:text-sm text-gray-400 line-through">
-            ${oldPrice.toFixed(2)}
+        </div>
+
+        {/* Store Name with Verification Badge */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs text-gray-500 font-medium truncate">
+            {storeName}
           </span>
+          {isVerified && (
+            <Badge className="bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white px-2 py-0.5 text-xs font-semibold shadow-lg border-0 flex items-center gap-1 flex-shrink-0 transition-all duration-200">
+              <BadgeCheck className="w-3 h-3" />
+              Verified
+            </Badge>
+          )}
         </div>
       </CardContent>
-
-      {/* Hover Add to Cart */}
-      <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        <Button className="w-full bg-teal-900 hover:bg-teal-800 text-white rounded-lg flex items-center justify-center gap-2 py-2 text-sm">
-          <ShoppingCart size={16} />
-          Add to Cart
-        </Button>
-      </div>
     </Card>
   );
 };
@@ -98,14 +198,14 @@ const ProductSection = ({ title, products }: SectionProps) => {
   if (!products || products.length === 0) return null;
 
   return (
-    <section className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl sm:text-2xl font-bold">{title}</h2>
-        <a href="#" className="underline text-sm font-medium">
+    <section className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-[75rem] mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-800">{title}</h2>
+        <Link href="/products" className="text-teal-600 hover:text-teal-800 text-sm font-medium transition-colors">
           See All Products
-        </a>
+        </Link>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
         {products.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
@@ -121,20 +221,20 @@ const ProductGrid = () => {
   if (error) return <p className="text-center py-10 text-red-500">Failed to load products.</p>;
 
   // Example: splitting products into sections
-  const flashDeals = products.slice(0, 6);
-  const clearanceSale = products.slice(6, 12);
-  const newArrivals = products.slice(12, 18);
-  const youMightLike = products.slice(18, 24);
+  const flashDeals = products.slice(0, 5);
+  const clearanceSale = products;
+  const newArrivals = products.slice(10, 15);
+  const youMightLike = products.slice(15, 20);
 
   return (
     <>
-      <ProductSection title="Flash Deals" products={flashDeals} />
+      {/* <ProductSection title="Flash Deals" products={flashDeals} /> */}
       <ProductSection
         title="Yearly Stock Clearance Sale Offer - Up to 70% Discount"
         products={clearanceSale}
       />
-      <ProductSection title="New Arrivals" products={newArrivals} />
-      <ProductSection title="You Might Also Like" products={youMightLike} />
+      {/* <ProductSection title="New Arrivals" products={newArrivals} />
+      <ProductSection title="You Might Also Like" products={youMightLike} /> */}
     </>
   );
 };

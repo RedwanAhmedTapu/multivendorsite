@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 
 const FeaturedOffers = () => {
   return (
-    <section className="max-w-6xl xl:max-w-7xl 2xl:max-w-[90%] mx-auto px-4 py-8">
+    <section className="max-w-4xl xl:max-w-6xl 2xl:max-w-[75rem] mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <h2 className="text-2xl font-bold">Our Featured Offers</h2>

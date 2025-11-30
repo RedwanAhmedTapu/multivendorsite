@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Plus, X, Trash2 } from "lucide-react";
 import ImageUploader from "@/components/imageuploader/ImageUploader";
-import {  VariantNamePart } from "@/types/type";
+import { VariantNamePart } from "@/types/type";
 import { ProductVariantInput } from "@/types/product";
 
 interface Props {
@@ -19,6 +19,7 @@ export default function VariantManager({
   variantNameParts,
 }: Props) {
   const [showImageUploaders, setShowImageUploaders] = useState<Record<string, boolean>>({});
+  const [showSpecialPrice, setShowSpecialPrice] = useState<Record<string, boolean>>({});
 
   // Generate variant name from selected fields
   const generateVariantName = (): string => {
@@ -57,6 +58,11 @@ export default function VariantManager({
       delete newState[id];
       return newState;
     });
+    setShowSpecialPrice(prev => {
+      const newState = { ...prev };
+      delete newState[id];
+      return newState;
+    });
   };
 
   const handleChange = (
@@ -82,6 +88,21 @@ export default function VariantManager({
       ...prev,
       [id]: !prev[id]
     }));
+  };
+
+  const toggleSpecialPrice = (id: string) => {
+    setShowSpecialPrice(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+
+    // If we're hiding the special price, clear the specialPrice value
+    if (showSpecialPrice[id]) {
+      const updated = variants.map((v) =>
+        v.id === id ? { ...v, specialPrice: undefined } : v
+      );
+      setVariants(updated);
+    }
   };
 
   return (
@@ -116,7 +137,7 @@ export default function VariantManager({
                 </Button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-3">
                 <div>
                   <label className="text-sm font-medium">SKU</label>
                   <Input
@@ -133,6 +154,28 @@ export default function VariantManager({
                     onChange={(e) => handleChange(variant.id!, "price", Number(e.target.value))}
                     placeholder="Price"
                   />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Special Price</label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      value={variant.specialPrice || ""}
+                      onChange={(e) => handleChange(variant.id!, "specialPrice", Number(e.target.value))}
+                      placeholder="Special Price"
+                    />
+                    {variant.specialPrice && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleChange(variant.id!, "specialPrice", undefined!)}
+                        className="mt-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Stock</label>
@@ -155,6 +198,7 @@ export default function VariantManager({
                 </div>
               </div>
 
+              {/* Images Section */}
               <div className="mb-3">
                 <div className="mt-2">
                   <Button
@@ -170,7 +214,6 @@ export default function VariantManager({
                   {showImageUploaders[variant.id!] && (
                     <div className="mt-2 p-3 border rounded bg-white">
                       <ImageUploader
-                      
                         images={variant.images || []}
                         setImages={(images) => handleImagesChange(variant.id!, images)}
                         maxImages={8}

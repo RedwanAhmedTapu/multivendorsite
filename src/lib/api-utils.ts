@@ -18,15 +18,15 @@ export async function getCategoriesServer() {
 export async function getProductsServer() {
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
-      cache: 'force-cache',
-      next: { revalidate: 3600 }
+      cache: "no-store",
     });
     return await response.json();
   } catch (error) {
-    console.error('Failed to fetch products:', error);
+    console.error("Failed to fetch products:", error);
     return { data: [] };
   }
 }
+
 
 export async function getCategoryFiltersServer(categoryId?: string) {
   if (!categoryId) return { data: null };

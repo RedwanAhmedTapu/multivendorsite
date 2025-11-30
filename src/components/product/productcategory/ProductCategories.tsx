@@ -77,7 +77,7 @@ export default function ProductCategories({
   };
 
   return (
-    <div className="relative inline-block text-left" ref={dropdownRef}>
+    <div  className="hidden md:block relative  text-left" ref={dropdownRef}>
       {/* Trigger Button */}
       <button
         onClick={() => setOpen(!open)}

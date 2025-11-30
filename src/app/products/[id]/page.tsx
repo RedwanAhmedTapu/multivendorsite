@@ -267,7 +267,7 @@ const SingleProduct = () => {
                 <p className="text-sm">
                   Brand:{" "}
                   <span className="text-teal-700 hover:underline cursor-pointer">
-                    {product.vendor?.storeName || "No Brand"}
+                     No Brand
                   </span>
                 </p>
 
@@ -320,7 +320,6 @@ const SingleProduct = () => {
                     >
                       +
                     </button>
-                    <span className="text-sm text-orange-600">Almost sold out, buy now!</span>
                   </div>
                 </div>
 

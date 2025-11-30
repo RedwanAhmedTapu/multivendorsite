@@ -5,7 +5,7 @@ import React from "react";
 const HomeSectionSkeleton = () => {
   return (
     <div className="w-full bg-gray-50">
-      <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-[90%] mx-auto md:px-4 sm:px-6 py-4">
+      <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-[75rem] mx-auto md:px-4 sm:px-6 py-4">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Left Section - Slider Skeleton */}
           <div className="lg:col-span-2 relative rounded-xl overflow-hidden h-80 sm:h-96 md:h-[22rem] lg:h-[28rem] bg-gradient-to-r from-gray-100 to-gray-200 animate-pulse">

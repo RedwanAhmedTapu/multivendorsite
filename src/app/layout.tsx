@@ -1,18 +1,27 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/publicnavbar/Navbar";
 import ReduxProvider from "@/context/ReduxProvider";
 import MobileBottomNav from "@/components/movilebottomnav/MobileBottomNav";
+import { config } from '@fortawesome/fontawesome-svg-core'
+import '@fortawesome/fontawesome-svg-core/styles.css'
+config.autoAddCss = false
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Primary font for body text, product info, prices
+const inter = Inter({
   subsets: ["latin"],
+  display: 'swap',
+  variable: '--font-inter',
+  weight: ['300', '400', '500', '600', '700'],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Heading font for titles, navigation, CTAs
+const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
+  display: 'swap',
+  variable: '--font-plus-jakarta',
+  weight: ['300', '400', '500', '600', '700'],
 });
 
 export const metadata: Metadata = {
@@ -26,17 +35,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="en" className={`${inter.variable} ${plusJakartaSans.variable}`}>
+      <head>
+        {/* FontAwesome CDN as backup */}
+        <link 
+          rel="stylesheet" 
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" 
+        />
+      </head>
+      <body className="font-sans antialiased">
         <ReduxProvider>
-
-        <Navbar/>
-        {children}
-        <MobileBottomNav/>
+          <Navbar/>
+          {children}
+          <MobileBottomNav/>
         </ReduxProvider>
-
       </body>
     </html>
   );

@@ -146,12 +146,10 @@ function AdminLayout({ main }: AdminLayoutProps) {
           href: "#",
           icon: Box,
           subItems: [
-            { title: "All Products", href: "/admin/products/list", icon: Database },
-            { title: "Add Product", href: "/admin/products/add", icon: PlusCircle },
+            { title: "All Products", href: "/admin-dashboard/products", icon: Database },
             { title: "Categories", href: "/admin-dashboard/category-manage", icon: Layers },
             { title: "Bulk Categories", href: "/admin-dashboard/bulk-category-upload", icon: Layers },
-            // { title: "Brands", href: "/admin/brands/list", icon: Tag },
-            { title: "Stock Status", href: "/admin/products/stock", icon: AlertTriangle },
+           
           ],
         },
       ],
@@ -229,8 +227,8 @@ function AdminLayout({ main }: AdminLayoutProps) {
       title: "Content Management",
       items: [
         { title: "Banners", href: "/admin-dashboard/banners", icon: Layout },
-        { title: "Blogs", href: "/admin/content/blogs", icon: FileText },
-        { title: "FAQ", href: "/admin/content/faq", icon: HelpCircle },
+        { title: "Blogs", href: "/admin-dashboard/content/blogs", icon: FileText },
+        { title: "FAQ", href: "/admin-dashboard/content/faq", icon: HelpCircle },
       ],
     },
   ];

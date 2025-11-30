@@ -19,6 +19,7 @@ import { shippingProviderApi } from "../features/shippingProviderApi";
 import { offerApi } from "../features/offerApi"; 
 import { employeeApi } from "@/features/employeeApi";
 import { storeEditorApi } from "@/features/storeEditorApi";
+import { faqApi } from "@/features/faqApi";
 
 // --------------------
 // All API imports in one array for easier management
@@ -37,6 +38,7 @@ const apiMiddlewares = [
   offerApi.middleware, 
   employeeApi.middleware,
   storeEditorApi.middleware,
+  faqApi.middleware,
 ];
 
 const apiReducers = {
@@ -55,6 +57,7 @@ const apiReducers = {
   [offerApi.reducerPath]: offerApi.reducer, 
   [employeeApi.reducerPath]: employeeApi.reducer,
   [storeEditorApi.reducerPath]: storeEditorApi.reducer,
+  [faqApi.reducerPath]: faqApi.reducer,
 };
 
 // --------------------

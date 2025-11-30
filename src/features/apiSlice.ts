@@ -198,71 +198,106 @@ export const apiSlice = createApi({
       ],
     }),
 
-    // ==========================================
-    // CATEGORY FILTER ENDPOINTS
-    // ==========================================
+   // ==========================================
+// CATEGORY FILTER ENDPOINTS
+// ==========================================
 
-    /**
-     * Get filter data for a single category by ID
-     */
-    getCategoryFilters: builder.query<CategoryFilterResponse, string>({
-      query: (categoryId) => `/categories-filter/${categoryId}/filters`,
-      providesTags: (result, error, categoryId) => [
-        { type: "CategoryFilter", id: categoryId },
-      ],
-    }),
+/**
+ * Get filter data for a single category by ID
+ */
+getCategoryFilters: builder.query<
+  { success: boolean; data: CategoryFilterResponse; message: string },
+  string
+>({
+  query: (categoryId) => `/categories-filter/${categoryId}/filters`,
+  transformResponse: (response: any) => ({
+    success: true,
+    data: response.data,
+    message: response.message || "Filter data retrieved successfully",
+  }),
+  providesTags: (result, error, categoryId) => [
+    { type: "CategoryFilter", id: categoryId },
+  ],
+}),
 
-    /**
-     * Get filter data for a single category by slug (SEO-friendly)
-     */
-    getCategoryFiltersBySlug: builder.query<CategoryFilterResponse, string>({
-      query: (slug) => `/categories-filter/slug/${slug}/filters`,
-      providesTags: (result) =>
-        result
-          ? [{ type: "CategoryFilter", id: result.category.id }]
-          : [{ type: "CategoryFilter", id: "LIST" }],
-    }),
+/**
+ * Get filter data for a single category by slug (SEO-friendly)
+ */
+getCategoryFiltersBySlug: builder.query<
+  { success: boolean; data: CategoryFilterResponse; message: string },
+  string
+>({
+  query: (slug) => `/categories-filter/slug/${slug}/filters`,
+  transformResponse: (response: any) => ({
+    success: true,
+    data: response.data,
+    message: response.message || "Filter data retrieved successfully",
+  }),
+  providesTags: (result) =>
+    result
+      ? [{ type: "CategoryFilter", id: result.data.category.id }]
+      : [{ type: "CategoryFilter", id: "LIST" }],
+}),
 
-    /**
-     * Get combined filter data for multiple categories by IDs
-     */
-    getMultipleCategoriesFilters: builder.query<
-      MultipleCategoriesFilterResponse,
-      string[]
-    >({
-      query: (categoryIds) => ({
-        url: "/categories-filter/filters/multiple",
-        params: { categoryIds: categoryIds.join(",") },
-      }),
-      providesTags: (result, error, categoryIds) => [
-        ...categoryIds.map((id) => ({ type: "CategoryFilter" as const, id })),
-        { type: "CategoryFilter", id: "MULTIPLE" },
-      ],
-    }),
+/**
+ * Get combined filter data for multiple categories by IDs
+ */
+getMultipleCategoriesFilters: builder.query<
+  { success: boolean; data: MultipleCategoriesFilterResponse; message: string },
+  string[]
+>({
+  query: (categoryIds) => ({
+    url: "/categories-filter/filters/multiple",
+    params: { categoryIds: categoryIds.join(",") },
+  }),
+  transformResponse: (response: any) => ({
+    success: true,
+    data: response.data,
+    message: response.message || "Filter data retrieved successfully",
+  }),
+  providesTags: (result, error, categoryIds) => [
+    ...categoryIds.map((id) => ({ type: "CategoryFilter" as const, id })),
+    { type: "CategoryFilter", id: "MULTIPLE" },
+  ],
+}),
 
-    /**
-     * Get combined filter data for multiple categories by slugs
-     */
-    getMultipleCategoriesFiltersBySlugs: builder.query<
-      MultipleCategoriesFilterResponse,
-      string[]
-    >({
-      query: (categorySlugs) => ({
-        url: "/categories-filter/filters/multiple-slugs",
-        params: { categorySlugs: categorySlugs.join(",") },
-      }),
-      providesTags: [{ type: "CategoryFilter", id: "MULTIPLE" }],
-    }),
+/**
+ * Get combined filter data for multiple categories by slugs
+ */
+getMultipleCategoriesFiltersBySlugs: builder.query<
+  { success: boolean; data: MultipleCategoriesFilterResponse; message: string },
+  string[]
+>({
+  query: (categorySlugs) => ({
+    url: "/categories-filter/filters/multiple-slugs",
+    params: { categorySlugs: categorySlugs.join(",") },
+  }),
+  transformResponse: (response: any) => ({
+    success: true,
+    data: response.data,
+    message: response.message || "Filter data retrieved successfully",
+  }),
+  providesTags: [{ type: "CategoryFilter", id: "MULTIPLE" }],
+}),
 
-    /**
-     * Get filter summary (lightweight endpoint)
-     */
-    getCategoryFilterSummary: builder.query<FilterSummaryResponse, string>({
-      query: (categoryId) => `/categories-filter/${categoryId}/filters/summary`,
-      providesTags: (result, error, categoryId) => [
-        { type: "CategoryFilter", id: `${categoryId}-summary` },
-      ],
-    }),
+/**
+ * Get filter summary (lightweight endpoint)
+ */
+getCategoryFilterSummary: builder.query<
+  { success: boolean; data: FilterSummaryResponse; message: string },
+  string
+>({
+  query: (categoryId) => `/categories-filter/${categoryId}/filters/summary`,
+  transformResponse: (response: any) => ({
+    success: true,
+    data: response.data,
+    message: response.message || "Filter summary retrieved successfully",
+  }),
+  providesTags: (result, error, categoryId) => [
+    { type: "CategoryFilter", id: `${categoryId}-summary` },
+  ],
+}),
+
 
     // ==========================================
     // ATTRIBUTE ENDPOINTS

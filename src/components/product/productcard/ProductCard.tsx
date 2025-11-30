@@ -1,107 +1,279 @@
 "use client";
 
-import { Heart, Eye, ShoppingCart } from "lucide-react";
+import { BadgeCheck, ShoppingCart, Heart, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import Image from "next/image";
-import { getImageUrl } from "@/utils/image";
+import { useState } from "react";
+
+interface ProductVariant {
+  price: number;
+  specialPrice: number | null;
+  discount: number | null;
+  stock: number;
+}
+
+interface ProductImage {
+  url: string;
+  altText: string;
+}
+
+interface Vendor {
+  id: string;
+  storeName: string;
+  avatar: string;
+  verificationStatus: "PENDING" | "VERIFIED" | "REJECTED";
+}
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface Review {
+  rating: number;
+}
+
+interface OfferProduct {
+  offer: {
+    id: string;
+    type: string;
+    title: string;
+    minOrderAmount: number | null;
+  };
+}
 
 interface Product {
   id: string;
-  title: string;
-  image: string;
-  images: string[];
-  colors: string;
-  rating: number;
-  reviews: number;
-  price: number;
-  oldPrice?: number;
-  tags: string[];
+  name: string;
+  slug: string;
+  approvalStatus?: string;
+  createdAt?: string;
+  vendor?: Vendor;
+  category?: Category;
+  images?: ProductImage[];
+  variants?: ProductVariant[];
+  reviews?: Review[];
+  offerProducts?: OfferProduct[];
 }
 
-export const ProductCard: React.FC<{ product: Product; view?: "grid" | "list" }> = ({
+interface ProductCardProps {
+  product: Product;
+  view?: "grid" | "list";
+}
+
+// Taka Icon Component using FontAwesome
+const TakaIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <i className={`fa-solid fa-bangladeshi-taka-sign ${className}`} />
+);
+
+export const ProductCard: React.FC<ProductCardProps> = ({
   product,
   view = "grid",
 }) => {
-  // Get the primary image with proper fallback
-  const getPrimaryImage = () => {
-    if (product.image && product.image.trim() !== "") {
-      return getImageUrl(product.image);
-    }
-    if (product.images && product.images.length > 0) {
-      return getImageUrl(product.images[0]);
-    }
-    return null;
-  };
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  const primaryImage = getPrimaryImage();
-  const hasValidImage = primaryImage !== null;
+  // Get primary image
+  const primaryImage = product.images?.length ? product.images[0].url : null;
+  const imageAlt = product.images?.length
+    ? product.images[0].altText
+    : product.name;
+
+  // Get variant info
+  const variant = product.variants?.length ? product.variants[0] : null;
+  const price = variant?.price || 0;
+  const specialPrice = variant?.specialPrice || null;
+  const discount = variant?.discount || null;
+
+  // Calculate average rating
+  const averageRating = product.reviews?.length
+    ? product.reviews.reduce((acc, review) => acc + review.rating, 0) /
+      product.reviews.length
+    : 0;
+  const reviewCount = product.reviews?.length || 0;
+
+  // Check for free shipping
+  const hasFreeShipping = product.offerProducts?.length
+    ? product.offerProducts.some((op) => op.offer.type === "FREE_SHIPPING")
+    : false;
+
+  // Check vendor verification
+  const isVerified = product.vendor?.verificationStatus === "VERIFIED";
+  const storeName = product.vendor?.storeName || "Unknown Store";
 
   // ---------------- LIST VIEW ----------------
   if (view === "list") {
     return (
-      <Card className="overflow-hidden">
+      <Card className="w-[62%] overflow-hidden border shadow-none hover:shadow-md transition-shadow duration-300">
         <CardContent className="p-0">
-          <div className="flex flex-col md:flex-row">
-            <div className="md:w-1/3 relative">
-              <div className="w-full h-48 md:h-full bg-gray-100 flex items-center justify-center relative overflow-hidden">
-                {hasValidImage ? (
+          <div className="flex flex-col lg:flex-row">
+            {/* Image Section */}
+            <div className="lg:w-2/5 xl:w-1/3 relative bg-gray-50 group">
+              <div className="w-full h-48 sm:h-56 md:h-64 lg:h-full flex items-center justify-center relative overflow-hidden min-h-[200px]">
+                {primaryImage ? (
                   <Image
                     src={primaryImage}
-                    alt={product.title}
+                    alt={imageAlt}
                     fill
-                    className="object-contain transition-transform duration-500 ease-in-out hover:scale-105"
+                    className="object-contain p-4 group-hover:scale-105 transition-transform duration-300"
+                    sizes="(max-width: 1024px) 100vw, 33vw"
                   />
                 ) : (
-                  <span className="text-gray-500">No Image</span>
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                    <span className="text-gray-400">No Image</span>
+                  </div>
                 )}
               </div>
-              {product.tags.length > 0 && (
-                <div className="absolute top-3 left-3 flex gap-2 z-10">
-                  {product.tags.map((tag, i) => (
-                    <Badge
-                      key={i}
-                      className={`${
-                        tag === "Sale"
-                          ? "bg-red-500 text-white"
-                          : "bg-orange-500 text-white"
-                      } px-2 py-0.5 text-xs`}
+
+              {/* Badges Container */}
+              <div className="absolute top-2 left-2 sm:top-3 sm:left-3 flex flex-col gap-2 z-10">
+                {hasFreeShipping && (
+                  <Badge className="bg-[#00A9E0] hover:bg-[#0095C9] text-white px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-sm font-semibold flex items-center gap-1 shadow-md">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      className="sm:w-3 sm:h-3"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="p-4 md:w-2/3">
-              <h3 className="font-semibold text-lg mb-2">{product.title}</h3>
-              <div className="flex items-center mb-2">
-                <div className="flex text-yellow-500">
-                  {"★".repeat(Math.floor(product.rating))}
-                  {"☆".repeat(5 - Math.floor(product.rating))}
-                </div>
-                <span className="text-sm text-gray-600 ml-2">
-                  ({product.reviews} reviews)
-                </span>
-              </div>
-              {product.colors && (
-                <p className="text-sm text-gray-600 mb-3">
-                  Color: {product.colors}
-                </p>
-              )}
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-lg font-bold">
-                  ${product.price.toFixed(2)}
-                </span>
-                {product.oldPrice && (
-                  <span className="text-sm text-gray-500 line-through">
-                    ${product.oldPrice.toFixed(2)}
-                  </span>
+                      <rect x="1" y="3" width="15" height="13" />
+                      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                      <circle cx="5.5" cy="18.5" r="2.5" />
+                      <circle cx="18.5" cy="18.5" r="2.5" />
+                    </svg>
+                    <span className="hidden xs:inline">FREE DELIVERY</span>
+                    <span className="xs:hidden">FREE</span>
+                  </Badge>
                 )}
               </div>
-              <Button className="bg-teal-900 hover:bg-teal-800 text-white rounded-lg flex items-center justify-center gap-2">
-                <ShoppingCart size={16} />
+
+              {/* Discount Badge */}
+              {discount && (
+                <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10">
+                  <Badge className="bg-pink-50 text-pink-600 px-2 py-0.5 sm:px-3 sm:py-1 text-xs font-bold border border-pink-200">
+                    -{discount}%
+                  </Badge>
+                </div>
+              )}
+
+              {/* Quick Actions Overlay */}
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <div className="flex gap-2">
+                  <button className="bg-white rounded-full p-2 sm:p-3 shadow-lg hover:bg-pink-50 hover:text-pink-600 transition-all duration-200 transform hover:scale-110">
+                    <Heart size={16} className="sm:w-4 sm:h-4" />
+                  </button>
+                  <button className="bg-white rounded-full p-2 sm:p-3 shadow-lg hover:bg-teal-50 hover:text-teal-600 transition-all duration-200 transform hover:scale-110">
+                    <Eye size={16} className="sm:w-4 sm:h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Content Section */}
+            <div className="p-4 sm:p-6 lg:w-3/5 xl:w-2/3 flex flex-col justify-between">
+              <div>
+                {/* Store Name with Verification Badge */}
+                <div className="flex flex-col xs:flex-row xs:items-center gap-1 xs:gap-2 mb-2 sm:mb-3">
+                  <span className="text-xs sm:text-sm text-gray-600 font-medium truncate">
+                    {storeName}
+                  </span>
+                  {isVerified && (
+                    <Badge className="bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white px-2 py-0.5 text-xs font-semibold shadow-lg border-0 flex items-center gap-1 flex-shrink-0 transition-all duration-200 w-fit">
+                      <BadgeCheck className="w-3 h-3" />
+                      Verified
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Product Name */}
+                <h3
+                  className={`font-medium text-base sm:text-lg text-gray-800 mb-2 sm:mb-3 leading-relaxed cursor-pointer hover:text-teal-700 transition-colors ${
+                    isExpanded ? "" : "overflow-hidden"
+                  }`}
+                  style={{
+                    display: isExpanded ? "block" : "-webkit-box",
+                    WebkitLineClamp: isExpanded ? "unset" : 2,
+                    WebkitBoxOrient: "vertical",
+                  }}
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  title={product.name}
+                >
+                  {product.name}
+                </h3>
+
+                {/* Price Section */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2 sm:mb-3">
+                  {specialPrice ? (
+                    <>
+                      <div className="flex items-center gap-1">
+                        <TakaIcon className="text-teal-600 text-base sm:text-lg" />
+                        <span className="text-2xl sm:text-3xl font-bold text-teal-600">
+                          {specialPrice.toLocaleString()}
+                        </span>
+                      </div>
+                      {discount && (
+                        <Badge className="bg-pink-50 text-teal-600 px-2 py-0.5 sm:px-3 sm:py-1 text-xs font-bold border border-teal-200 w-fit">
+                          -{discount}%
+                        </Badge>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <TakaIcon className="text-gray-800 text-base sm:text-lg" />
+                      <span className="text-2xl sm:text-3xl font-bold text-gray-800">
+                        {price.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Original Price */}
+                {specialPrice && (
+                  <div className="mb-2 sm:mb-3">
+                    <div className="flex items-center gap-1">
+                      <TakaIcon className="text-gray-400 text-sm sm:text-base" />
+                      <span className="text-sm sm:text-base text-gray-400 line-through">
+                        {price.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Rating and Category Container */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 sm:mb-4">
+                  {/* Rating Section */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex text-orange-400">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <span key={i} className="text-sm sm:text-base">
+                          {i < Math.floor(averageRating) ? "★" : "☆"}
+                        </span>
+                      ))}
+                    </div>
+                    <span className="text-xs sm:text-sm text-gray-600 font-medium">
+                      {averageRating.toFixed(1)} ({reviewCount} reviews)
+                    </span>
+                  </div>
+
+                  {/* Category */}
+                  {product.category && (
+                    <Badge variant="outline" className="text-gray-500 text-xs w-fit">
+                      {product.category.name}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Add to Cart Button */}
+              <Button className="mt-3 sm:mt-4 bg-teal-900 hover:bg-teal-800 text-white flex items-center justify-center gap-2 h-10 sm:h-12 text-sm sm:text-base font-medium transition-all duration-200 hover:shadow-lg w-full">
+                <ShoppingCart size={16} className="sm:w-5 sm:h-5" />
                 Add to Cart
               </Button>
             </div>
@@ -113,85 +285,140 @@ export const ProductCard: React.FC<{ product: Product; view?: "grid" | "list" }>
 
   // ---------------- GRID VIEW ----------------
   return (
-    <Card className="group relative p-3 sm:p-4 rounded-xl border flex flex-col justify-between transition-all duration-300 hover:shadow-lg">
-      {/* Icons */}
-      <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        <button className="bg-white rounded-full p-2 shadow-md hover:bg-gray-100">
-          <Heart size={16} className="text-gray-600" />
+    <Card className="group relative border border-gray-200 rounded-lg p-0 shadow-sm hover:shadow-lg transition-all duration-300 h-full flex flex-col bg-white overflow-hidden">
+      {/* Wishlist & View Icons */}
+      <div className="absolute top-3 right-3 z-20 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <button className="bg-white rounded-full p-2 shadow-lg hover:bg-pink-50 hover:text-pink-600 transition-all duration-200 transform hover:scale-110">
+          <Heart size={18} />
         </button>
-        <button className="bg-white rounded-full p-2 shadow-md hover:bg-gray-100">
-          <Eye size={16} className="text-gray-600" />
+        <button className="bg-white rounded-full p-2 shadow-lg hover:bg-teal-50 hover:text-teal-600 transition-all duration-200 transform hover:scale-110">
+          <Eye size={18} />
         </button>
       </div>
 
-      {/* Tags */}
-      {product.tags.length > 0 && (
-        <div className="absolute top-3 left-3 flex gap-2 z-10">
-          {product.tags.map((tag, i) => (
-            <Badge
-              key={i}
-              className={`${
-                tag === "Sale"
-                  ? "bg-red-500 text-white"
-                  : "bg-orange-500 text-white"
-              } px-2 py-0.5 text-xs sm:px-3 sm:py-1`}
-            >
-              {tag}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {/* Image */}
-      <CardContent className="flex flex-col items-center p-0">
-        <div className="relative w-full h-32 sm:h-40 mb-3 flex items-center justify-center bg-gray-100 overflow-hidden rounded-lg">
-          {hasValidImage ? (
+      {/* Image Container */}
+      <div className="relative w-full h-44 overflow-hidden bg-gray-50">
+        <div className="relative w-full h-full flex items-center justify-center">
+          {primaryImage ? (
             <Image
               src={primaryImage}
-              alt={product.title}
+              alt={imageAlt}
               fill
-              className="object-contain transition-transform duration-500 ease-in-out group-hover:scale-105"
+              className="object-contain  "
             />
           ) : (
-            <span className="text-gray-500">No Image</span>
+            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+              <span className="text-gray-400">No Image</span>
+            </div>
           )}
         </div>
 
-        {product.colors && (
-          <p className="text-xs text-gray-500 mb-1">{product.colors}</p>
-        )}
+        {/* Top Left Badge - Free Shipping */}
+        <div className="absolute top-3 left-3 z-10">
+          {hasFreeShipping && (
+            <Badge className="bg-[#00A9E0] hover:bg-[#0095C9] text-white px-3 py-1 text-xs font-semibold flex items-center gap-1 shadow-md">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="1" y="3" width="15" height="13" />
+                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                <circle cx="5.5" cy="18.5" r="2.5" />
+                <circle cx="18.5" cy="18.5" r="2.5" />
+              </svg>
+              FREE DELIVERY
+            </Badge>
+          )}
+        </div>
+      </div>
 
-        <h3 className="text-xs sm:text-sm font-medium text-center mb-1 line-clamp-2 h-8 sm:h-10">
-          {product.title}
+      {/* Content */}
+      <CardContent className="flex flex-col px-4 py-1 flex-grow">
+        {/* Product Name */}
+        <h3
+          className={`text-sm font-medium text-gray-800 mb-2 leading-tight cursor-pointer hover:text-teal-700 transition-colors ${
+            isExpanded ? "" : "overflow-hidden text-ellipsis"
+          }`}
+          style={{
+            display: isExpanded ? "block" : "-webkit-box",
+            WebkitLineClamp: isExpanded ? "unset" : 2,
+            WebkitBoxOrient: "vertical",
+          }}
+          onClick={() => setIsExpanded(!isExpanded)}
+          title={product.name}
+        >
+          {product.name}
         </h3>
 
-        <div className="flex text-yellow-500 text-xs sm:text-sm mb-1">
-          {"★".repeat(Math.floor(product.rating))}
-          {"☆".repeat(5 - Math.floor(product.rating))}
+        {/* Price Section */}
+        <div className="mb-2">
+          {specialPrice ? (
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5 mb-1">
+                <div className="flex items-center gap-1">
+                  <TakaIcon className="text-teal-600 text-lg" />
+                  <span className="text-xl font-bold text-teal-600">
+                    {specialPrice.toLocaleString()}
+                  </span>
+                </div>
+                {discount && (
+                  <Badge className="bg-pink-50 text-teal-600 px-2 py-0.5 text-xs font-bold border border-teal-200">
+                    -{discount}%
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <TakaIcon className="text-gray-400 text-base" />
+                <span className="text-sm text-gray-400 line-through">
+                  {price.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <TakaIcon className="text-gray-800 text-lg" />
+              <span className="text-xl font-bold text-gray-800">
+                {price.toLocaleString()}
+              </span>
+            </div>
+          )}
         </div>
 
-        <p className="text-xs text-gray-500 mb-2">
-          ({product.reviews} review{product.reviews !== 1 ? "s" : ""})
-        </p>
-
-        <div className="flex gap-2 items-center">
-          <span className="text-base sm:text-lg font-semibold text-black">
-            ${product.price.toFixed(2)}
+        {/* Rating Section */}
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex text-orange-400">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <span key={i} className="text-sm">
+                {i < Math.floor(averageRating) ? "★" : "☆"}
+              </span>
+            ))}
+          </div>
+          <span className="text-sm text-gray-600 font-medium">
+            {averageRating > 0 ? averageRating.toFixed(1) : "0.0"} (
+            {reviewCount})
           </span>
-          {product.oldPrice && (
-            <span className="text-xs sm:text-sm text-gray-400 line-through">
-              ${product.oldPrice.toFixed(2)}
-            </span>
+        </div>
+
+        {/* Store Name with Verification Badge */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs text-gray-500 font-medium truncate">
+            {storeName}
+          </span>
+          {isVerified && (
+            <Badge className="bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white px-2 py-0.5 text-xs font-semibold shadow-lg border-0 flex items-center gap-1 flex-shrink-0 transition-all duration-200">
+              <BadgeCheck className="w-3 h-3" />
+              Verified
+            </Badge>
           )}
         </div>
       </CardContent>
-
-      <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        <Button className="w-full bg-teal-900 hover:bg-teal-800 text-white rounded-lg flex items-center justify-center gap-2 py-2 text-sm">
-          <ShoppingCart size={16} />
-          Add to Cart
-        </Button>
-      </div>
     </Card>
   );
 };

@@ -1,5 +1,30 @@
 import { Vendor, Category, OrderItem, Attribute, AttributeValue, Specification } from "./type";
 
+// -------- Review & Offer Interfaces --------
+export interface Review {
+  id: string;
+  rating: number;
+  comment?: string;
+  userId: string;
+  productId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OfferProduct {
+  id: string;
+  productId: string;
+  offerId: string;
+  offer: {
+    id: string;
+    type: string;
+    title: string;
+    minOrderAmount: number | null;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
 // -------- Product --------
 export interface Product {
   id: string;
@@ -8,6 +33,7 @@ export interface Product {
   slug: string;
   videoUrl?: string;  
   vendorId: number;
+  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   vendor: Vendor;
   categoryId: string;
   category: Category;
@@ -15,9 +41,13 @@ export interface Product {
   specifications: ProductSpecificationValue[];
   attributeSettings: ProductAttributeSetting[];
   images: ProductImage[];
+  // Add the missing properties
+  reviews?: Review[];
+  offerProducts?: OfferProduct[];
   createdAt: string;
   updatedAt: string;
 }
+
 export interface BulkProductData {
   id: string;
   name: string;
@@ -25,6 +55,8 @@ export interface BulkProductData {
   sku: string;
   price: number;
   stock: number;
+  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+
   variantGroupNo?: number;
   images: string[];
   videoUrl?: string;
@@ -36,6 +68,27 @@ export interface BulkProductData {
   status: 'draft' | 'processing' | 'success' | 'error';
 }
 // -------- ProductVariant --------
+export interface BulkProductData {
+  id: string;
+  name: string;
+  description: string;
+  sku: string;
+  price: number;
+  stock: number;
+  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+
+  variantGroupNo?: number;
+  images: string[];
+  videoUrl?: string;
+  specInputs: ProductSpecificationInput[];
+  attributeSettings: ProductAttributeSettingInput[];
+  variantInputs: ProductVariantInput[];
+  shippingWarranty?: ProductShippingWarrantyInput;
+  errors: Record<string, string>;
+  status: 'draft' | 'processing' | 'success' | 'error';
+}
+
+// -------- ProductVariant --------
 export interface ProductVariant {
   id: string;
   productId: string;
@@ -43,6 +96,8 @@ export interface ProductVariant {
   name: string;
   sku: string;
   price: number;
+  specialPrice?: number;
+  discount?: number;
   stock: number;
   weight: number;
   images: ProductImage[];
@@ -111,6 +166,7 @@ export interface ProductVariantInput {
   name: string;
   sku: string;
   price: number;
+  specialPrice?: number;
   stock: number;
   weight: number;
   attributes?: { attributeValueId: string }[];

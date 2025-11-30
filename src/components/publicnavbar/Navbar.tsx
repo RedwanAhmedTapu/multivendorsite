@@ -102,7 +102,7 @@ export default function Navbar(): JSX.Element {
     <>
       {isNavbarFixed && <div className="h-28 md:h-36"></div>}
       <header
-        className={`w-full bg-teal-900 text-white ${
+        className={`w-full bg-[#0b5052] text-white ${
           isNavbarFixed
             ? "fixed top-0 left-0 z-50 shadow-lg animate-in slide-in-from-top duration-300"
             : "relative"
@@ -264,7 +264,7 @@ export default function Navbar(): JSX.Element {
         </div>
 
         {/* Mobile Search */}
-        <div className="md:hidden px-2 py-1 bg-teal-900">
+        <div className="md:hidden px-2 py-1 bg-[#0b5052]">
           <div className="flex w-full gap-x-1">
             <Input
               value={search}

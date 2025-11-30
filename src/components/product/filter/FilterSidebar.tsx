@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useGetCategoryFiltersQuery } from "@/features/apiSlice";
+import { useSearchParams } from "next/navigation";
 
 // ============================================
 // TYPE DEFINITIONS
@@ -44,14 +45,25 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   onFiltersChange,
   currentFilters: externalFilters,
 }) => {
+  const searchParams = useSearchParams();
+  
+  // Check if products page has any parameters in URL
+  const hasUrlParams = useMemo(() => {
+    return searchParams.toString().length > 0;
+  }, [searchParams]);
+
   // FIXED: The query returns CategoryFilterResponse directly, not wrapped in { data: ... }
   const { 
-    data: filterData, // filterData is CategoryFilterResponse
+    data: filtersr, // filterData is CategoryFilterResponse
     isLoading: filterLoading,
+    isSuccess: filterSuccess,
     error: filterError 
   } = useGetCategoryFiltersQuery(categoryId || '', {
     skip: !categoryId,
   });
+  
+  const filterData = filtersr?.data;
+  console.log(filterSuccess, "fil");
 
   // Initialize filters with proper defaults - 0 to 1 lakh
   const [internalFilters, setInternalFilters] = useState<ProductFilters>({
@@ -82,6 +94,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
   // Use external filters if provided, otherwise use internal state
   const filters = externalFilters || internalFilters;
+  console.log(filterData, "filterData");
 
   // Sync price inputs with filters
   useEffect(() => {
@@ -521,7 +534,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     // Loading state
     if (filterLoading && categoryId) {
       return (
-        <div className="w-full md:w-64 p-4 h-full md:h-fit bg-white overflow-y-auto rounded-lg shadow-sm">
+        <div className="w-full md:w-64 p-4 h-full md:h-fit overflow-y-auto bg-transparent">
           <div className="animate-pulse space-y-4">
             <div className="h-5 bg-gray-200 rounded w-3/4"></div>
             <div className="space-y-2">
@@ -536,7 +549,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     // Error state
     if (filterError) {
       return (
-        <div className="w-full md:w-64 p-4 h-full md:h-fit bg-white overflow-y-auto rounded-lg shadow-sm">
+        <div className="w-full md:w-64 p-4 h-full md:h-fit bg-transparent overflow-y-auto">
           <div className="text-center py-6">
             <p className="text-sm text-red-500">Failed to load filters</p>
             <p className="text-xs text-gray-400 mt-2">Showing common filters only</p>
@@ -549,7 +562,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     // No data yet but still show common filters
     if (!filterData && categoryId) {
       return (
-        <div className="w-full md:w-64 p-4 h-full md:h-fit bg-white overflow-y-auto rounded-lg shadow-sm">
+        <div className="w-full md:w-64 p-4 h-full md:h-fit bg-transparent overflow-y-auto">
           <div className="text-center py-3">
             <p className="text-sm text-gray-500">Loading category filters...</p>
             <p className="text-xs text-gray-400 mt-1">Common filters available below</p>
@@ -560,7 +573,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     }
 
     return (
-      <div className="w-full md:w-64 p-4 h-full md:h-fit bg-white overflow-y-auto rounded-lg shadow-sm">
+      <div className="w-full md:w-64 p-4 h-full md:h-fit bg-transparent overflow-y-auto">
         {/* Header with Clear All and Close */}
         <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
           <div className="flex items-center gap-2">
@@ -852,6 +865,11 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     onMobileClose, clearAllFilters, FilterSection, hasCategoryFilters, renderCommonFilters
   ]);
 
+  // Hide the filter sidebar if no URL parameters are present
+  if (!hasUrlParams) {
+    return null;
+  }
+
   return (
     <>
       {/* Desktop sidebar */}
@@ -862,7 +880,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       {/* Mobile sidebar overlay */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          className="fixed inset-0  bg-opacity-50 z-40 md:hidden"
           onClick={onMobileClose}
         />
       )}
@@ -870,8 +888,8 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       {/* Mobile sidebar */}
       <div
         className={`
-        fixed top-0 left-0 h-full w-80 bg-white z-50 shadow-xl transform transition-transform duration-300 ease-in-out
-        md:hidden filter-sidebar overflow-y-auto
+        fixed top-0 left-0 h-full w-full bg-white z-50 transform transition-transform duration-300 ease-in-out
+        md:hidden filter-sidebar overflow-y-auto 
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
       `}
       >

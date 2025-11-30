@@ -7,6 +7,7 @@ export interface Vendor {
   id: string;
   storeName: string;
   avatar:string,
+  verificationStatus?: "PENDING" | "VERIFIED" | "REJECTED";
   email: string;
   createdAt: string;
   updatedAt: string;

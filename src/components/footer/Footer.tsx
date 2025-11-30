@@ -15,7 +15,7 @@ import Link from 'next/link';
 const Footer: React.FC = () => {
   return (
     <footer className="bg-gray-50 pt-12 pb-6 md:pt-16 md:pb-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-[75rem] mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main Footer Content */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 mb-10 md:mb-12">
           {/* Left Section - Contact Info */}

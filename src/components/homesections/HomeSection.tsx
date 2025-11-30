@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import { useGetSlidersQuery } from "@/features/sliderApi";
 import HomeSectionSkeleton from "../skeletons/HomeSectionSkeleton";
+import DownloadApp from "../DownloadApp";
 
 const HeroSlider = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -37,11 +38,11 @@ const HeroSlider = () => {
 
   return (
     <div className="w-full bg-gray-50">
-      <div className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto md:px-4 sm:px-6 py-4">
+      <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-[75rem] mx-auto md:px-4 sm:px-6 py-4">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Left Section - Hero Slider */}
           <div
-            className="lg:col-span-2 relative rounded-sm overflow-hidden h-80 sm:h-96 md:h-[22rem] lg:h-[28rem]"
+            className="lg:col-span-2 relative rounded-sm overflow-hidden h-80 sm:h-96 md:h-[22rem] lg:h-[25rem]"
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
@@ -87,16 +88,16 @@ const HeroSlider = () => {
             <button
               onClick={prevSlide}
               aria-label="Previous Slide"
-              className="hidden sm:block absolute left-2 sm:left-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 text-gray-800 p-1 sm:p-2 rounded-full transition-all duration-200 z-20"
+              className="hidden sm:block h-16 absolute  sm:left-2 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 text-gray-800 p-1  rounded-md shadow-2xl shadow-gray-950 transition-all duration-200 cursor-pointer z-20"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={24} />
             </button>
             <button
               onClick={nextSlide}
               aria-label="Next Slide"
-              className="hidden sm:block absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 text-gray-800 p-1 sm:p-2 rounded-full transition-all duration-200 z-20"
+              className="hidden h-16 sm:block absolute  sm:right-2 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 text-gray-800 p-1  rounded-md shadow-2xl shadow-gray-950 transition-all duration-200 cursor-pointer z-20"
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={24} />
             </button>
 
             {/* Dot Indicators */}
@@ -116,49 +117,8 @@ const HeroSlider = () => {
           </div>
 
           {/* Right Section - Static Cards */}
-          <div className="flex flex-col px-4 md:px-0 mt-4 lg:mt-0 space-y-4 sm:space-y-6">
-            <div className="bg-[#E8EDF6] rounded-sm p-4 sm:p-6 h-48 sm:h-56 md:h-60 lg:h-[13.5rem] relative overflow-hidden">
-              <div className="absolute inset-0 bg-[url('/homesection/homev3-Newarrivals.webp')] bg-cover bg-center"></div>
-              <div className="flex h-full relative z-10">
-                <div className="flex-1">
-                  <p className="text-xs sm:text-sm font-semibold text-gray-900 tracking-wider mb-1">
-                    NEW ARRIVALS
-                  </p>
-                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 sm:mb-3">
-                    Stay Comfy
-                  </h2>
-                  <p className="text-gray-800 text-xs sm:text-sm mb-3 sm:mb-4 leading-relaxed">
-                    A collection of premium organic pieces.
-                  </p>
-                  <button className="text-gray-800 font-semibold text-xs sm:text-sm border-b-2 border-teal-400 hover:border-teal-300 transition-colors duration-200">
-                    Shop Now
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#E8EDF6] rounded-sm p-4 sm:p-6 h-48 sm:h-56 md:h-60 lg:h-[13.5rem] relative overflow-hidden">
-              <div className="absolute inset-0 bg-[url('/homesection/homev3-featured.webp')] bg-cover bg-center"></div>
-              <div className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-teal-500 text-white text-xs px-2 py-1 rounded-full font-semibold z-10">
-                SALE
-              </div>
-              <div className="flex h-full relative z-10">
-                <div className="flex-1">
-                  <p className="text-xs sm:text-sm font-semibold text-gray-900 tracking-wider mb-1">
-                    FEATURED
-                  </p>
-                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 sm:mb-3">
-                    Smart Toothbrush
-                  </h2>
-                  <p className="text-gray-800 text-xs sm:text-sm mb-3 sm:mb-4 leading-relaxed">
-                    A brush that knows you. an app that shows you.
-                  </p>
-                  <button className="text-gray-800 font-semibold text-xs sm:text-sm border-b-2 border-teal-400 hover:border-teal-300 transition-colors duration-200">
-                    Shop Now
-                  </button>
-                </div>
-              </div>
-            </div>
+          <div className="hidden lg:flex flex-col px-4 md:px-0 mt-4 lg:mt-0 space-y-4 sm:space-y-6">
+           <DownloadApp/>
           </div>
         </div>
       </div>

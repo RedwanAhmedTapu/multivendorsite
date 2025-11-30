@@ -1,18 +1,15 @@
 "use client";
-
 import { useGetCategoriesQuery } from "@/features/apiSlice";
 import Image from "next/image";
 import Link from "next/link";
 
 export default function CategorySection() {
   const { data, isLoading, isError } = useGetCategoriesQuery(undefined);
-
-  // useGetCategoriesQuery returns Category[] directly (not wrapped)
   const categories = data || [];
 
   if (isLoading) {
     return (
-      <section className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 sm:px-6">
+      <section className="max-w-4xl xl:max-w-6xl 2xl:max-w-[75rem] mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl md:text-2xl font-bold">Shop by Category</h2>
         </div>
@@ -44,24 +41,28 @@ export default function CategorySection() {
   }
 
   return (
-    <section className="max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 sm:px-6">
+    <section className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-[75rem] mx-auto px-4 sm:px-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl md:text-2xl font-bold">Shop by Category</h2>
         <Link
-          href="/categories"
+          href="/products"
           className="text-sm font-medium text-gray-700 hover:underline"
         >
           See All
         </Link>
       </div>
-
       <div className="relative">
-        <div className="overflow-x-auto scrollbar-hide">
+        <div className="overflow-x-auto overflow-y-hidden scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <style jsx>{`
+            div::-webkit-scrollbar {
+              display: none;
+            }
+          `}</style>
           <div className="flex space-x-6 pb-4 justify-between items-center">
             {categories.map((cat: any) => (
               <Link
                 key={cat.id}
-                href={`/categories/${cat.slug || cat.id}`}
+                href={`/products?category=${cat.slug || cat.id}`}
                 className="flex flex-col items-center text-center group cursor-pointer min-w-max"
               >
                 <div
