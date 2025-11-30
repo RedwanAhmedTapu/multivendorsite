@@ -1,20 +1,20 @@
 // app/admin/employees/add/page.tsx
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import Link from 'next/link';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -23,83 +23,87 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
+} from "@/components/ui/form";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowLeft, UserPlus, Save } from 'lucide-react';
-import { useCreateAdminEmployeeMutation } from '@/features/employeeApi';
-import { toast } from 'sonner';
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, UserPlus, Save } from "lucide-react";
+import { useCreateAdminEmployeeMutation } from "@/features/employeeApi";
+import { toast } from "sonner";
 
 // Updated schema to include required fields
-const createEmployeeSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
-  phone: z.string().optional(),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string(),
-  designation: z.string().min(2, 'Designation is required'),
-  department: z.string().min(2, 'Department is required'),
-  permissions: z.array(z.string()).min(1, 'At least one permission is required'),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+const createEmployeeSchema = z
+  .object({
+    name: z.string().min(2, "Name must be at least 2 characters"),
+    email: z.string().email("Invalid email address"),
+    phone: z.string().optional(),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+    confirmPassword: z.string(),
+    designation: z.string().min(2, "Designation is required"),
+    department: z.string().min(2, "Department is required"),
+    permissions: z
+      .array(z.string())
+      .min(1, "At least one permission is required"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
 type CreateEmployeeFormData = z.infer<typeof createEmployeeSchema>;
 
 // Common designations
 const DESIGNATIONS = [
-  'Manager',
-  'Assistant Manager',
-  'Supervisor',
-  'Team Lead',
-  'Senior Executive',
-  'Executive',
-  'Associate',
-  'Intern',
+  "Manager",
+  "Assistant Manager",
+  "Supervisor",
+  "Team Lead",
+  "Senior Executive",
+  "Executive",
+  "Associate",
+  "Intern",
 ];
 
 // Common departments
 const DEPARTMENTS = [
-  'Sales',
-  'Marketing',
-  'Operations',
-  'Customer Service',
-  'IT',
-  'HR',
-  'Finance',
-  'Logistics',
+  "Sales",
+  "Marketing",
+  "Operations",
+  "Customer Service",
+  "IT",
+  "HR",
+  "Finance",
+  "Logistics",
 ];
 
 // Available permissions - matching API structure
 const PERMISSIONS = [
-  { id: 'productManagement', label: 'Product Management' },
-  { id: 'orderManagement', label: 'Order Management' },
-  { id: 'customerSupport', label: 'Customer Support' },
-  { id: 'analytics', label: 'Analytics' },
-  { id: 'offerManagement', label: 'Offer Management' },
-  { id: 'inventoryManagement', label: 'Inventory Management' },
+  { id: "productManagement", label: "Product Management" },
+  { id: "orderManagement", label: "Order Management" },
+  { id: "customerSupport", label: "Customer Support" },
+  { id: "analytics", label: "Analytics" },
+  { id: "offerManagement", label: "Offer Management" },
+  { id: "inventoryManagement", label: "Inventory Management" },
 ];
 
 export default function AddEmployeePage() {
   const [createEmployee, { isLoading }] = useCreateAdminEmployeeMutation();
-  
+
   const form = useForm<CreateEmployeeFormData>({
     resolver: zodResolver(createEmployeeSchema),
     defaultValues: {
-      name: '',
-      email: '',
-      phone: '',
-      password: '',
-      confirmPassword: '',
-      designation: '',
-      department: '',
+      name: "",
+      email: "",
+      phone: "",
+      password: "",
+      confirmPassword: "",
+      designation: "",
+      department: "",
       permissions: [],
     },
   });
@@ -107,27 +111,27 @@ export default function AddEmployeePage() {
   const onSubmit = async (data: CreateEmployeeFormData) => {
     try {
       const { confirmPassword, permissions, ...baseData } = data;
-      
+
       // Convert permissions array to object format expected by API
       const permissionsObject = {
-        productManagement: permissions.includes('productManagement'),
-        orderManagement: permissions.includes('orderManagement'),
-        customerSupport: permissions.includes('customerSupport'),
-        analytics: permissions.includes('analytics'),
-        offerManagement: permissions.includes('offerManagement'),
-        inventoryManagement: permissions.includes('inventoryManagement'),
+        productManagement: permissions.includes("productManagement"),
+        orderManagement: permissions.includes("orderManagement"),
+        customerSupport: permissions.includes("customerSupport"),
+        analytics: permissions.includes("analytics"),
+        offerManagement: permissions.includes("offerManagement"),
+        inventoryManagement: permissions.includes("inventoryManagement"),
       };
-      
+
       const submitData = {
         ...baseData,
         permissions: permissionsObject,
       };
-      
+
       await createEmployee(submitData).unwrap();
-      toast.success('Employee created successfully');
+      toast.success("Employee created successfully");
       form.reset();
     } catch (error: any) {
-      toast.error(error?.data?.message || 'Failed to create employee');
+      toast.error(error?.data?.message || "Failed to create employee");
     }
   };
 
@@ -141,7 +145,9 @@ export default function AddEmployeePage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Add New Employee</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Add New Employee
+          </h1>
           <p className="text-muted-foreground">
             Create a new employee account with basic information
           </p>
@@ -184,7 +190,11 @@ export default function AddEmployeePage() {
                     <FormItem>
                       <FormLabel>Email Address *</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="john@company.com" {...field} />
+                        <Input
+                          type="email"
+                          placeholder="john@company.com"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -211,7 +221,10 @@ export default function AddEmployeePage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Designation *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select designation" />
@@ -236,7 +249,10 @@ export default function AddEmployeePage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Department *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select department" />
@@ -275,11 +291,13 @@ export default function AddEmployeePage() {
                     <FormItem>
                       <FormLabel>Password *</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          {...field}
+                        />
                       </FormControl>
-                      <FormDescription>
-                        Minimum 6 characters
-                      </FormDescription>
+                      <FormDescription>Minimum 6 characters</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -292,7 +310,11 @@ export default function AddEmployeePage() {
                     <FormItem>
                       <FormLabel>Confirm Password *</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -336,15 +358,20 @@ export default function AddEmployeePage() {
                               >
                                 <FormControl>
                                   <Checkbox
-                                    checked={field.value?.includes(permission.id)}
+                                    checked={field.value?.includes(
+                                      permission.id
+                                    )}
                                     onCheckedChange={(checked) => {
                                       return checked
-                                        ? field.onChange([...field.value, permission.id])
+                                        ? field.onChange([
+                                            ...(field.value ?? []),
+                                            permission.id,
+                                          ])
                                         : field.onChange(
-                                            field.value?.filter(
+                                            (field.value ?? []).filter(
                                               (value) => value !== permission.id
                                             )
-                                          )
+                                          );
                                     }}
                                   />
                                 </FormControl>
@@ -352,7 +379,7 @@ export default function AddEmployeePage() {
                                   {permission.label}
                                 </FormLabel>
                               </FormItem>
-                            )
+                            );
                           }}
                         />
                       ))}
@@ -373,7 +400,7 @@ export default function AddEmployeePage() {
             </Link>
             <Button type="submit" disabled={isLoading}>
               <Save className="w-4 h-4 mr-2" />
-              {isLoading ? 'Creating Employee...' : 'Create Employee'}
+              {isLoading ? "Creating Employee..." : "Create Employee"}
             </Button>
           </div>
         </form>
