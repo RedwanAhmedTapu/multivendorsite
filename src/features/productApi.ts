@@ -49,6 +49,7 @@ export const productApi = createApi({
       query: (id) => `/products/${id}`,
       transformResponse: (response: { success: boolean; data: Product }) => {
         return response.data;
+        
       },
       providesTags: (result, error, id) => [{ type: "Products", id }],
     }),

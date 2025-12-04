@@ -5,7 +5,7 @@ import type { RootState } from "@/store/store";
 
 // Core fetchBaseQuery with credentials + headers
 const rawBaseQuery = fetchBaseQuery({
-  baseUrl: "https://api.finixmart.com.bd/api",
+  baseUrl: "http://localhost:5000/api",
   credentials: "include", // allows cookies
   prepareHeaders: (headers, { getState }) => {
     const token = (getState() as RootState).auth.accessToken;
@@ -26,7 +26,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
   // Handle expired/invalid token (401 or 403)
   if (result.error && (result.error.status === 401 || result.error.status === 403)) {
     // Try refresh
-    const refreshResult = await rawBaseQuery("https://api.finixmart.com.bd/api/auth/refresh", api, extraOptions);
+    const refreshResult = await rawBaseQuery("http://localhost:5000/api/auth/refresh", api, extraOptions);
 
     if (refreshResult.data && (refreshResult.data as any).accessToken) {
       // Save new access token

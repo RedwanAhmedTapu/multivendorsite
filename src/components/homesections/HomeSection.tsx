@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useGetSlidersQuery } from "@/features/sliderApi";
 import HomeSectionSkeleton from "../skeletons/HomeSectionSkeleton";
 import DownloadApp from "../DownloadApp";
+import { Container } from "../Container";
 
 const HeroSlider = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -37,9 +38,9 @@ const HeroSlider = () => {
     return <div className="text-center py-8">Failed to load slider</div>;
 
   return (
-    <div className="w-full bg-gray-50">
-      <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-[75rem] mx-auto md:px-4 sm:px-6 py-4">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+    <div className="w-full ">
+      <Container>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-x-10">
           {/* Left Section - Hero Slider */}
           <div
             className="lg:col-span-2 relative rounded-sm overflow-hidden h-80 sm:h-96 md:h-[22rem] lg:h-[25rem]"
@@ -117,12 +118,12 @@ const HeroSlider = () => {
           </div>
 
           {/* Right Section - Static Cards */}
-          <div className="hidden lg:flex flex-col px-4 md:px-0 mt-4 lg:mt-0 space-y-4 sm:space-y-6">
+          <div className="hidden lg:flex flex-col px-4 md:px-0 mt-4 lg:mt-0  ">
            <DownloadApp/>
           </div>
         </div>
+        </Container>
       </div>
-    </div>
   );
 };
 

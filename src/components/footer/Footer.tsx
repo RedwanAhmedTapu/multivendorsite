@@ -1,192 +1,348 @@
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { 
-  Phone, 
-  Mail, 
-  Twitter, 
-  Facebook, 
-  Youtube, 
-  Instagram, 
-  MessageCircle 
-} from 'lucide-react';
-import Link from 'next/link';
+import React from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import SSLEcommerzBanner from "../../../public/footer/sslcommerz-banner.png";
+import {
+  Phone,
+  Mail,
+  MapPin,
+  Twitter,
+  Facebook,
+  Youtube,
+  Instagram,
+  Linkedin,
+  MessageCircle,
+  Shield,
+  Truck,
+  Headphones,
+  CreditCard,
+  Globe,
+} from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
 
 const Footer: React.FC = () => {
   return (
-    <footer className="bg-gray-50 pt-12 pb-6 md:pt-16 md:pb-8">
-      <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-[75rem] mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Main Footer Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 mb-10 md:mb-12">
-          {/* Left Section - Contact Info */}
-          <div className="space-y-6 md:space-y-8">
-            {/* Call Section */}
-            <div className="flex items-start space-x-3 md:space-x-4">
-              <div className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                <Phone className="w-5 h-5 md:w-6 md:h-6 text-gray-600" />
-              </div>
-              <div>
-                <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-1 md:mb-2">Call</h3>
-                <p className="text-sm md:text-base text-gray-600 mb-1 md:mb-2">
-                  Call us from 8am to<br />12am ET.
+    <footer className="bg-white text-gray-800">
+      
+
+      {/* Main Footer Content */}
+      <div className="py-12 md:py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">
+            {/* Brand Section */}
+            <div className="lg:col-span-2">
+              <div className="mb-6">
+                <h2 className="text-3xl font-bold text-gray-900">
+                  Finix<span className="text-emerald-600">Mart</span>
+                </h2>
+                <p className="text-gray-600 mt-2">
+                  Your Trusted Shopping Destination
                 </p>
-                <p className="text-gray-900 font-medium text-sm md:text-base">1-866-237-8289</p>
+              </div>
+
+              <p className="text-gray-600 mb-6 max-w-md leading-relaxed">
+                Experience seamless shopping with the widest selection of
+                products, competitive prices, and exceptional customer service.
+              </p>
+
+              {/* Newsletter Subscription */}
+              <div className="mb-8">
+                <h4 className="font-semibold text-gray-900 mb-3">
+                  Subscribe to Newsletter
+                </h4>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="Enter your email"
+                    className="bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-emerald-500"
+                  />
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                    Subscribe
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Get updates on new products and special offers
+                </p>
+              </div>
+
+              {/* Contact Info */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Phone className="w-5 h-5 text-emerald-600" />
+                  <span className="text-gray-600">+1 (555) 123-4567</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Mail className="w-5 h-5 text-emerald-600" />
+                  <span className="text-gray-600">support@finixmart.com</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <MapPin className="w-5 h-5 text-emerald-600" />
+                  <span className="text-gray-600">
+                    123 Business Ave, Suite 100
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Email Section */}
-            <div className="flex items-start space-x-3 md:space-x-4">
-              <div className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                <Mail className="w-5 h-5 md:w-6 md:h-6 text-gray-600" />
-              </div>
-              <div>
-                <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-1 md:mb-2">Email</h3>
-                <p className="text-sm md:text-base text-gray-600 mb-1 md:mb-2">
-                  Our response time is<br />1 to 3 business days.
-                </p>
-                <button className="text-gray-900 font-medium text-sm md:text-base hover:text-gray-700 transition-colors">
-                  Send a Message
-                </button>
-              </div>
+            {/* Quick Links */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 mb-6 pb-3 border-b border-gray-200">
+                Quick Links
+              </h4>
+              <ul className="space-y-3">
+                <li>
+                  <Link
+                    href="/about"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    About Us
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/contact"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Contact Us
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/blog"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Blog & News
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/careers"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Careers
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/sitemap"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Site Map
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Customer Service */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 mb-6 pb-3 border-b border-gray-200">
+                Customer Service
+              </h4>
+              <ul className="space-y-3">
+                <li>
+                  <Link
+                    href="/help"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Help Center
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/faq"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    FAQ's
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/shipping"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Shipping Info
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/returns"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Returns & Exchanges
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/track-order"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Track Your Order
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Policies */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 mb-6 pb-3 border-b border-gray-200">
+                Policies
+              </h4>
+              <ul className="space-y-3">
+                <li>
+                  <Link
+                    href="/terms-condition?type=PRIVACY_POLICY"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/terms-condition?type=GENERAL"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Terms of Use
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/terms-condition"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Legal Information
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/cookie-policy"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Cookie Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/accessibility"
+                    className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Accessibility
+                  </Link>
+                </li>
+              </ul>
             </div>
           </div>
 
-          {/* Right Section - Newsletter */}
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2 md:mb-3">Let's keep in touch</h2>
-            <p className="text-sm md:text-base text-gray-600 mb-4 md:mb-6">
-              Get recommendations, tips, updates, promotions and more.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
-              <Input 
-                type="email"
-                placeholder="Enter your email address"
-                className="flex-1 h-10 md:h-12 px-3 md:px-4 text-sm border-gray-300 focus:border-teal-500 focus:ring-teal-500"
-              />
-              <Button 
-                className="h-10 md:h-12 px-4 md:px-8 text-sm md:text-base bg-teal-700 hover:bg-teal-800 text-white font-medium rounded-lg"
-              >
-                Subscribe
-              </Button>
+          {/* Social Media & App Download */}
+          <div className="mt-12 pt-8 border-t border-gray-200">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+              {/* Social Media */}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-4 text-center md:text-left">
+                  Connect With Us
+                </h4>
+                <div className="flex gap-3 justify-center md:justify-start">
+                  <a
+                    href="#"
+                    className="p-2 bg-gray-100 text-gray-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-colors"
+                  >
+                    <Facebook className="w-5 h-5" />
+                  </a>
+                  <a
+                    href="#"
+                    className="p-2 bg-gray-100 text-gray-600 hover:bg-sky-500 hover:text-white rounded-lg transition-colors"
+                  >
+                    <Twitter className="w-5 h-5" />
+                  </a>
+                  <a
+                    href="#"
+                    className="p-2 bg-gray-100 text-gray-600 hover:bg-pink-600 hover:text-white rounded-lg transition-colors"
+                  >
+                    <Instagram className="w-5 h-5" />
+                  </a>
+                  <a
+                    href="#"
+                    className="p-2 bg-gray-100 text-gray-600 hover:bg-red-600 hover:text-white rounded-lg transition-colors"
+                  >
+                    <Youtube className="w-5 h-5" />
+                  </a>
+                  <a
+                    href="#"
+                    className="p-2 bg-gray-100 text-gray-600 hover:bg-blue-700 hover:text-white rounded-lg transition-colors"
+                  >
+                    <Linkedin className="w-5 h-5" />
+                  </a>
+                  <a
+                    href="#"
+                    className="p-2 bg-gray-100 text-gray-600 hover:bg-green-500 hover:text-white rounded-lg transition-colors"
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                  </a>
+                </div>
+              </div>
+
+              {/* App Download */}
+              <div className="text-center md:text-right">
+                <h4 className="font-semibold text-gray-900 mb-4">
+                  Download Our App
+                </h4>
+                <div className="flex gap-3 justify-center md:justify-end">
+                  <button className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg flex items-center gap-2 transition-colors">
+                    <svg
+                      className="w-5 h-5"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+                    </svg>
+                    <span className="text-sm">App Store</span>
+                  </button>
+                  <button className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg flex items-center gap-2 transition-colors">
+                    <svg
+                      className="w-5 h-5"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M3 20.5V3.5C3 2.91 3.34 2.5 3.75 2.5H15L21 8.5V20.5C21 21.09 20.66 21.5 20.25 21.5H3.75C3.34 21.5 3 21.09 3 20.5Z" />
+                    </svg>
+                    <span className="text-sm">Google Play</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Brand and Links Section */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 py-8 md:py-12 border-t border-gray-200">
-          {/* Brand Section */}
-          <div className="col-span-2 md:col-span-1">
-            <div className="mb-4 md:mb-6">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">
-                FinixMart<span className="text-red-500">.</span><span className="text-blue-500">.</span><span className="text-yellow-500">.</span>
-              </h2>
-            </div>
-            <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">Best For Shopping</h3>
-            <p className="text-xs md:text-sm text-gray-600 mb-4 md:mb-6 leading-relaxed">
-              Sed do eiusmod tempor incididunt ut labore dolore magna.
-            </p>
-            {/* Social Links */}
-            <div className="flex space-x-3 md:space-x-4">
-              <a href="#" className="text-gray-400 hover:text-gray-600 transition-colors">
-                <Twitter className="w-4 h-4 md:w-5 md:h-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-gray-600 transition-colors">
-                <Facebook className="w-4 h-4 md:w-5 md:h-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-gray-600 transition-colors">
-                <Youtube className="w-4 h-4 md:w-5 md:h-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-gray-600 transition-colors">
-                <Instagram className="w-4 h-4 md:w-5 md:h-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-gray-600 transition-colors">
-                <MessageCircle className="w-4 h-4 md:w-5 md:h-5" />
-              </a>
-            </div>
-          </div>
+     
 
-          {/* Get to Know Us */}
-          <div>
-            <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-4 md:mb-6">Get to Know Us</h4>
-            <ul className="space-y-2 md:space-y-4">
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">About Us</a></li>
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">News & Blog</a></li>
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Careers</a></li>
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Investors</a></li>
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Contact Us</a></li>
-            </ul>
-          </div>
-
-          {/* Customer Service */}
-          <div>
-            <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-4 md:mb-6">Customer Service</h4>
-            <ul className="space-y-2 md:space-y-4">
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Help Center</a></li>
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">FAQ's</a></li>
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Accessibility</a></li>
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Feedback</a></li>
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Size Guide</a></li>
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Payment Method</a></li>
-            </ul>
-          </div>
-
-          {/* Orders & Returns */}
-          <div>
-            <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-4 md:mb-6">Orders & Returns</h4>
-            <ul className="space-y-2 md:space-y-4">
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Track Order</a></li>
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Shipping & Delivery</a></li>
-              <li>
-                <Link 
-                  href="/terms-condition" 
-                  className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  Terms & Conditions
-                </Link>
-              </li>
-              <li><a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">Price Match Guarantee</a></li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Bottom Section */}
-        <div className="flex flex-col lg:flex-row justify-between items-center pt-6 md:pt-8 border-t border-gray-200">
-          {/* Legal Links */}
-          <div className="flex flex-wrap justify-center lg:justify-start gap-4 md:gap-6 mb-4 lg:mb-0">
-            <Link 
-              href="/terms-condition?type=PRIVACY_POLICY" 
-              className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Privacy Policy
-            </Link>
-            <Link 
-              href="/terms-condition?type=GENERAL" 
-              className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Terms of Use
-            </Link>
-            <Link 
-              href="/terms-condition" 
-              className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Legal
-            </Link>
-            <a href="#" className="text-xs md:text-sm text-gray-600 hover:text-gray-900 transition-colors">
-              Site Map
-            </a>
-          </div>
-
-          {/* Payment Methods */}
-          <div className="flex items-center gap-3 md:gap-4 flex-wrap justify-center">
-            <div className="flex items-center space-x-1 text-gray-400 text-xs md:text-sm">
-              <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 md:px-2 md:py-1 rounded text-xs font-medium">BANK</span>
-            </div>
-            <div className="text-gray-400 text-xs md:text-sm font-semibold">VISA</div>
-            <div className="w-6 h-6 md:w-8 md:h-8 bg-gray-800 rounded-full flex items-center justify-center">
-              <span className="text-white text-xs font-bold">M</span>
-            </div>
-            <div className="text-gray-400 text-xs md:text-sm">mastercard</div>
-            <div className="text-blue-600 text-xs md:text-sm font-semibold">PayPal</div>
+      {/* SSLCOMMERZ Banner */}
+      <div className="w-full bg-gradient-to-r from-emerald-50 to-blue-50 border-t border-gray-200">
+        <div className="w-full px-0">
+          <div className="relative w-full h-16 sm:h-20 md:h-24">
+            <Image
+              src={SSLEcommerzBanner}
+              alt="SSLCOMMERZ Secure Payment"
+              fill
+              className="object-contain w-full"
+              priority
+              sizes="100vw"
+            />
           </div>
         </div>
       </div>

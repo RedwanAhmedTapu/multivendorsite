@@ -3,7 +3,7 @@ import React from "react";
 const DownloadApp: React.FC = () => {
   return (
     <div className=" flex items-center justify-center ">
-      <div className="max-w-sm mx-auto   p-8">
+      <div className="max-w-sm mx-auto  ">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <svg

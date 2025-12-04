@@ -15,7 +15,7 @@ import {
   Store,
   QrCode,
   ShieldCheck,
-  ArrowLeft
+  ArrowLeft,
 } from "lucide-react";
 import MoreInfoProduct from "@/components/product/moreinfoproduct/MoreInfoProduct";
 import { useGetProductByIdQuery } from "@/features/productApi";
@@ -54,35 +54,37 @@ const calculateProductWeight = (product: any): number => {
   if (product?.variants?.[0]?.weight) {
     return product.variants[0].weight;
   }
-  
+
   // Default weights based on category
   const defaultWeights: { [key: string]: number } = {
-    'electronics': 1000,
-    'clothing': 200,
-    'books': 300,
-    'home': 500,
-    'default': 500,
+    electronics: 1000,
+    clothing: 200,
+    books: 300,
+    home: 500,
+    default: 500,
   };
-  
-  return defaultWeights[product?.category?.toLowerCase()] || defaultWeights.default;
+
+  return (
+    defaultWeights[product?.category?.toLowerCase()] || defaultWeights.default
+  );
 };
 
 // Helper function to get product images
 const getProductImages = (product: any): string[] => {
   const images: string[] = [];
-  
+
   // Add main product images
   product?.images?.forEach((img: any) => {
     if (img.url) images.push(img.url);
   });
-  
+
   // Add variant images
   product?.variants?.forEach((v: any) => {
     v.images?.forEach((img: any) => {
       if (img.url) images.push(img.url);
     });
   });
-  
+
   return images.length > 0 ? images : ["/placeholder-product.jpg"];
 };
 
@@ -90,7 +92,7 @@ const SingleProduct = () => {
   const params = useParams();
   const router = useRouter();
   const productId = params.id as string;
-  
+
   const { data: product, isLoading, error } = useGetProductByIdQuery(productId);
   const [selectedImg, setSelectedImg] = useState<string | null>(null);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
@@ -121,14 +123,16 @@ const SingleProduct = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-    const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
+    const { left, top, width, height } =
+      e.currentTarget.getBoundingClientRect();
     const x = ((e.pageX - left - window.scrollX) / width) * 100;
     const y = ((e.pageY - top - window.scrollY) / height) * 100;
     setHoverPos({ x, y });
   };
 
-  const increaseQuantity = () => setQuantity(prev => prev + 1);
-  const decreaseQuantity = () => setQuantity(prev => prev > 1 ? prev - 1 : 1);
+  const increaseQuantity = () => setQuantity((prev) => prev + 1);
+  const decreaseQuantity = () =>
+    setQuantity((prev) => (prev > 1 ? prev - 1 : 1));
 
   if (isLoading) {
     return (
@@ -226,7 +230,13 @@ const SingleProduct = () => {
         {/* Right Section - Two Column Layout */}
         <div className="text-gray-800 relative">
           {/* Zoom Preview */}
-          <div className={`absolute inset-0 transition-opacity duration-300 ${isHovering ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+          <div
+            className={`absolute inset-0 transition-opacity duration-300 ${
+              isHovering
+                ? "opacity-100 z-10"
+                : "opacity-0 z-0 pointer-events-none"
+            }`}
+          >
             <div className="border rounded-lg overflow-hidden w-full h-[400px] bg-gray-100 mb-6">
               {selectedImg && (
                 <div
@@ -242,7 +252,11 @@ const SingleProduct = () => {
           </div>
 
           {/* Product Info - Two Columns */}
-          <div className={`transition-opacity duration-300 ${!isHovering ? 'opacity-100' : 'opacity-0'}`}>
+          <div
+            className={`transition-opacity duration-300 ${
+              !isHovering ? "opacity-100" : "opacity-0"
+            }`}
+          >
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Column - Product Details */}
               <div className="space-y-5">
@@ -251,7 +265,6 @@ const SingleProduct = () => {
                   {product.name}
                 </h2>
 
-               
                 {/* Ratings */}
                 <div className="flex items-center gap-2">
                   {[...Array(5)].map((_, i) => (
@@ -267,7 +280,7 @@ const SingleProduct = () => {
                 <p className="text-sm">
                   Brand:{" "}
                   <span className="text-teal-700 hover:underline cursor-pointer">
-                     No Brand
+                    No Brand
                   </span>
                 </p>
 
@@ -307,14 +320,14 @@ const SingleProduct = () => {
                 <div>
                   <h4 className="font-semibold text-sm mb-2">Quantity</h4>
                   <div className="flex items-center gap-3">
-                    <button 
+                    <button
                       className="px-3 py-1 border rounded hover:bg-gray-100"
                       onClick={decreaseQuantity}
                     >
                       -
                     </button>
                     <span>{quantity}</span>
-                    <button 
+                    <button
                       className="px-3 py-1 border rounded hover:bg-gray-100"
                       onClick={increaseQuantity}
                     >
@@ -335,23 +348,19 @@ const SingleProduct = () => {
                     Add to Cart
                   </Button>
                 </div>
-
-               
               </div>
 
               {/* Right Column - Shipping & Seller Info */}
               <div className="space-y-5">
                 {/* Delivery Options */}
                 <div className="border rounded-lg p-4 space-y-3">
-                    <div>
-                      <DeliveryLocation 
-                        productWeight={productWeight}
-                        onDeliveryCostCalculated={handleDeliveryCostCalculated}
-                        onLocationSelected={handleLocationSelected}
-                      />
-                     
-                    </div>
-                 
+                  <div>
+                    <DeliveryLocation
+                      productWeight={productWeight}
+                      onDeliveryCostCalculated={handleDeliveryCostCalculated}
+                      onLocationSelected={handleLocationSelected}
+                    />
+                  </div>
                 </div>
 
                 {/* Seller Information */}
@@ -363,18 +372,24 @@ const SingleProduct = () => {
                       <span className="text-sm">Verified Seller</span>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-700">{product.vendor?.storeName || "Unknown Seller"}</p>
+                  <p className="text-sm text-gray-700">
+                    {product.vendor?.storeName || "Unknown Seller"}
+                  </p>
                   <div className="flex gap-2 pt-2">
-                     {product.vendor && (
-                  <VendorChatButton
-                    vendorId={product.vendor.id}
-                    vendorName={product.vendor.storeName}
-                    vendorAvatar={product.vendor.avatar}
-                    productId={product.id}
-                    productName={product.name}
-                  />
-                )}
-                    <Button variant="outline" size="sm" className="flex items-center gap-1 text-xs">
+                    {product.vendor && (
+                      <VendorChatButton
+                        vendorId={product.vendor.id}
+                        vendorName={product.vendor.storeName}
+                        vendorAvatar={product.vendor.avatar}
+                        productId={product.id}
+                        productName={product.name}
+                      />
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-1 text-xs"
+                    >
                       <Store className="w-4 h-4" />
                       Visit Store
                     </Button>
@@ -385,7 +400,9 @@ const SingleProduct = () => {
                 <div className="border rounded-lg p-4 flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold text-lg mb-1">Scan to view</h3>
-                    <p className="text-xs text-gray-600">Use your phone camera to scan QR code</p>
+                    <p className="text-xs text-gray-600">
+                      Use your phone camera to scan QR code
+                    </p>
                   </div>
                   <div className="bg-white p-2 border rounded">
                     <QrCode className="w-12 h-12 text-teal-900" />
@@ -409,7 +426,7 @@ const SingleProduct = () => {
           </div>
         </div>
       </section>
-     
+
       {/* Product Details Tabs */}
       <MoreInfoProduct product={product} />
     </div>

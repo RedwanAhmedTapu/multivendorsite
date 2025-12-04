@@ -1,21 +1,37 @@
-import Footer from "@/components/footer/Footer";
-import CashbackBanner from "@/components/homesections/CashbackBanner";
-import CategorySection from "@/components/homesections/CategorySection";
-import DailyDeals from "@/components/homesections/DailyDeals";
-import FeaturedOffers from "@/components/homesections/FeaturedOffers";
-import HeroSlider from "@/components/homesections/HomeSection";
-import ProductGrid from "@/components/homesections/ProductGrid";
+// app/page.tsx
+import { Suspense } from 'react';
+import LayoutProvider from "@/components/layout/LayoutProvider";
+import { getCategoriesServer } from "@/lib/api-utils";
+import { getActiveLayoutType, getActiveTheme } from "@/lib/theme-utils";
 
-export default function Home() {
+
+
+export default async function Home() {
+  // Fetch data in parallel
+  const [layoutType, categoriesData] = await Promise.all([
+    getActiveLayoutType(),
+    getCategoriesServer()
+  ]);
+  
+  const categories = categoriesData || [];
+  
   return (
-   <>
-   <HeroSlider/>
-   <CategorySection/>
-   {/* <DailyDeals/> */}
-   <ProductGrid/>
-   {/* <FeaturedOffers/> */}
-   {/* <CashbackBanner/> */}
-   <Footer/>
-   </>
+    <Suspense >
+      <main className="min-h-screen">
+        <LayoutProvider layoutType={layoutType} categories={categories} />
+      </main>
+    </Suspense>
   );
+}
+
+// Generate metadata dynamically
+export async function generateMetadata() {
+  const activeTheme = await getActiveTheme();
+  
+  return {
+    title: activeTheme?.name 
+      ? `${activeTheme.name} | Your Store` 
+      : 'Your Store - Multi-Vendor Marketplace',
+    description: activeTheme?.description || 'Discover amazing products from multiple vendors',
+  };
 }

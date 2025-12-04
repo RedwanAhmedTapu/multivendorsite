@@ -9,6 +9,7 @@ import { Heart, Eye, ShoppingCart, BadgeCheck } from "lucide-react";
 import { useGetProductsQuery } from "@/features/productApi";
 import Link from "next/link";
 import type { Product as ProductType } from "@/types/product"; // Import with alias
+import HomepageProductSectionSkeleton from "../skeletons/HomepageProductSectionSkeleton";
 
 // Taka Icon Component using FontAwesome
 const TakaIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
@@ -200,12 +201,12 @@ const ProductSection = ({ title, products }: SectionProps) => {
   return (
     <section className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-[75rem] mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800">{title}</h2>
+        <h2 className="text-xs sm:text-sm md:text-lg lg:text-xl font-bold text-gray-800">{title}</h2>
         <Link href="/products" className="text-teal-600 hover:text-teal-800 text-sm font-medium transition-colors">
-          See All Products
+          See All 
         </Link>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-6 gap-1 ">
         {products.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
@@ -217,7 +218,17 @@ const ProductSection = ({ title, products }: SectionProps) => {
 const ProductGrid = () => {
   const { data: products = [], isLoading, error } = useGetProductsQuery();
 
-  if (isLoading) return <p className="text-center py-10">Loading...</p>;
+  // Show skeleton while loading
+  if (isLoading) {
+    return (
+      <>
+        {/* <HomepageProductSectionSkeleton title={true} showSeeAll={true} gridCols={5} /> */}
+        <HomepageProductSectionSkeleton title={true} showSeeAll={true} gridCols={6} />
+        {/* <HomepageProductSectionSkeleton title={true} showSeeAll={true} gridCols={5} />
+        <HomepageProductSectionSkeleton title={true} showSeeAll={true} gridCols={5} /> */}
+      </>
+    );
+  }
   if (error) return <p className="text-center py-10 text-red-500">Failed to load products.</p>;
 
   // Example: splitting products into sections
