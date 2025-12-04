@@ -38,7 +38,7 @@ const HeroSlider = () => {
     return <div className="text-center py-8">Failed to load slider</div>;
 
   return (
-    <div className="w-full ">
+    <div className="w-full">
       <Container>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-x-10">
           {/* Left Section - Hero Slider */}

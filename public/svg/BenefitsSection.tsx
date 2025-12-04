@@ -1,3 +1,4 @@
+import { Container } from "@/components/Container";
 import React from "react";
 
 // Secure Payment Icon
@@ -180,7 +181,7 @@ const BenefitsSection: React.FC<BenefitsSectionProps> = ({
   subtitle = "Experience the advantages of working with our platform",
   columns = 4,
   variant = "default",
-  iconSize = "small",
+  iconSize = "medium",
   className = "",
   showDivider = false,
   centered = true,
@@ -244,9 +245,8 @@ const BenefitsSection: React.FC<BenefitsSectionProps> = ({
 
   // Default variant
   return (
-    <section className={`py-3 px-4 sm:px-6 lg:px-8 ${className} `}>
-      <div className="max-w-4xl lg:max-w-5xl xl:max-w-6xl  mx-auto">
-        <div className="flex flex-nowrap items-center justify-between gap-6 overflow-x-auto">
+      <Container className="py-4">
+        <div className=" grid grid-cols-4 divide-x-2  divide-gray-400  gap-6 overflow-x-auto">
           {benefits.map((benefit, index) => {
             const iconName = getIconName(benefit.icon);
             const bgColorClass =
@@ -255,7 +255,7 @@ const BenefitsSection: React.FC<BenefitsSectionProps> = ({
             return (
               <div
                 key={index}
-                className="hidden lg:flex items-start gap-1.5 text-left flex-shrink-0"
+                className="hidden lg:flex items-start gap-1.5 p-2 text-left flex-shrink-0"
               >
                 {benefit.icon && (
                   <div className={`p-1.5 rounded-full ${bgColorClass}`}>
@@ -266,10 +266,10 @@ const BenefitsSection: React.FC<BenefitsSectionProps> = ({
                 )}
 
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">
+                  <h3 className="text-md font-semibold text-gray-900">
                     {benefit.title}
                   </h3>
-                  <p className="text-xs text-gray-600 leading-tight">
+                  <p className="text-sm text-gray-600 leading-tight">
                     {benefit.description}
                   </p>
                 </div>
@@ -277,8 +277,7 @@ const BenefitsSection: React.FC<BenefitsSectionProps> = ({
             );
           })}
         </div>
-      </div>
-    </section>
+       </Container>
   );
 };
 

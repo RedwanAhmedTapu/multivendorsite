@@ -2,6 +2,7 @@
 import { useGetCategoriesQuery } from "@/features/apiSlice";
 import Image from "next/image";
 import Link from "next/link";
+import { Container } from "../Container";
 
 export default function CategorySection() {
   const { data, isLoading, isError } = useGetCategoriesQuery(undefined);
@@ -41,9 +42,9 @@ export default function CategorySection() {
   }
 
   return (
-    <section className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-[75rem] mx-auto px-4 sm:px-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl md:text-2xl font-bold">Shop by Category</h2>
+    <Container className="flex flex-col px-1 md:px-0 gap-y-2 ">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl md:text-2xl font-bold">Categories</h2>
         <Link
           href="/products"
           className="text-sm font-medium text-gray-700 hover:underline"
@@ -84,6 +85,6 @@ export default function CategorySection() {
           </div>
         </div>
       </div>
-    </section>
+    </Container>
   );
 }

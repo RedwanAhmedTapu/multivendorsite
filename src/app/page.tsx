@@ -31,7 +31,7 @@ export async function generateMetadata() {
   return {
     title: activeTheme?.name 
       ? `${activeTheme.name} | Your Store` 
-      : 'Your Store - Multi-Vendor Marketplace',
+      : 'FinixMart - Multi-Vendor Marketplace',
     description: activeTheme?.description || 'Discover amazing products from multiple vendors',
   };
 }

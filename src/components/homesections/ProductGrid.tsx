@@ -10,6 +10,7 @@ import { useGetProductsQuery } from "@/features/productApi";
 import Link from "next/link";
 import type { Product as ProductType } from "@/types/product"; // Import with alias
 import HomepageProductSectionSkeleton from "../skeletons/HomepageProductSectionSkeleton";
+import { Container } from "../Container";
 
 // Taka Icon Component using FontAwesome
 const TakaIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
@@ -199,7 +200,7 @@ const ProductSection = ({ title, products }: SectionProps) => {
   if (!products || products.length === 0) return null;
 
   return (
-    <section className="max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-[75rem] mx-auto px-4 py-8">
+    <Container className="py-4">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xs sm:text-sm md:text-lg lg:text-xl font-bold text-gray-800">{title}</h2>
         <Link href="/products" className="text-teal-600 hover:text-teal-800 text-sm font-medium transition-colors">
@@ -211,7 +212,7 @@ const ProductSection = ({ title, products }: SectionProps) => {
           <ProductCard key={product.id} product={product} />
         ))}
       </div>
-    </section>
+    </Container>
   );
 };
 
