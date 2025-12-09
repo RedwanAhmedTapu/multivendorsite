@@ -283,7 +283,7 @@ const Footer = () => {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             {/* Copyright */}
             <p className="text-gray-600 text-sm">
-              Copyright © 2025 <span className="font-semibold">Motta</span>, All rights reserved.
+              Copyright © 2025 <span className="font-semibold">FinixMart</span>, All rights reserved.
             </p>
 
             {/* Payment Methods */}

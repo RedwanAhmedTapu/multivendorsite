@@ -90,7 +90,6 @@ function AdminLayout({ main }: { main: ReactNode }) {
       title: "Dashboard",
       items: [
         { title: "Dashboard", href: "/admin-dashboard", icon: Home, color: "text-teal-600" },
-        { title: "POS", href: "/admin-dashboard/pos", icon: ShoppingCart },
       ],
     },
     {
@@ -154,6 +153,20 @@ function AdminLayout({ main }: { main: ReactNode }) {
             { title: "Refunds & Returns", href: "/admin/orders/refunds", icon: CreditCard },
             { title: "Order Notifications", href: "/admin/orders/notifications", icon: Bell },
             { title: "Cancellations", href: "/admin/orders/cancellations", icon: Calendar },
+          ],
+        },
+      ],
+    },
+    {
+      title: "Category Management",
+      items: [
+        {
+          title: "Category",
+          href: "#",
+          icon: Box,
+          subItems: [
+            { title: "Categories", href: "/admin-dashboard/category/category-manage", icon: Layers },
+            { title: "Bulk Categories", href: "/admin-dashboard/category/bulk-category-upload", icon: Layers },
           ],
         },
       ],
@@ -279,7 +292,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
         />
 
         <main className="flex-1 overflow-y-auto bg-grey-50 ">
-          <div className="p-6">{main}</div>
+          <div className="p-2 sm:p-4">{main}</div>
         </main>
       </div>
     </div>

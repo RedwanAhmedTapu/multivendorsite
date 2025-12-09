@@ -1,7 +1,7 @@
 // app/products/ProductsPageClient.tsx
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useGetCategoriesQuery } from "@/features/apiSlice";
@@ -85,13 +85,16 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     categories: [],
     priceRange: [1, 100000],
     attributes: {},
-    specifications: {},
     brands: [],
     vendors: [],
     ratings: [],
     availability: [],
   });
-  const [isUrlProcessing, setIsUrlProcessing] = useState(false);
+  
+  // Use refs to track if we're in the middle of an update
+  const isUpdatingFromUrl = useRef(false);
+  const isUpdatingToUrl = useRef(false);
+  const isInitialMount = useRef(true);
 
   // Check if this is the base products page (no query params)
   const isBaseProductsPage = useMemo(() => {
@@ -104,34 +107,39 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     return !hasQueryParams || (!hasCategoryParam && !hasOtherParams);
   }, [searchParams]);
 
-  // Handle URL parameters for both SSR and client-side navigation
+  // Handle URL parameters - only update state from URL
   useEffect(() => {
-    const categoryFromUrl = searchParams.get("category");
+    if (isUpdatingToUrl.current) {
+      isUpdatingToUrl.current = false;
+      return;
+    }
 
+    const categoryFromUrl = searchParams.get("category");
     console.log("URL category changed:", categoryFromUrl);
 
     if (categoryFromUrl && categories.length > 0) {
-      setIsUrlProcessing(true);
       const category = categories.find((c: any) => c.slug === categoryFromUrl);
 
       if (category) {
         console.log("Found category:", category.name);
+        isUpdatingFromUrl.current = true;
         setSelectedCategory(category.id);
+        setSelectedCategorySlug(category.slug);
         setCurrentFilters((prev) => ({
           ...prev,
           categories: [category.id],
         }));
+        isUpdatingFromUrl.current = false;
       } else {
         console.log("Category not found in categories list");
         setSelectedCategory("");
+        setSelectedCategorySlug("");
         setCurrentFilters((prev) => ({
           ...prev,
           categories: [],
         }));
       }
-      setIsUrlProcessing(false);
-    } else if (!categoryFromUrl) {
-      setIsUrlProcessing(true);
+    } else if (!categoryFromUrl && !isInitialMount.current) {
       console.log("Clearing category selection - no category in URL");
       setSelectedCategory("");
       setSelectedCategorySlug("");
@@ -139,36 +147,35 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
         ...prev,
         categories: [],
       }));
-      setIsUrlProcessing(false);
+    }
+
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
     }
   }, [searchParams, categories]);
 
-  // Update category slug when category is selected
+  // Update URL when category changes from component (not from URL)
   useEffect(() => {
-    if (selectedCategory && categories.length > 0) {
-      const category = categories.find((c: any) => c.id === selectedCategory);
-      if (category) {
-        setSelectedCategorySlug(category.slug);
-      }
-    } else {
-      setSelectedCategorySlug("");
+    if (isUpdatingFromUrl.current || isInitialMount.current) {
+      return;
     }
-  }, [selectedCategory, categories]);
 
-  // Update URL when category changes from component
-  useEffect(() => {
     if (selectedCategorySlug) {
       const params = new URLSearchParams(searchParams.toString());
-      params.set("category", selectedCategorySlug);
-      const newUrl = `${window.location.pathname}?${params.toString()}`;
-      window.history.replaceState({}, "", newUrl);
+      if (params.get("category") !== selectedCategorySlug) {
+        params.set("category", selectedCategorySlug);
+        isUpdatingToUrl.current = true;
+        router.replace(`/products?${params.toString()}`, { scroll: false });
+      }
     } else {
       const params = new URLSearchParams(searchParams.toString());
-      params.delete("category");
-      const newUrl = `${window.location.pathname}?${params.toString()}`;
-      window.history.replaceState({}, "", newUrl);
+      if (params.has("category")) {
+        params.delete("category");
+        isUpdatingToUrl.current = true;
+        router.replace(`/products?${params.toString()}`, { scroll: false });
+      }
     }
-  }, [selectedCategorySlug, searchParams]);
+  }, [selectedCategorySlug, searchParams, router]);
 
   // Find leaf categories for a given category ID
   const getLeafCategoryIds = useCallback(
@@ -190,9 +197,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
         Object.values(currentFilters.attributes).some(
           (arr) => arr.length > 0
         ) ||
-        Object.values(currentFilters.specifications).some(
-          (arr) => arr.length > 0
-        ) ||
         currentFilters.ratings.length > 0 ||
         currentFilters.availability.length > 0 ||
         currentFilters.brands.length > 0 ||
@@ -205,67 +209,49 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
           ? getLeafCategoryIds(selectedCategory)
           : [];
 
-        // FIXED: Match ProductFilter types exactly
-        // attributes: { [key: string]: string | string[] }
-        const flattenedAttributes: { [key: string]: string | string[] } = {};
+        // Unified attributes structure
+        const unifiedAttributes: { [key: string]: string | string[] | number | number[] | boolean } = {};
+        
         Object.entries(currentFilters.attributes).forEach(([key, values]) => {
           if (Array.isArray(values) && values.length > 0) {
-            if (values.length === 1) {
-              flattenedAttributes[key] = String(values[0]);
+            const firstValue = values[0];
+            
+            if (typeof firstValue === 'number') {
+              if (values.length === 1) {
+                unifiedAttributes[key] = firstValue;
+              } else {
+                unifiedAttributes[key] = values;
+              }
+            } else if (typeof firstValue === 'boolean') {
+              unifiedAttributes[key] = firstValue;
             } else {
-              flattenedAttributes[key] = values.map((v) => String(v));
+              if (values.length === 1) {
+                unifiedAttributes[key] = String(firstValue);
+              } else {
+                unifiedAttributes[key] = values.map(v => String(v));
+              }
             }
           }
         });
 
-        // specifications: { [key: string]: string | number | boolean }
-        const flattenedSpecifications: {
-          [key: string]: string | number | boolean;
-        } = {};
-        Object.entries(currentFilters.specifications).forEach(
-          ([key, values]) => {
-            if (Array.isArray(values) && values.length > 0) {
-              const firstValue = values[0];
-              // Keep as appropriate type - string, number, or boolean
-              if (typeof firstValue === "number") {
-                flattenedSpecifications[key] = firstValue;
-              } else if (typeof firstValue === "boolean") {
-                flattenedSpecifications[key] = firstValue;
-              } else {
-                flattenedSpecifications[key] = String(firstValue);
-              }
-            }
-          }
-        );
-
-        // Build filter data matching ProductFilter interface exactly
+        // Build filter data matching ProductFilter interface
         const filterData = {
           categoryId: selectedCategory || undefined,
           categoryIds: leafCategoryIds.length > 0 ? leafCategoryIds : undefined,
           minPrice: currentFilters.priceRange[0],
           maxPrice: currentFilters.priceRange[1],
-          // Matches { [key: string]: string | string[] }
-          attributes:
-            Object.keys(flattenedAttributes).length > 0
-              ? flattenedAttributes
-              : undefined,
-          // Matches { [key: string]: string | number | boolean }
-          specifications:
-            Object.keys(flattenedSpecifications).length > 0
-              ? flattenedSpecifications
-              : undefined,
-          ratings:
-            currentFilters.ratings.length > 0
-              ? currentFilters.ratings
-              : undefined,
-          brands:
-            currentFilters.brands.length > 0
-              ? currentFilters.brands
-              : undefined,
-          vendors:
-            currentFilters.vendors.length > 0
-              ? currentFilters.vendors
-              : undefined,
+          attributes: Object.keys(unifiedAttributes).length > 0 
+            ? unifiedAttributes 
+            : undefined,
+          ratings: currentFilters.ratings.length > 0
+            ? currentFilters.ratings
+            : undefined,
+          brands: currentFilters.brands.length > 0
+            ? currentFilters.brands
+            : undefined,
+          vendors: currentFilters.vendors.length > 0
+            ? currentFilters.vendors
+            : undefined,
           inStock: currentFilters.availability.includes("inStock")
             ? true
             : undefined,
@@ -280,7 +266,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
         console.log("Applying filters:", filterData);
         console.log("Leaf category IDs for filtering:", leafCategoryIds);
 
-        // Type assertion to ensure compatibility
+        // Call filter API
         filterProducts(filterData as any);
       }
     }, 300);
@@ -294,9 +280,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
       currentFilters.priceRange[0] > 1 ||
       currentFilters.priceRange[1] < 100000 ||
       Object.values(currentFilters.attributes).some((arr) => arr.length > 0) ||
-      Object.values(currentFilters.specifications).some(
-        (arr) => arr.length > 0
-      ) ||
       currentFilters.ratings.length > 0 ||
       currentFilters.availability.length > 0 ||
       currentFilters.brands.length > 0 ||
@@ -339,6 +322,10 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
 
   const handleCategorySelect = useCallback(
     (categoryId: string) => {
+      if (categoryId === selectedCategory) {
+        return; // Already selected, no need to update
+      }
+
       setSelectedCategory(categoryId);
 
       setCurrentFilters((prev) => ({
@@ -349,17 +336,13 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
       if (categoryId && categories.length > 0) {
         const category = categories.find((c: any) => c.id === categoryId);
         if (category) {
-          const params = new URLSearchParams(searchParams.toString());
-          params.set("category", category.slug);
-          router.replace(`/products?${params.toString()}`, { scroll: false });
+          setSelectedCategorySlug(category.slug);
         }
       } else {
-        const params = new URLSearchParams(searchParams.toString());
-        params.delete("category");
-        router.replace(`/products?${params.toString()}`, { scroll: false });
+        setSelectedCategorySlug("");
       }
     },
-    [categories, searchParams, router]
+    [categories, selectedCategory]
   );
 
   const handleFiltersChange = useCallback((filters: ProductFilters) => {
@@ -373,7 +356,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
       categories: [],
       priceRange: [1, 100000],
       attributes: {},
-      specifications: {},
       brands: [],
       vendors: [],
       ratings: [],
@@ -389,8 +371,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
   const isLoading =
     (initialProducts.length === 0 && productsLoading) ||
     (initialCategories.length === 0 && categoriesLoading) ||
-    filterLoading ||
-    isUrlProcessing;
+    filterLoading;
 
   // Count active filters
   const activeFilterCount = useMemo(() => {
@@ -401,7 +382,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     )
       count++;
     count += Object.values(currentFilters.attributes).flat().length;
-    count += Object.values(currentFilters.specifications).flat().length;
     count += currentFilters.ratings.length;
     count += currentFilters.availability.length;
     count += currentFilters.brands.length;
@@ -447,10 +427,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     }
 
     if (isBaseProductsPage) {
-      // Base products page: more columns for better product showcase
       return "grid gap-1 sm:gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4  lg:grid-cols-5 2xl:grid-cols-6";
     } else {
-      // Filtered/categorized page: default columns
       return "grid gap-1 sm:gap-2 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
     }
   }, [viewMode, isBaseProductsPage]);

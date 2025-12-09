@@ -1,6 +1,6 @@
 // components/vendor-management/CategoryTreeSelector.tsx
 "use client";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { ChevronDown, ChevronRight, Folder } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGetCategoriesQuery } from "@/features/apiSlice";
@@ -21,6 +21,35 @@ const CategoryTreeSelectorItem: React.FC<{
   const isLeaf = !hasChildren;
   const currentPath = parentPath ? `${parentPath} > ${category.name}` : category.name;
 
+  // Split unified attributes into original categories for backward compatibility
+  const { regularAttributes, specificationAttributes } = useMemo(() => {
+    const regular: any[] = [];
+    const specs: any[] = [];
+    
+    // Check if category has the unified attributes array
+    if (category.attributes && Array.isArray(category.attributes)) {
+      category.attributes.forEach((attr: any) => {
+        // Determine if it's a specification based on its properties
+        // You can adjust these conditions based on your actual data structure
+        const isSpecification = 
+          attr.type === 'specification' ||
+          attr.dataType === 'number' ||
+          attr.unit !== undefined ||
+          attr.minValue !== undefined ||
+          attr.maxValue !== undefined ||
+          (attr.name && attr.name.toLowerCase().includes('spec'));
+        
+        if (isSpecification) {
+          specs.push(attr);
+        } else {
+          regular.push(attr);
+        }
+      });
+    }
+    
+    return { regularAttributes: regular, specificationAttributes: specs };
+  }, [category.attributes]);
+
   return (
     <div className="ml-4">
       <div
@@ -33,8 +62,8 @@ const CategoryTreeSelectorItem: React.FC<{
           category.id, 
           currentPath, 
           isLeaf, 
-          category.attributes || [], 
-          category.specifications || []
+          regularAttributes, 
+          specificationAttributes
         )}
       >
         {/* Expand/Collapse Arrow */}
@@ -117,6 +146,23 @@ export default function CategoryTreeSelector({ onSelect }: Props) {
       {selectedId && (
         <div className="mt-4 p-3 border rounded-md bg-gray-50">
           <p className="text-sm font-medium">Selected: {selectedPath}</p>
+          
+          <div className="mt-2 text-xs">
+            {categoryAttributes.length > 0 && (
+              <p className="text-gray-600">
+                Attributes: {categoryAttributes.length} available
+              </p>
+            )}
+            {categorySpecifications.length > 0 && (
+              <p className="text-gray-600">
+                Specifications: {categorySpecifications.length} available
+              </p>
+            )}
+            {categoryAttributes.length === 0 && categorySpecifications.length === 0 && (
+              <p className="text-gray-500">No attributes or specifications defined for this category</p>
+            )}
+          </div>
+          
           {isLeafCategory ? (
             <div className="mt-2">
               <p className="text-xs text-green-600">✓ Leaf category selected</p>

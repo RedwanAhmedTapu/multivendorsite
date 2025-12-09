@@ -1,12 +1,10 @@
 // types/type.ts
 
-import { ProductSpecificationValue } from "./product";
-
 // -------- Base Types --------
 export interface Vendor {
   id: string;
   storeName: string;
-  avatar:string,
+  avatar: string;
   verificationStatus?: "PENDING" | "VERIFIED" | "REJECTED";
   email: string;
   createdAt: string;
@@ -16,13 +14,24 @@ export interface Vendor {
 export interface Category {
   id: string;
   name: string;
-  image?:string;
-  slug: string; 
+  slug: string;
+  image?: string;
   parentId?: string;
+  keywords: string[];
+  tags: string[];
   parent?: Category;
   children?: Category[];
-  attributes?: Attribute[];
-  specifications?: Specification[];
+  attributes?: CategoryAttribute[];
+  categoryTemplate?: CategoryTemplate;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CategoryTemplate {
+  id: string;
+  categoryId: string;
+  filePath: string;
+  category?: Category;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,89 +47,54 @@ export interface OrderItem {
 }
 
 // -------- Attribute System --------
-export type AttributeType = "TEXT" | "NUMBER" | "SELECT" | "BOOLEAN";
+export type AttributeType =
+  | "TEXT"
+  | "NUMBER"
+  | "SELECT"
+  | "MULTISELECT"
+  | "BOOLEAN";
 
 export interface Attribute {
+  isRequired?: unknown;
   id: string;
   name: string;
+  slug: string;
   type: AttributeType;
-  categoryId: string;
-  category?: Category;
+  unit?: string;
   values?: AttributeValue[];
+  categories?: CategoryAttribute[];
   createdAt: string;
   updatedAt: string;
 }
 
 export interface AttributeValue {
   id: string;
+  value: string;
   attributeId: string;
   attribute?: Attribute;
-  value: string;
   createdAt: string;
   updatedAt: string;
 }
 
+// Category-Attribute Junction
 export interface CategoryAttribute {
   id: string;
-  name?: string;
-  type?: string;
-  values?: AttributeValue[]; // <-- fix here
   categoryId: string;
-  category?: Category;
   attributeId: string;
+  isRequired: boolean;
+  filterable: boolean;
+  sortOrder: number;
+
+  // Relations
   attribute?: Attribute;
-  isRequired: boolean;
-  isForVariant: boolean;
-  filterable: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// -------- Specification System --------
-export type SpecificationType = "TEXT" | "NUMBER" | "SELECT" | "BOOLEAN";
-
-export interface Specification {
-  id: string;
-  name: string;
-  slug: string;
-  type: SpecificationType;
-  unit?: string;
-  categories?: CategorySpecification[];
-  values?: ProductSpecificationValue[];
-  options?: SpecificationOption[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface SpecificationOption {
-  id: string;
-  specificationId: string;
-  value: string;
-  
-  createdAt: string;
-  updatedAt: string;
-}
-export interface CreateSpecificationData {
-  name: string;
-  type: SpecificationType;
-  unit?: string;
-  filterable?: boolean;
-  isRequired?: boolean;
-  categoryId: string;
-  options?: string[];
-}
-export interface CategorySpecification {
-  id: string;
-  name?:string;
-  type?:string;
-  unit?:string;
-  categoryId: string;
   category?: Category;
-  specificationId: string;
-  specification?: Specification;
-  options?:SpecificationOption[];
-  isRequired: boolean;
-  filterable: boolean;
+
+  // For frontend convenience (if needed)
+  name?: string;
+  type?: AttributeType;
+  unit?: string;
+  values?: AttributeValue[];
+
   createdAt: string;
   updatedAt: string;
 }
@@ -129,7 +103,19 @@ export interface CategorySpecification {
 export interface VariantNamePart {
   name: string;
   value: any;
+  displayValue?: string;
   include: boolean;
+}
+
+// -------- Create Specification Data (legacy - can be updated or removed) --------
+export interface CreateSpecificationData {
+  name: string;
+  type: AttributeType;
+  unit?: string;
+  filterable?: boolean;
+  isRequired?: boolean;
+  categoryId: string;
+  options?: string[];
 }
 
 // -------- API Response --------

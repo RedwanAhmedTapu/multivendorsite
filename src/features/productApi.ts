@@ -2,22 +2,23 @@ import { createApi } from "@reduxjs/toolkit/query/react";
 import type {
   Product,
   CreateProductData,
+  UpdateProductData,
   ProductFilter,
-  ApiResponse,
+  ProductStatistics,
 } from "../types/product";
 import baseQueryWithReauth from "./baseQueryWithReauth";
+
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+  count?: number;
+}
 
 interface TemplateResponse {
   success: boolean;
   message: string;
   templateData: any;
-}
-
-interface ProductStatistics {
-  total: number;
-  pending: number;
-  active: number;
-  rejected: number;
 }
 
 interface SearchParams {
@@ -35,28 +36,33 @@ export const productApi = createApi({
   tagTypes: ["Products", "VendorProducts", "ProductStatistics"],
 
   endpoints: (builder) => ({
-    // ------- GET ALL -------
+    // ======================
+    // GET ALL PRODUCTS
+    // ======================
     getProducts: builder.query<Product[], void>({
       query: () => "/products",
-      transformResponse: (response: { success: boolean; data: Product[] }) => {
+      transformResponse: (response: ApiResponse<Product[]>) => {
         return response.data;
       },
       providesTags: ["Products"],
     }),
 
-    // ------- GET BY ID -------
+    // ======================
+    // GET PRODUCT BY ID
+    // ======================
     getProductById: builder.query<Product, string>({
       query: (id) => `/products/${id}`,
-      transformResponse: (response: { success: boolean; data: Product }) => {
+      transformResponse: (response: ApiResponse<Product>) => {
         return response.data;
-        
       },
       providesTags: (result, error, id) => [{ type: "Products", id }],
     }),
 
-    // ------- GET BY VENDOR ID -------
+    // ======================
+    // GET PRODUCTS BY VENDOR ID
+    // ======================
     getProductsByVendorId: builder.query<
-      Product[], 
+      Product[],
       { vendorId: string; status?: "PENDING" | "ACTIVE" | "REJECTED" }
     >({
       query: ({ vendorId, status }) => {
@@ -65,7 +71,7 @@ export const productApi = createApi({
         const queryString = params.toString();
         return `/products/vendor/${vendorId}${queryString ? `?${queryString}` : ""}`;
       },
-      transformResponse: (response: { success: boolean; data: Product[]; count: number }) => {
+      transformResponse: (response: ApiResponse<Product[]>) => {
         return response.data;
       },
       providesTags: (result, error, { vendorId }) => [
@@ -74,10 +80,12 @@ export const productApi = createApi({
       ],
     }),
 
-    // ------- GET VENDOR STATISTICS -------
+    // ======================
+    // GET VENDOR PRODUCT STATISTICS
+    // ======================
     getVendorStatistics: builder.query<ProductStatistics, string>({
       query: (vendorId) => `/products/vendor/${vendorId}/statistics`,
-      transformResponse: (response: { success: boolean; data: ProductStatistics }) => {
+      transformResponse: (response: ApiResponse<ProductStatistics>) => {
         return response.data;
       },
       providesTags: (result, error, vendorId) => [
@@ -85,7 +93,9 @@ export const productApi = createApi({
       ],
     }),
 
-    // ------- SEARCH PRODUCTS -------
+    // ======================
+    // SEARCH PRODUCTS
+    // ======================
     searchProducts: builder.query<Product[], SearchParams>({
       query: ({ q, vendorId, categoryId, minPrice, maxPrice, inStock }) => {
         const params = new URLSearchParams();
@@ -95,23 +105,25 @@ export const productApi = createApi({
         if (minPrice !== undefined) params.append("minPrice", minPrice.toString());
         if (maxPrice !== undefined) params.append("maxPrice", maxPrice.toString());
         if (inStock !== undefined) params.append("inStock", inStock.toString());
-        
+
         return `/products/search?${params.toString()}`;
       },
-      transformResponse: (response: { success: boolean; data: Product[]; count: number }) => {
+      transformResponse: (response: ApiResponse<Product[]>) => {
         return response.data;
       },
       providesTags: ["Products"],
     }),
 
-    // ------- CREATE -------
+    // ======================
+    // CREATE PRODUCT
+    // ======================
     createProduct: builder.mutation<Product, CreateProductData>({
       query: (body) => ({
         url: "/products",
         method: "POST",
         body,
       }),
-      transformResponse: (response: { success: boolean; data: Product; message: string }) => {
+      transformResponse: (response: ApiResponse<Product>) => {
         return response.data;
       },
       invalidatesTags: (result) => [
@@ -121,17 +133,19 @@ export const productApi = createApi({
       ],
     }),
 
-    // ------- UPDATE -------
+    // ======================
+    // UPDATE PRODUCT
+    // ======================
     updateProduct: builder.mutation<
       Product,
-      { id: string; data: Partial<CreateProductData> }
+      { id: string; data: UpdateProductData }
     >({
       query: ({ id, data }) => ({
         url: `/products/${id}`,
         method: "PUT",
         body: data,
       }),
-      transformResponse: (response: { success: boolean; data: Product; message: string }) => {
+      transformResponse: (response: ApiResponse<Product>) => {
         return response.data;
       },
       invalidatesTags: (result, error, { id }) => [
@@ -142,17 +156,19 @@ export const productApi = createApi({
       ],
     }),
 
-    // ------- UPDATE STATUS -------
+    // ======================
+    // UPDATE PRODUCT STATUS (Admin approval)
+    // ======================
     updateProductStatus: builder.mutation<
       Product,
-      { id: string; status: "PENDING" | "ACTIVE" | "REJECTED" }
+      { id: string; status: "PENDING" | "ACTIVE" | "REJECTED"; approvedById?: string }
     >({
-      query: ({ id, status }) => ({
+      query: ({ id, status, approvedById }) => ({
         url: `/products/${id}/status`,
         method: "PATCH",
-        body: { status },
+        body: { status, approvedById },
       }),
-      transformResponse: (response: { success: boolean; data: Product; message: string }) => {
+      transformResponse: (response: ApiResponse<Product>) => {
         return response.data;
       },
       invalidatesTags: (result, error, { id }) => [
@@ -163,7 +179,9 @@ export const productApi = createApi({
       ],
     }),
 
-    // ------- DELETE -------
+    // ======================
+    // DELETE PRODUCT
+    // ======================
     deleteProduct: builder.mutation<ApiResponse<null>, string>({
       query: (id) => ({
         url: `/products/${id}`,
@@ -178,19 +196,37 @@ export const productApi = createApi({
       ],
     }),
 
-    // ------- FILTER -------
+    // ======================
+    // FILTER PRODUCTS (Advanced filtering)
+    // ======================
     filterProducts: builder.mutation<Product[], ProductFilter>({
       query: (filters) => ({
         url: "/products/filter",
         method: "POST",
         body: filters,
       }),
-      transformResponse: (response: { success: boolean; data: Product[]; count: number }) => {
+      transformResponse: (response: ApiResponse<Product[]>) => {
         return response.data;
       },
     }),
 
-    // ------- GENERATE TEMPLATE -------
+    // ======================
+    // GET PRODUCT STATISTICS (Global or by vendor)
+    // ======================
+    getProductStatistics: builder.query<ProductStatistics, string | void>({
+      query: (vendorId) =>
+        vendorId ? `/products/statistics?vendorId=${vendorId}` : "/products/statistics",
+      transformResponse: (response: ApiResponse<ProductStatistics>) => {
+        return response.data;
+      },
+      providesTags: (result, error, vendorId) => [
+        { type: "ProductStatistics", id: vendorId || "global" },
+      ],
+    }),
+
+    // ======================
+    // BULK TEMPLATE GENERATION
+    // ======================
     generateTemplate: builder.mutation<TemplateResponse, string>({
       query: (categoryId) => ({
         url: `/bulkproduct-templates/generate/${categoryId}`,
@@ -198,25 +234,33 @@ export const productApi = createApi({
       }),
     }),
 
-    // ------- DOWNLOAD TEMPLATE -------
+    // ======================
+    // DOWNLOAD BULK TEMPLATE
+    // ======================
     downloadTemplate: builder.query<{ url: string }, string>({
       query: (categoryId) => `/bulkproduct-templates/download/${categoryId}`,
     }),
   }),
 });
 
-// ------- Export hooks -------
+// ======================
+// Export hooks
+// ======================
 export const {
+  // Query hooks
   useGetProductsQuery,
   useGetProductByIdQuery,
   useGetProductsByVendorIdQuery,
   useGetVendorStatisticsQuery,
+  useGetProductStatisticsQuery,
   useSearchProductsQuery,
+  useDownloadTemplateQuery,
+
+  // Mutation hooks
   useCreateProductMutation,
   useUpdateProductMutation,
   useUpdateProductStatusMutation,
   useDeleteProductMutation,
   useFilterProductsMutation,
   useGenerateTemplateMutation,
-  useDownloadTemplateQuery,
 } = productApi;

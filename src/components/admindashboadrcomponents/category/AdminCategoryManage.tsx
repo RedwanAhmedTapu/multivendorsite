@@ -1,24 +1,24 @@
+// AdminCategoryManager.tsx (Updated to Single Column)
 "use client";
 import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { ListTree, Settings } from "lucide-react";
+import { ListTree, Settings, Tags } from "lucide-react";
 import {
   useGetCategoriesQuery,
   useCreateCategoryMutation,
   useUpdateCategoryMutation,
   useDeleteCategoryMutation,
 } from "@/features/apiSlice";
-import CategoryTree from "../../../../components/admindashboadrcomponents/CategoryTree";
-import CategoryForm from "../../../../components/admindashboadrcomponents/CategoryForm";
-import PropertiesManager from "../../../../components/admindashboadrcomponents/PropertiesManager";
-import { Category } from "../../../../types/type";
+import CategoryTree from "../CategoryTree";
+import CategoryForm from "../CategoryForm";
+import PropertiesManager from "../PropertiesManager";
+import { Category } from "@/types/category.types";
 
 const AdminCategoryManager = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [activeTab, setActiveTab] = useState<"attributes" | "specifications">("attributes");
 
   const { data: categories = [], refetch: refetchCategories } = useGetCategoriesQuery();
   const [createCategory] = useCreateCategoryMutation();
@@ -44,10 +44,9 @@ const AdminCategoryManager = () => {
   const handleCreateCategory = async (formData: FormData, parentId?: string | null) => {
     try {
       if (parentId) {
-        // always set as single string
         formData.set("parentId", parentId);
       } else {
-        formData.delete("parentId"); // don’t send undefined or array
+        formData.delete("parentId");
       }
 
       const promise = createCategory(formData).unwrap();
@@ -98,35 +97,19 @@ const AdminCategoryManager = () => {
     }
   };
 
-  // Only top-level categories for tree
   const parentCategories = categories.filter((c) => !c.parentId);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-teal-100 rounded-lg">
-              <ListTree className="h-7 w-7 text-teal-700" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Category Management</h1>
-              <p className="text-gray-600">
-                Manage your product categories, attributes and specifications
-              </p>
-            </div>
-          </div>
-          <Button className="bg-teal-600 hover:bg-teal-700">
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Left Panel - Category Tree */}
-          <Card className="lg:col-span-1 bg-white border-gray-200 shadow-sm">
+    <div className="min-h-screen">
+      <div className="mx-auto space-y-6">
+        {/* Single Column Layout */}
+        <div className="space-y-6">
+          {/* Category Structure Section */}
+          {categories.length !== 0 && (
+          <Card className="bg-white border-gray-200 shadow-none ">
             <CardHeader className="bg-gray-50 border-b border-gray-200">
               <CardTitle className="text-gray-900 flex items-center gap-2">
+                <ListTree className="h-5 w-5" />
                 Category Structure
               </CardTitle>
               <CardDescription className="text-gray-500">
@@ -142,29 +125,47 @@ const AdminCategoryManager = () => {
                 onDeleteCategory={handleDeleteCategory}
               />
             </CardContent>
+          </Card>)}
+
+          {/* Category Form Section */}
+          <Card className="bg-white border-gray-200 shadow-none">
+            <CardHeader className="bg-gray-50 border-b border-gray-200">
+              <CardTitle className="text-gray-900">
+                {editingCategory ? "Edit Category" : "Create New Category"}
+              </CardTitle>
+              <CardDescription className="text-gray-500">
+                {editingCategory
+                  ? "Update category details"
+                  : "Add a new category to your hierarchy"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4">
+              <CategoryForm
+                editingCategory={editingCategory}
+                selectedParentId={selectedCategoryId}
+                parentCategories={parentCategories}
+                onUpdateCategory={handleUpdateCategory}
+                onCreateCategory={handleCreateCategory}
+                onCancelEdit={() => setEditingCategory(null)}
+                onSelectParent={setSelectedCategoryId}
+              />
+            </CardContent>
           </Card>
 
-          {/* Right Panel - Forms */}
-          <div className="lg:col-span-3 space-y-6">
-            <CategoryForm
-              editingCategory={editingCategory}
-              selectedParentId={selectedCategoryId}
-              parentCategories={parentCategories}
-              onUpdateCategory={handleUpdateCategory}
-              onCreateCategory={handleCreateCategory}
-              onCancelEdit={() => setEditingCategory(null)}
-              onSelectParent={setSelectedCategoryId}
-            />
+          {/* Properties Manager Section (Conditional) */}
+          {selectedCategory && (
+            <Card className="bg-white border-gray-200 shadow-none">
+              
+              <CardContent className="p-2">
+                <PropertiesManager
+                  selectedChildId={selectedCategory.id}
+                  selectedChildCategory={selectedCategory}
+                />
+              </CardContent>
+            </Card>
+          )}
 
-            {selectedCategory && (
-              <PropertiesManager
-                selectedChildId={selectedCategory.id}
-                selectedChildCategory={selectedCategory}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-              />
-            )}
-          </div>
+         
         </div>
       </div>
     </div>

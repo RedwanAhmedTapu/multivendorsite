@@ -1,28 +1,30 @@
-// features/attrSpecSlice.ts
+// features/attributeSlice.ts
 import { createApi } from "@reduxjs/toolkit/query/react";
-import {
-  CategoryAttribute,
-  AttributeValue,
-  CategorySpecification,
-  SpecificationOption,
-} from "../types/type";
 import baseQueryWithReauth from "./baseQueryWithReauth";
+import { Attribute, AttributeValue, CategoryAttribute } from "@/types/category.types";
 
-export const attrSpecSlice = createApi({
-  reducerPath: "attrSpecApi",
+// Types based on unified Attribute model
+
+
+export const attributeSlice = createApi({
+  reducerPath: "attributeApi",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Attribute", "Specification", "SpecificationOption"],
+  tagTypes: ["Attribute", "AttributeValue", "CategoryAttribute"],
 
   endpoints: (builder) => ({
-    // ---------- Attribute Endpoints ----------
-    getAllAttributes: builder.query<CategoryAttribute[], void>({
+    // ---------- Global Attributes (all attributes across all categories) ----------
+    getAllGlobalAttributes: builder.query<Attribute[], void>({
       query: () => `/attributes/`,
       providesTags: ["Attribute"],
     }),
 
+    // ---------- Category-specific Attributes ----------
     getAttributesByCategory: builder.query<CategoryAttribute[], string>({
       query: (categoryId) => `/attributes/${categoryId}`,
-      providesTags: ["Attribute"],
+      providesTags: (result, error, categoryId) => [
+        { type: "CategoryAttribute", id: categoryId },
+        { type: "Attribute", id: `category-${categoryId}` },
+      ],
     }),
 
     createAttribute: builder.mutation<
@@ -30,10 +32,11 @@ export const attrSpecSlice = createApi({
       {
         categoryId: string;
         name: string;
-        type: string;
-        filterable: boolean;
-        isRequired: boolean;
+        type: "TEXT" | "NUMBER" | "BOOLEAN" | "SELECT" | "MULTISELECT" | "DATE" | "FILE";
+        filterable?: boolean;
+        required?: boolean;
         values?: string[];
+        unit?: string;
       }
     >({
       query: (body) => ({
@@ -41,19 +44,24 @@ export const attrSpecSlice = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Attribute"],
+      invalidatesTags: (result, error, { categoryId }) => [
+        { type: "CategoryAttribute", id: categoryId },
+        { type: "Attribute", id: `category-${categoryId}` },
+      ],
     }),
 
     updateAttribute: builder.mutation<
       CategoryAttribute,
       {
-        id: string;
-        data: Partial<{
-          name: string;
-          type: string;
-          filterable: boolean;
-          isRequired: boolean;
-        }>;
+        id: string; // categoryAttributeId
+        data: {
+          name?: string;
+          type?: "TEXT" | "NUMBER" | "BOOLEAN" | "SELECT" | "MULTISELECT" | "DATE" | "FILE";
+          filterable?: boolean;
+          required?: boolean;
+          sortOrder?: number;
+          unit?: string;
+        };
       }
     >({
       query: ({ id, data }) => ({
@@ -61,7 +69,10 @@ export const attrSpecSlice = createApi({
         method: "PUT",
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [{ type: "Attribute", id }],
+      invalidatesTags: (result, error, { id }) => [
+        { type: "CategoryAttribute", id },
+        "Attribute",
+      ],
     }),
 
     deleteAttribute: builder.mutation<{ message: string }, string>({
@@ -69,9 +80,27 @@ export const attrSpecSlice = createApi({
         url: `/attributes/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: (result, error, id) => [{ type: "Attribute", id }],
+      invalidatesTags: (result, error, id) => [
+        { type: "CategoryAttribute", id },
+        "Attribute",
+      ],
     }),
 
+    updateAttributeSortOrder: builder.mutation<
+      CategoryAttribute[],
+      { categoryId: string; attributeOrders: { id: string; sortOrder: number }[] }
+    >({
+      query: ({ categoryId, attributeOrders }) => ({
+        url: `/attributes/${categoryId}/sort-order`,
+        method: "PUT",
+        body: { attributeOrders },
+      }),
+      invalidatesTags: (result, error, { categoryId }) => [
+        { type: "CategoryAttribute", id: categoryId },
+      ],
+    }),
+
+    // ---------- Attribute Values ----------
     addAttributeValue: builder.mutation<
       AttributeValue,
       { attributeId: string; value: string }
@@ -81,7 +110,7 @@ export const attrSpecSlice = createApi({
         method: "POST",
         body: { value },
       }),
-      invalidatesTags: ["Attribute"],
+      invalidatesTags: ["AttributeValue", "Attribute"],
     }),
 
     deleteAttributeValue: builder.mutation<{ message: string }, string>({
@@ -89,94 +118,22 @@ export const attrSpecSlice = createApi({
         url: `/attributes/values/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["Attribute"],
+      invalidatesTags: ["AttributeValue", "Attribute"],
     }),
 
-    // ---------- Specification Endpoints ----------
-    getAllSpecifications: builder.query<CategorySpecification[], void>({
-      query: () => `/specifications`,
-      providesTags: ["Specification"],
-    }),
-
-    getSpecificationsByCategory: builder.query<CategorySpecification[], string>({
-      query: (categoryId) => `/specifications/${categoryId}`,
-      providesTags: ["Specification"],
-    }),
-
-    createSpecification: builder.mutation<
-      CategorySpecification,
-      {
-        categoryId: string;
-        name: string;
-        type: string;
-        unit?: string;
-        filterable: boolean;
-        isRequired: boolean;
-      }
-    >({
-      query: (body) => ({
-        url: "/specifications",
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: ["Specification"],
-    }),
-
-    updateSpecification: builder.mutation<
-      CategorySpecification,
-      {
-        id: string;
-        data: Partial<{
-          name: string;
-          type: string;
-          unit?: string;
-          filterable: boolean;
-          isRequired: boolean;
-        }>;
-      }
-    >({
-      query: ({ id, data }) => ({
-        url: `/specifications/${id}`,
-        method: "PUT",
-        body: data,
-      }),
-      invalidatesTags: (result, error, { id }) => [
-        { type: "Specification", id },
+    // ---------- Additional utility endpoints ----------
+    getAttributeById: builder.query<Attribute, string>({
+      query: (attributeId) => `/attributes/details/${attributeId}`,
+      providesTags: (result, error, attributeId) => [
+        { type: "Attribute", id: attributeId },
       ],
     }),
 
-    deleteSpecification: builder.mutation<{ message: string }, string>({
-      query: (id) => ({
-        url: `/specifications/${id}`,
-        method: "DELETE",
+    searchAttributes: builder.query<Attribute[], { query: string; limit?: number }>({
+      query: ({ query, limit = 10 }) => ({
+        url: `/attributes/search`,
+        params: { query, limit },
       }),
-      invalidatesTags: (result, error, id) => [{ type: "Specification", id }],
-    }),
-
-    // ---------- SpecificationOption Endpoints ----------
-    getSpecificationOptions: builder.query<SpecificationOption[], string>({
-      query: (specificationId) => `/specifications/${specificationId}/options`,
-      providesTags: ["SpecificationOption"],
-    }),
-
-    createSpecificationOption: builder.mutation<
-      SpecificationOption,
-      { specificationId: string; value: string }
-    >({
-      query: ({ specificationId, value }) => ({
-        url: `/specifications/${specificationId}/options`,
-        method: "POST",
-        body: { value },
-      }),
-      invalidatesTags: ["SpecificationOption"],
-    }),
-
-    deleteSpecificationOption: builder.mutation<void, string>({
-      query: (id) => ({
-        url: `/specifications/options/${id}`,
-        method: "DELETE",
-      }),
-      invalidatesTags: ["SpecificationOption"],
     }),
   }),
 });
@@ -184,23 +141,18 @@ export const attrSpecSlice = createApi({
 // Export hooks
 export const {
   // ---------- Attribute hooks ----------
-  useGetAllAttributesQuery,
+  useGetAllGlobalAttributesQuery,
   useGetAttributesByCategoryQuery,
+  useGetAttributeByIdQuery,
+  useSearchAttributesQuery,
+  
+  // ---------- Attribute CRUD hooks ----------
   useCreateAttributeMutation,
   useUpdateAttributeMutation,
   useDeleteAttributeMutation,
+  useUpdateAttributeSortOrderMutation,
+  
+  // ---------- Attribute Value hooks ----------
   useAddAttributeValueMutation,
   useDeleteAttributeValueMutation,
-
-  // ---------- Specification hooks ----------
-  useGetAllSpecificationsQuery,
-  useGetSpecificationsByCategoryQuery,
-  useCreateSpecificationMutation,
-  useUpdateSpecificationMutation,
-  useDeleteSpecificationMutation,
-
-  // ---------- SpecificationOption hooks ----------
-  useGetSpecificationOptionsQuery,
-  useCreateSpecificationOptionMutation,
-  useDeleteSpecificationOptionMutation,
-} = attrSpecSlice;
+} = attributeSlice;

@@ -17,7 +17,6 @@ export interface ProductFilters {
   categories: string[];
   priceRange: [number, number];
   attributes: Record<string, string[]>;
-  specifications: Record<string, string[]>;
   brands: string[];
   vendors: string[];
   ratings: number[];
@@ -31,6 +30,50 @@ interface FilterSidebarProps {
   selectedVendor?: string;
   onFiltersChange: (filters: ProductFilters) => void;
   currentFilters?: ProductFilters;
+}
+
+interface FilterAttributeValue {
+  id: string;
+  value: string;
+  productCount: number;
+}
+
+interface FilterAttribute {
+  id: string;
+  name: string;
+  slug: string;
+  type: 'SELECT' | 'MULTISELECT' | 'TEXT' | 'NUMBER' | 'BOOLEAN' | 'DATE' | 'FILE';
+  unit?: string;
+  values: FilterAttributeValue[];
+}
+
+interface CategoryFilterResponse {
+  success: boolean;
+  data: {
+    category: {
+      id: string;
+      name: string;
+      slug: string;
+      breadcrumb: Array<{
+        id: string;
+        name: string;
+        slug: string;
+        level: number;
+      }>;
+    };
+    filters: {
+      attributes: FilterAttribute[];
+      priceRange: {
+        min: number;
+        max: number;
+      };
+    };
+    meta: {
+      totalProducts: number;
+      hasFilters: boolean;
+    };
+  };
+  message: string;
 }
 
 // ============================================
@@ -52,9 +95,9 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     return searchParams.toString().length > 0;
   }, [searchParams]);
 
-  // FIXED: The query returns CategoryFilterResponse directly, not wrapped in { data: ... }
+  // Fetch filter data from API
   const { 
-    data: filtersr, // filterData is CategoryFilterResponse
+    data: filterResponse,
     isLoading: filterLoading,
     isSuccess: filterSuccess,
     error: filterError 
@@ -62,22 +105,21 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     skip: !categoryId,
   });
   
-  const filterData = filtersr?.data;
-  console.log(filterSuccess, "fil");
-
-  // Initialize filters with proper defaults - 0 to 1 lakh
+  // Extract filter data from response
+  const filterData: CategoryFilterResponse['data'] | undefined = filterResponse?.data;
+  
+  // Initialize filters with proper defaults
   const [internalFilters, setInternalFilters] = useState<ProductFilters>({
-    categories: [],
-    priceRange: [0, 100000],
+    categories: categoryId ? [categoryId] : [],
+    priceRange: [0, 100000], // Default range
     attributes: {},
-    specifications: {},
     brands: [],
     vendors: selectedVendor ? [selectedVendor] : [],
     ratings: [],
     availability: [],
   });
 
-  // Price input states - keep as strings for input
+  // Price input states
   const [minPriceInput, setMinPriceInput] = useState<string>("0");
   const [maxPriceInput, setMaxPriceInput] = useState<string>("100000");
 
@@ -85,7 +127,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     price: true,
     attributes: true,
-    specifications: true,
     ratings: true,
     availability: true,
   });
@@ -94,7 +135,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
   // Use external filters if provided, otherwise use internal state
   const filters = externalFilters || internalFilters;
-  console.log(filterData, "filterData");
 
   // Sync price inputs with filters
   useEffect(() => {
@@ -105,18 +145,23 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   // Update price range when filter data loads
   useEffect(() => {
     if (filterData?.filters?.priceRange && !externalFilters) {
+      const apiMin = filterData.filters.priceRange.min;
+      const apiMax = filterData.filters.priceRange.max;
+      
       setInternalFilters((prev) => {
+        // Only update if we're still using defaults
         if (prev.priceRange[0] === 0 && prev.priceRange[1] === 100000) {
           return {
             ...prev,
-            priceRange: [
-              filterData.filters.priceRange.min,
-              filterData.filters.priceRange.max
-            ],
+            priceRange: [apiMin, apiMax],
           };
         }
         return prev;
       });
+      
+      // Update input values
+      setMinPriceInput(apiMin.toString());
+      setMaxPriceInput(apiMax.toString());
     }
   }, [filterData, externalFilters]);
 
@@ -157,19 +202,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         [attributeId]: (filters.attributes[attributeId] || []).includes(valueId)
           ? (filters.attributes[attributeId] || []).filter((id) => id !== valueId)
           : [...(filters.attributes[attributeId] || []), valueId]
-      }
-    });
-  }, [filters, updateFilters]);
-
-  const toggleSpecificationFilter = useCallback((specId: string, value: string | number) => {
-    const valueStr = String(value);
-    updateFilters({
-      ...filters,
-      specifications: {
-        ...filters.specifications,
-        [specId]: (filters.specifications[specId] || []).includes(valueStr)
-          ? (filters.specifications[specId] || []).filter((v) => v !== valueStr)
-          : [...(filters.specifications[specId] || []), valueStr]
       }
     });
   }, [filters, updateFilters]);
@@ -232,10 +264,9 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       : [0, 100000];
 
     const clearedFilters = {
-      categories: categoryId && filterData ? [filterData.category.id] : [],
+      categories: categoryId ? [categoryId] : [],
       priceRange: defaultPriceRange as [number, number],
       attributes: {},
-      specifications: {},
       brands: [],
       vendors: selectedVendor ? [selectedVendor] : [],
       ratings: [],
@@ -256,7 +287,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       count += 1;
     }
     count += Object.values(filters.attributes).flat().length;
-    count += Object.values(filters.specifications).flat().length;
     count += filters.brands.length;
     if (!selectedVendor) count += filters.vendors.length;
     count += filters.ratings.length;
@@ -292,20 +322,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             ...filters,
             attributes: {
               ...filters.attributes,
-              [key]: newValues,
-            },
-          });
-        }
-        break;
-      
-      case "specification":
-        if (key && value) {
-          const currentValues = filters.specifications[key] || [];
-          const newValues = currentValues.filter(v => v !== String(value));
-          updateFilters({
-            ...filters,
-            specifications: {
-              ...filters.specifications,
               [key]: newValues,
             },
           });
@@ -354,22 +370,31 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     }
   }, [filters, filterData, updateFilters]);
 
-  // Get filterable items from API response
+  // Get filterable attributes from API response
   const filterableAttributes = useMemo(() => {
-    return filterData?.filters?.attributes || [];
-  }, [filterData]);
-
-  const filterableSpecifications = useMemo(() => {
-    return filterData?.filters?.specifications || [];
+    if (!filterData?.filters?.attributes) return [];
+    
+    // All attributes from API are filterable
+    return filterData.filters.attributes.filter((attr: FilterAttribute) => 
+      attr.values && attr.values.length > 0
+    );
   }, [filterData]);
 
   // Check if we have category-specific filters
   const hasCategoryFilters = useMemo(() => {
-    return filterData?.meta?.hasFilters && 
-           (filterableAttributes.length > 0 || filterableSpecifications.length > 0);
-  }, [filterData, filterableAttributes, filterableSpecifications]);
+    return filterData?.meta?.hasFilters && filterableAttributes.length > 0;
+  }, [filterData, filterableAttributes]);
 
-  // FilterSection component with larger text
+  // Helper function to get display value with unit
+  const getDisplayValueWithUnit = (attribute: FilterAttribute, value: FilterAttributeValue): string => {
+    const valueStr = String(value.value);
+    if (attribute.unit) {
+      return `${valueStr} ${attribute.unit}`;
+    }
+    return valueStr;
+  };
+
+  // FilterSection component
   const FilterSection: React.FC<{
     title: string;
     sectionKey: string;
@@ -439,8 +464,8 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               </div>
             </div>
             <div className="flex justify-between text-xs text-gray-500 px-1">
-              <span>৳0</span>
-              <span>৳1L</span>
+              <span>৳{filterData?.filters?.priceRange?.min || 0}</span>
+              <span>৳{filterData?.filters?.priceRange?.max || 100000}</span>
             </div>
           </div>
         </FilterSection>
@@ -524,7 +549,87 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         </FilterSection>
       </>
     );
-  }, [filters, minPriceInput, maxPriceInput, handleMinPriceChange, handleMaxPriceChange, handleMinPriceBlur, handleMaxPriceBlur, toggleArrayFilter, FilterSection]);
+  }, [
+    filters, minPriceInput, maxPriceInput, handleMinPriceChange, 
+    handleMaxPriceChange, handleMinPriceBlur, handleMaxPriceBlur, 
+    toggleArrayFilter, FilterSection, filterData
+  ]);
+
+  // Render dynamic attributes from API
+  const renderDynamicAttributes = useCallback(() => {
+    if (!filterableAttributes.length) return null;
+
+    return filterableAttributes.map((attribute: FilterAttribute) => {
+      const selectedCount = filters.attributes[attribute.id]?.length || 0;
+      const displayLimit = 6;
+      const shouldShowToggle = attribute.values.length > displayLimit;
+      const displayValues = showAllItems[attribute.id]
+        ? attribute.values
+        : attribute.values.slice(0, displayLimit);
+
+      return (
+        <FilterSection
+          key={attribute.id}
+          title={`${attribute.name}${attribute.unit ? ` (${attribute.unit})` : ""}`}
+          sectionKey={`attr-${attribute.id}`}
+          count={selectedCount}
+        >
+          <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1 custom-scrollbar">
+            {displayValues.map((value: FilterAttributeValue) => {
+              const displayValue = getDisplayValueWithUnit(attribute, value);
+              
+              return (
+                <div
+                  key={value.id}
+                  className="flex items-center justify-between space-x-2 hover:bg-gray-50 p-1.5 rounded transition-colors"
+                >
+                  <div className="flex items-center space-x-2 flex-1 min-w-0">
+                    <Checkbox
+                      id={`attr-${value.id}`}
+                      checked={
+                        filters.attributes[attribute.id]?.includes(value.id) || false
+                      }
+                      onCheckedChange={() =>
+                        toggleAttributeFilter(attribute.id, value.id)
+                      }
+                      className="h-4 w-4"
+                    />
+                    <label
+                      htmlFor={`attr-${value.id}`}
+                      className="text-sm text-gray-700 cursor-pointer flex-1 truncate"
+                      title={displayValue}
+                    >
+                      {displayValue}
+                    </label>
+                  </div>
+                  <span className="text-xs text-gray-500 whitespace-nowrap">
+                    ({value.productCount})
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {shouldShowToggle && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-2 h-6 px-2 text-xs w-full hover:bg-gray-100"
+              onClick={() =>
+                setShowAllItems((prev) => ({
+                  ...prev,
+                  [attribute.id]: !prev[attribute.id],
+                }))
+              }
+            >
+              {showAllItems[attribute.id]
+                ? "Show Less"
+                : `+${attribute.values.length - displayLimit} more`}
+            </Button>
+          )}
+        </FilterSection>
+      );
+    });
+  }, [filterableAttributes, filters, showAllItems, toggleAttributeFilter, FilterSection, getDisplayValueWithUnit]);
 
   const FilterContent = useCallback(() => {
     const activeCount = getActiveFilterCount();
@@ -631,9 +736,14 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               {/* Attribute filters */}
               {Object.entries(filters.attributes).map(([attrId, values]) =>
                 values.map((valueId) => {
-                  const attribute = filterableAttributes.find((a: any) => a.id === attrId);
+                  const attribute = filterableAttributes.find((a: FilterAttribute) => a.id === attrId);
                   const value = attribute?.values.find((v: any) => v.id === valueId);
-                  return value ? (
+                  
+                  if (!attribute || !value) return null;
+                  
+                  const displayValue = getDisplayValueWithUnit(attribute, value);
+                  
+                  return (
                     <Badge
                       key={`${attrId}-${valueId}`}
                       variant="secondary"
@@ -643,31 +753,10 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                         removeFilter("attribute", attrId, valueId);
                       }}
                     >
-                      {attribute?.name}: {value.value}
+                      {attribute.name}: {displayValue}
                       <X size={12} className="hover:text-red-500" />
                     </Badge>
-                  ) : null;
-                })
-              )}
-
-              {/* Specification filters */}
-              {Object.entries(filters.specifications).map(([specId, values]) =>
-                values.map((value) => {
-                  const spec = filterableSpecifications.find((s: any) => s.id === specId);
-                  return spec ? (
-                    <Badge
-                      key={`${specId}-${value}`}
-                      variant="secondary"
-                      className="flex items-center gap-1 py-1 px-2 text-xs bg-white hover:bg-gray-50 cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeFilter("specification", specId, value);
-                      }}
-                    >
-                      {spec?.name}: {value}{spec?.unit && spec.unit}
-                      <X size={12} className="hover:text-red-500" />
-                    </Badge>
-                  ) : null;
+                  );
                 })
               )}
 
@@ -698,7 +787,10 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                     removeFilter("availability", undefined, avail);
                   }}
                 >
-                  {avail}
+                  {avail === 'inStock' ? 'In Stock' : 
+                   avail === 'onSale' ? 'On Sale' : 
+                   avail === 'newArrivals' ? 'New Arrivals' : 
+                   'Free Shipping'}
                   <X size={12} className="hover:text-red-500" />
                 </Badge>
               ))}
@@ -709,140 +801,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         {/* Filter Sections */}
         <div className="space-y-3">
           {/* Dynamic Attributes from API */}
-          {hasCategoryFilters && filterableAttributes.length > 0 && filterableAttributes.map((attribute: any) => {
-            const selectedCount = filters.attributes[attribute.id]?.length || 0;
-            const displayLimit = 6;
-            const shouldShowToggle = attribute.values.length > displayLimit;
-            const displayValues = showAllItems[attribute.id]
-              ? attribute.values
-              : attribute.values.slice(0, displayLimit);
-
-            return (
-              <FilterSection
-                key={attribute.id}
-                title={attribute.name}
-                sectionKey={`attr-${attribute.id}`}
-                count={selectedCount}
-              >
-                <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1 custom-scrollbar">
-                  {displayValues.map((value: any) => (
-                    <div
-                      key={value.id}
-                      className="flex items-center justify-between space-x-2 hover:bg-gray-50 p-1.5 rounded transition-colors"
-                    >
-                      <div className="flex items-center space-x-2 flex-1 min-w-0">
-                        <Checkbox
-                          id={`attr-${value.id}`}
-                          checked={
-                            filters.attributes[attribute.id]?.includes(value.id) || false
-                          }
-                          onCheckedChange={() =>
-                            toggleAttributeFilter(attribute.id, value.id)
-                          }
-                          className="h-4 w-4"
-                        />
-                        <label
-                          htmlFor={`attr-${value.id}`}
-                          className="text-sm text-gray-700 cursor-pointer flex-1 truncate"
-                          title={value.value}
-                        >
-                          {value.value}
-                        </label>
-                      </div>
-                      <span className="text-xs text-gray-500 whitespace-nowrap">
-                        ({value.productCount})
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                {shouldShowToggle && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 h-6 px-2 text-xs w-full hover:bg-gray-100"
-                    onClick={() =>
-                      setShowAllItems((prev) => ({
-                        ...prev,
-                        [attribute.id]: !prev[attribute.id],
-                      }))
-                    }
-                  >
-                    {showAllItems[attribute.id]
-                      ? "Show Less"
-                      : `+${attribute.values.length - displayLimit} more`}
-                  </Button>
-                )}
-              </FilterSection>
-            );
-          })}
-
-          {/* Dynamic Specifications from API */}
-          {hasCategoryFilters && filterableSpecifications.length > 0 && filterableSpecifications.map((specification: any) => {
-            const selectedCount = filters.specifications[specification.id]?.length || 0;
-            const displayLimit = 6;
-            const shouldShowToggle = specification.values.length > displayLimit;
-            const displayValues = showAllItems[specification.id]
-              ? specification.values
-              : specification.values.slice(0, displayLimit);
-
-            return (
-              <FilterSection
-                key={specification.id}
-                title={`${specification.name}${specification.unit ? ` (${specification.unit})` : ""}`}
-                sectionKey={`spec-${specification.id}`}
-                count={selectedCount}
-              >
-                <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1 custom-scrollbar">
-                  {displayValues.map((specValue: any, index: number) => (
-                    <div
-                      key={`${specification.id}-${specValue.value}-${index}`}
-                      className="flex items-center justify-between space-x-2 hover:bg-gray-50 p-1.5 rounded transition-colors"
-                    >
-                      <div className="flex items-center space-x-2 flex-1 min-w-0">
-                        <Checkbox
-                          id={`spec-${specification.id}-${specValue.value}`}
-                          checked={
-                            filters.specifications[specification.id]?.includes(String(specValue.value)) || false
-                          }
-                          onCheckedChange={() =>
-                            toggleSpecificationFilter(specification.id, specValue.value)
-                          }
-                          className="h-4 w-4"
-                        />
-                        <label
-                          htmlFor={`spec-${specification.id}-${specValue.value}`}
-                          className="text-sm text-gray-700 cursor-pointer flex-1 truncate"
-                          title={String(specValue.value)}
-                        >
-                          {specValue.value}
-                        </label>
-                      </div>
-                      <span className="text-xs text-gray-500 whitespace-nowrap">
-                        ({specValue.productCount})
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                {shouldShowToggle && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 h-6 px-2 text-xs w-full hover:bg-gray-100"
-                    onClick={() =>
-                      setShowAllItems((prev) => ({
-                        ...prev,
-                        [specification.id]: !prev[specification.id],
-                      }))
-                    }
-                  >
-                    {showAllItems[specification.id]
-                      ? "Show Less"
-                      : `+${specification.values.length - displayLimit} more`}
-                  </Button>
-                )}
-              </FilterSection>
-            );
-          })}
+          {hasCategoryFilters && renderDynamicAttributes()}
 
           {/* Always show common filters */}
           {renderCommonFilters()}
@@ -859,10 +818,10 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     );
   }, [
     filterLoading, categoryId, filterError, filterData, 
-    filters, getActiveFilterCount, removeFilter, filterableAttributes, 
-    filterableSpecifications, toggleAttributeFilter, toggleSpecificationFilter, 
-    showAllItems, expandedSections, 
-    onMobileClose, clearAllFilters, FilterSection, hasCategoryFilters, renderCommonFilters
+    filters, getActiveFilterCount, removeFilter, filterableAttributes,
+    showAllItems, expandedSections, onMobileClose, clearAllFilters, 
+    FilterSection, hasCategoryFilters, renderCommonFilters, 
+    renderDynamicAttributes, getDisplayValueWithUnit
   ]);
 
   // Hide the filter sidebar if no URL parameters are present
@@ -880,7 +839,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       {/* Mobile sidebar overlay */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0  bg-opacity-50 z-40 md:hidden"
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
           onClick={onMobileClose}
         />
       )}

@@ -1,6 +1,8 @@
-import { Vendor, Category, OrderItem, Attribute, AttributeValue, Specification } from "./type";
+import { Vendor, Category, OrderItem, Attribute, AttributeValue, AttributeType } from "./type";
 
-// -------- Review & Offer Interfaces --------
+// =====================
+// Review & Offer Interfaces
+// =====================
 export interface Review {
   id: string;
   rating: number;
@@ -9,6 +11,10 @@ export interface Review {
   productId: string;
   createdAt: string;
   updatedAt: string;
+  user?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface OfferProduct {
@@ -25,164 +31,176 @@ export interface OfferProduct {
   updatedAt: string;
 }
 
-// -------- Product --------
+// =====================
+// UNIFIED ProductAttribute (replaces both specifications and settings)
+// =====================
+
+/**
+ * ProductAttribute - Unified model for both product specifications and variant attribute settings
+ * isForVariant: false = product specification
+ * isForVariant: true = variant attribute setting (defines which attributes are used for variants)
+ */
+export interface ProductAttribute {
+  id: string;
+  productId: string;
+  product?: Product;
+  attributeId: string;
+  attribute: Attribute;
+  isForVariant: boolean;
+  
+  // For TEXT/NUMBER/BOOLEAN types (direct values for specifications)
+  valueString?: string | null;
+  valueNumber?: number | null;
+  valueBoolean?: boolean | null;
+  
+  // For SELECT/MULTISELECT types (selected value for specifications)
+  attributeValueId?: string | null;
+  attributeValue?: AttributeValue | null;
+}
+
+// =====================
+// Product Interfaces
+// =====================
+
 export interface Product {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   slug: string;
-  videoUrl?: string;  
-  vendorId: number;
-  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
-  vendor: Vendor;
+  vendorId: string;
   categoryId: string;
+  approvalStatus: 'PENDING' | 'ACTIVE' | 'REJECTED';
+  approvedById?: string | null;
+  
+  // Relations
+  vendor: Vendor;
   category: Category;
   variants: ProductVariant[];
-  specifications: ProductSpecificationValue[];
-  attributeSettings: ProductAttributeSetting[];
+  attributes: ProductAttribute[]; // Unified: contains both specifications (isForVariant: false)
+   videoUrl?: string;
   images: ProductImage[];
-  // Add the missing properties
+  warranty?: Warranty | null;
   reviews?: Review[];
   offerProducts?: OfferProduct[];
+  approvedBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  
   createdAt: string;
   updatedAt: string;
 }
 
-export interface BulkProductData {
+// =====================
+// Warranty
+// =====================
+export interface Warranty {
   id: string;
-  name: string;
-  description: string;
-  sku: string;
-  price: number;
-  stock: number;
-  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
-
-  variantGroupNo?: number;
-  images: string[];
-  videoUrl?: string;
-  specInputs: ProductSpecificationInput[];
-  attributeSettings: ProductAttributeSettingInput[];
-  variantInputs: ProductVariantInput[];
-  shippingWarranty?: ProductShippingWarrantyInput;
-  errors: Record<string, string>;
-  status: 'draft' | 'processing' | 'success' | 'error';
-}
-// -------- ProductVariant --------
-export interface BulkProductData {
-  id: string;
-  name: string;
-  description: string;
-  sku: string;
-  price: number;
-  stock: number;
-  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
-
-  variantGroupNo?: number;
-  images: string[];
-  videoUrl?: string;
-  specInputs: ProductSpecificationInput[];
-  attributeSettings: ProductAttributeSettingInput[];
-  variantInputs: ProductVariantInput[];
-  shippingWarranty?: ProductShippingWarrantyInput;
-  errors: Record<string, string>;
-  status: 'draft' | 'processing' | 'success' | 'error';
+  productId: string;
+  packageWeightValue: number;
+  packageWeightUnit: "KG" | "G";
+  packageLength: number;
+  packageWidth: number;
+  packageHeight: number;
+  dangerousGoods: "NONE" | "CONTAINS";
+  duration: number;
+  unit: "DAYS" | "MONTHS" | "YEARS";
+  policy?: string | null;
+  type: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-// -------- ProductVariant --------
+// =====================
+// ProductVariant
+// =====================
 export interface ProductVariant {
   id: string;
   productId: string;
   product?: Product;
-  name: string;
+  name?: string | null;
   sku: string;
   price: number;
-  specialPrice?: number;
-  discount?: number;
+  specialPrice?: number | null;
+  discount?: number | null;
   stock: number;
-  weight: number;
+  weight?: number | null;
   images: ProductImage[];
   attributes: ProductVariantAttribute[];
-  orderItems: OrderItem[];
+  orderItems?: OrderItem[];
   createdAt: string;
   updatedAt: string;
 }
 
-// -------- ProductImage --------
+// =====================
+// ProductImage
+// =====================
 export interface ProductImage {
   id: string;
-  productId?: string;
+  productId?: string | null;
   product?: Product;
-  variantId?: string;
+  variantId?: string | null;
   variant?: ProductVariant;
   url: string;
-  altText?: string;
-  sortOrder: number;
+  altText?: string | null;
+  sortOrder?: number | null;
   createdAt: string;
 }
 
-// -------- ProductAttributeSetting --------
-export interface ProductAttributeSetting {
-  id: string;
-  productId: string;
-  product: Product;
-  attributeId: string;
-  attribute: Attribute;
-  isVariant: boolean;
-}
-
-// -------- ProductVariantAttribute --------
+// =====================
+// ProductVariantAttribute
+// =====================
 export interface ProductVariantAttribute {
   id: string;
   variantId: string;
-  variant: ProductVariant;
+  variant?: ProductVariant;
   attributeValueId: string;
-  attributeValue: AttributeValue;
-  createdAt: string;
-  updatedAt: string;
+  attributeValue: AttributeValue & {
+    attribute: Attribute;
+  };
 }
 
-// -------- ProductSpecificationValue --------
-export interface ProductSpecificationValue {
-  id: string;
-  productId: string;
-  product: Product;
-  specificationId: string;
-  specification: Specification;
-  valueString?: string;
-  valueNumber?: number;
-  createdAt: string;
-  updatedAt: string;
-}
+// =====================
+// Input Types for Frontend Forms
+// =====================
 
-// -------- Input types for Frontend Forms --------
 export interface ProductImageInput {
   url: string;
-  altText?: string;
+  altText?: string | null;
   sortOrder?: number;
+}
+
+/**
+ * Unified attribute input for product creation
+ * Used for both specifications and variant attribute settings
+ */
+export interface ProductAttributeInput {
+  attributeId: string;
+  isForVariant?: boolean; // false = specification, true = variant attribute setting
+  
+  // For specifications (TEXT/NUMBER/BOOLEAN types)
+  valueString?: string | null;
+  valueNumber?: number | null;
+  valueBoolean?: boolean | null;
+  
+  // For specifications (SELECT/MULTISELECT types)
+  attributeValueId?: string | null;
 }
 
 export interface ProductVariantInput {
   id?: string;
-  name: string;
+  name?: string | null;
   sku: string;
   price: number;
-  specialPrice?: number;
-  stock: number;
-  weight: number;
+  specialPrice?: number | null;
+  discount?: number;
+  stock?: number;
+  weight?: number | null;
   attributes?: { attributeValueId: string }[];
-  images: string[]; // Array of image URLs for frontend
+  images?: (string | ProductImageInput)[]; // URLs or full image objects
 }
 
-export interface ProductSpecificationInput {
-  specificationId: string;
-  valueString?: string;
-  valueNumber?: number;
-}
-
-export interface ProductAttributeSettingInput {
-  attributeId: string;
-  isVariant?: boolean;
-}
 export interface ProductShippingWarrantyInput {
   packageWeightValue: number;
   packageWeightUnit: "kg" | "g";
@@ -193,75 +211,148 @@ export interface ProductShippingWarrantyInput {
   warrantyType: string;
   warrantyPeriodValue: number;
   warrantyPeriodUnit: "days" | "months" | "years";
-  warrantyDetails: string;
+  warrantyDetails?: string | null;
 }
 
+// =====================
+// Create Product Data
+// =====================
 export interface CreateProductData {
   name: string;
-  description?: string;
-  videoUrl?: string;
+  nameBn?: string;  
+  description?: string | null;
   categoryId: string;
   vendorId: string;
-  images: (string | { url: string; altText?: string })[];
-  specifications: ProductSpecificationInput[];
-  variants: ProductVariantInput[];
-  attributeSettings: ProductAttributeSettingInput[];
-  shippingWarranty?: ProductShippingWarrantyInput;  // NEW
+   videoUrl?: string;
+  images?: ProductImageInput[];
+  
+  // ✅ NEW: Unified attributes (replaces both specifications and attributeSettings)
+  attributes?: ProductAttributeInput[];
+  
+  variants?: ProductVariantInput[];
+  shippingWarranty?: ProductShippingWarrantyInput;
+  
+  // For audit logging
+  userId?: string;
 }
 
-
-// -------- Update Product Data --------
+// =====================
+// Update Product Data
+// =====================
 export interface UpdateProductData {
   name?: string;
-  description?: string;
-  videoUrl?: string;  
-  vendorId?: number;
+  description?: string | null;
+  vendorId?: string;
   categoryId?: string;
+   videoUrl?: string;
   images?: ProductImageInput[];
-  specifications?: ProductSpecificationInput[];
-  attributeSettings?: ProductAttributeSettingInput[];
+  
+  // ✅ Unified attributes for updates
+  attributes?: ProductAttributeInput[];
+  
   variants?: ProductVariantInput[];
+  shippingWarranty?: ProductShippingWarrantyInput;
+  
+  // Approval status
+  status?: "PENDING" | "ACTIVE" | "REJECTED";
+  approvedById?: string;
+  
+  // For audit logging
+  userId?: string;
 }
 
-// -------- Filter Types --------
+// =====================
+// Bulk Product Data
+// =====================
+export interface BulkProductData {
+  id: string;
+  name: string;
+  description: string;
+  sku: string;
+  price: number;
+  stock: number;
+  approvalStatus?: 'PENDING' | 'ACTIVE' | 'REJECTED';
+  variantGroupNo?: number;
+  videoUrl?: string;
+  images: string[];
+  
+  attributes: ProductAttributeInput[];
+  variantInputs: ProductVariantInput[];
+  shippingWarranty?: ProductShippingWarrantyInput;
+  
+  errors: Record<string, string>;
+  status: 'draft' | 'processing' | 'success' | 'error';
+}
+
+// =====================
+// Filter Types
+// =====================
 export interface ProductFilter {
   categoryId?: string;
-  attributes?: { [key: string]: string | string[] };
-  specifications?: { [key: string]: string | number | boolean };
+  categoryIds?: string[]; // multiple categories
+  vendorId?: string;
+  vendors?: string[]; // multiple vendors
+  inStock?: boolean;
   minPrice?: number;
   maxPrice?: number;
-  vendorId?: number;
-  inStock?: boolean;
-  searchQuery?: string;
+  onSale?: boolean;
+  newArrivals?: boolean;
+  search?: string;
+  
+  ratings?: number[]; // filter by minimum ratings
+  brands?: string[]; // filter by brand values
+  
+  // Variant attributes (for filtering variants)
+  attributes?: Record<string, string | string[]>; // attributeId -> attributeValueId(s)
+  
+  // Product specifications (for filtering products)
+  specifications?: Record<string, string | string[] | number>; // attributeId -> value(s)
+  
+  // Approval status
+  approvalStatus?: "PENDING" | "ACTIVE" | "REJECTED";
 }
 
-
-// -------- Product List Item for Efficient Queries --------
+// =====================
+// Product List Item (for efficient queries)
+// =====================
 export interface ProductListItem {
   id: string;
   name: string;
   slug: string;
+  approvalStatus: 'PENDING' | 'ACTIVE' | 'REJECTED';
   vendor: {
-    id: number;
-    name: string;
+    id: string;
+    storeName: string;
+    avatar?: string | null;
   };
   category: {
     id: string;
     name: string;
+    slug: string;
   };
-  videoUrl?: string;
+   videoUrl?: string;
   images: ProductImage[];
   variants: {
     id: string;
-    name: string;
+    name?: string | null;
+    sku: string;
     price: number;
+    specialPrice?: number | null;
+    discount?: number | null;
     stock: number;
     images: ProductImage[];
   }[];
+  reviews?: {
+    id: string;
+    rating: number;
+  }[];
+  offerProducts?: OfferProduct[];
   createdAt: string;
 }
 
-// -------- Product Detail for Single Product View --------
+// =====================
+// Product Detail (for single product view)
+// =====================
 export interface ProductDetail extends Product {
   variants: (ProductVariant & {
     attributes: (ProductVariantAttribute & {
@@ -270,27 +361,33 @@ export interface ProductDetail extends Product {
       };
     })[];
   })[];
-  specifications: (ProductSpecificationValue & {
-    specification: Specification & {
+  
+  // ✅ Specifications are now part of the unified attributes array
+  // Filter by isForVariant: false to get specifications
+  attributes: (ProductAttribute & {
+    attribute: Attribute & {
       values?: AttributeValue[];
     };
+    attributeValue?: AttributeValue | null;
   })[];
-  attributeSettings: (ProductAttributeSetting & {
-    attribute: Attribute & {
-      values: AttributeValue[];
-    };
-  })[];
+  
+  warranty?: Warranty | null;
 }
 
-// -------- Generic API Response --------
+// =====================
+// Generic API Response
+// =====================
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   message?: string;
   errors?: string[];
+  count?: number;
 }
 
-// -------- Pagination --------
+// =====================
+// Pagination
+// =====================
 export interface PaginatedResponse<T> {
   success: boolean;
   data: T[];
@@ -304,7 +401,9 @@ export interface PaginatedResponse<T> {
   };
 }
 
-// -------- Product Search --------
+// =====================
+// Product Search
+// =====================
 export interface ProductSearchParams {
   query?: string;
   categoryId?: string;
@@ -317,7 +416,19 @@ export interface ProductSearchParams {
   limit?: number;
 }
 
-// -------- Product Analytics --------
+// =====================
+// Product Statistics
+// =====================
+export interface ProductStatistics {
+  total: number;
+  pending: number;
+  active: number;
+  rejected: number;
+}
+
+// =====================
+// Product Analytics
+// =====================
 export interface ProductAnalytics {
   totalProducts: number;
   totalVariants: number;
@@ -330,8 +441,31 @@ export interface ProductAnalytics {
     productCount: number;
   }[];
   topVendors: {
-    vendorId: number;
+    vendorId: string;
     vendorName: string;
     productCount: number;
   }[];
+}
+
+// =====================
+// Helper Types
+// =====================
+
+/**
+ * Helper to extract specifications from ProductAttribute array
+ */
+export type ProductSpecification = ProductAttribute & { isForVariant: false };
+
+/**
+ * Helper to extract variant attribute settings from ProductAttribute array
+ */
+export type ProductVariantAttributeSetting = ProductAttribute & { isForVariant: true };
+
+/**
+ * Used for UI to manage variant naming logic
+ */
+export interface VariantNamePart {
+  name: string;
+  value: string;
+  include: boolean;
 }

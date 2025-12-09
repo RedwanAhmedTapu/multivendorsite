@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,20 @@ import {
   Loader2,
   X,
   Link,
+  List,
+  Search,
+  Filter,
+  Check,
+  AlertCircle,
+  Tag,
+  Key,
+  Hash as HashIcon,
+  Globe,
+  FolderTree,
+  Copy,
+  Save,
+  Upload,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -29,53 +43,130 @@ import {
   useDeleteAttributeMutation,
   useAddAttributeValueMutation,
   useDeleteAttributeValueMutation,
+  useUpdateCategoryMutation,
 } from "@/features/apiSlice";
-import { useGetAllAttributesQuery } from "@/features/attrSpecSlice";
+import { useGetAllGlobalAttributesQuery } from "@/features/attrSpecSlice";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 
 interface AttributesTabProps {
   selectedChildId: string;
 }
 
-// Match the actual structure from your API response
-interface AttributeFromAPI {
+interface AttributeValue {
   id: string;
-  name?: string; // Make optional
-  slug?: string; // Make optional
-  type?: string; // Make optional
-  values?: Array<{
-    id: string;
-    value: string;
-    attributeId: string;
-    createdAt: string;
-    updatedAt: string;
-  }>;
-  isisRequired: boolean;
-  isForVariant: boolean;
-  filterable: boolean;
+  value: string;
+  attributeId: string;
   createdAt: string;
   updatedAt: string;
 }
 
+interface CategoryAttributeFromAPI {
+  id: string;
+  categoryAttributeId: string;
+  name: string;
+  slug: string;
+  type: "SELECT" | "MULTISELECT" | "TEXT" | "NUMBER" | "BOOLEAN";
+  unit?: string | null;
+  isRequired: boolean;
+  filterable: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  values?: AttributeValue[];
+}
+
+interface GlobalAttribute {
+  id: string;
+  name: string;
+  slug?: string;
+  type: "SELECT" | "MULTISELECT" | "TEXT" | "NUMBER" | "BOOLEAN";
+  unit?: string;
+  values?: AttributeValue[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface CategoryData {
+  id: string;
+  name: string;
+  slug: string;
+  parentId?: string;
+  keywords: string[];
+  tags: string[];
+  children?: CategoryData[];
+  attributes?: CategoryAttributeFromAPI[];
+}
+
+type AttributeType = "SELECT" | "MULTISELECT" | "TEXT" | "NUMBER" | "BOOLEAN";
+
 const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
+  const [activeTab, setActiveTab] = useState("attributes");
   const [newAttribute, setNewAttribute] = useState({
     name: "",
-    type: "SELECT",
+    type: "SELECT" as AttributeType,
+    unit: "",
     filterable: true,
     isRequired: false,
     values: [] as string[],
   });
+
   const [selectedExistingAttribute, setSelectedExistingAttribute] =
     useState("");
   const [existingAttributeValues, setExistingAttributeValues] = useState<
     string[]
   >([]);
   const [newValue, setNewValue] = useState("");
-  const [addingValueTo, setAddingValueTo] = useState<string>(""); 
+  const [addingValueTo, setAddingValueTo] = useState<string>("");
   const [editingAttribute, setEditingAttribute] =
-    useState<AttributeFromAPI | null>(null);
-  const [isCreatingNew, setIsCreatingNew] = useState(true); 
+    useState<CategoryAttributeFromAPI | null>(null);
+  const [isCreatingNew, setIsCreatingNew] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [attributeToDelete, setAttributeToDelete] = useState<{
+    id: string;
+    name: string;
+    categoryAttributeId: string;
+  } | null>(null);
 
-  // Get categories and attributes data
+  // Keywords and Tags state with bulk addition
+  const [newKeyword, setNewKeyword] = useState("");
+  const [newTag, setNewTag] = useState("");
+  const [bulkKeywords, setBulkKeywords] = useState("");
+  const [bulkTags, setBulkTags] = useState("");
+  const [showBulkKeywords, setShowBulkKeywords] = useState(false);
+  const [showBulkTags, setShowBulkTags] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<CategoryData | null>(
+    null
+  );
+  const [isLeafCategory, setIsLeafCategory] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const componentRef = useRef<HTMLDivElement>(null);
+  const lastScrolledId = useRef<string | null>(null);
+
   const {
     data: categories = [],
     isLoading: categoriesLoading,
@@ -86,55 +177,463 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     data: allAttributes = [],
     isLoading: attributesLoading,
     refetch: refetchAttributes,
-  } = useGetAllAttributesQuery();
-  console.log(allAttributes);
+  } = useGetAllGlobalAttributesQuery();
 
-  const [createAttribute] = useCreateAttributeMutation();
-  const [updateAttribute] = useUpdateAttributeMutation();
-  const [deleteAttribute] = useDeleteAttributeMutation();
-  const [addAttributeValue] = useAddAttributeValueMutation();
-  const [deleteAttributeValue] = useDeleteAttributeValueMutation();
-
-  // Extract attributes for the selected category
-  const currentAttributes = useMemo(() => {
-    if (!selectedChildId || !categories.length) return [];
-
-    // Find the selected category recursively
-    const findCategoryById = (cats: any[], id: string): any => {
-      for (const cat of cats) {
-        if (cat.id === id) return cat;
-        if (cat.children?.length) {
-          const found = findCategoryById(cat.children, id);
-          if (found) return found;
+  const [createAttribute, { isLoading: isCreating }] =
+    useCreateAttributeMutation();
+  const [updateAttribute, { isLoading: isUpdating }] =
+    useUpdateAttributeMutation();
+  const [deleteAttribute, { isLoading: isDeleting }] =
+    useDeleteAttributeMutation();
+  const [addAttributeValue, { isLoading: isAddingValue }] =
+    useAddAttributeValueMutation();
+  const [deleteAttributeValue, { isLoading: isDeletingValue }] =
+    useDeleteAttributeValueMutation();
+  const [updateCategory, { isLoading: isUpdatingCategory }] =
+    useUpdateCategoryMutation();
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
+  useEffect(() => {
+    if (selectedChildId && categories.length > 0) {
+      const findCategoryById = (cats: any[], id: string): any => {
+        for (const cat of cats) {
+          if (cat.id === id) return cat;
+          if (cat.children?.length) {
+            const found = findCategoryById(cat.children, id);
+            if (found) return found;
+          }
         }
+        return null;
+      };
+
+      const foundCategory = findCategoryById(categories, selectedChildId);
+      if (foundCategory) {
+        const isLeaf =
+          !foundCategory.children || foundCategory.children.length === 0;
+        setSelectedCategory(foundCategory);
+        setIsLeafCategory(isLeaf);
       }
-      return null;
-    };
+    }
+  }, [selectedChildId, categories]);
 
-    const selectedCategory = findCategoryById(categories, selectedChildId);
-    return selectedCategory?.attributes || [];
-  }, [categories, selectedChildId]);
+  useEffect(() => {
+    console.log("Scroll effect - Conditions:", {
+      isMounted,
+      isLeafCategory,
+      selectedChildId,
+      hasRef: !!componentRef.current,
+      lastScrolledId: lastScrolledId.current,
+    });
 
-  // Get attributes that are not already assigned to this category
+    // Only scroll if:
+    // 1. Component is mounted
+    // 2. We have a leaf category
+    // 3. We have a selectedChildId
+    // 4. We haven't already scrolled to this ID
+    if (
+      isMounted &&
+      isLeafCategory &&
+      selectedChildId &&
+      componentRef.current
+    ) {
+      // Prevent duplicate scrolling
+      if (lastScrolledId.current === selectedChildId) {
+        console.log("Already scrolled to this category, skipping");
+        return;
+      }
+
+      console.log("Attempting to scroll to component");
+      lastScrolledId.current = selectedChildId;
+
+      // Use setTimeout to ensure DOM is fully updated
+      const scrollTimer = setTimeout(() => {
+        if (componentRef.current) {
+          console.log("Scrolling now...");
+          componentRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }
+      }, 300); // Increased delay to ensure ref is attached
+
+      return () => clearTimeout(scrollTimer);
+    }
+  }, [isMounted, isLeafCategory, selectedChildId]);
+
+  const currentAttributes = useMemo(() => {
+    if (!selectedCategory || !selectedCategory.attributes) return [];
+    return selectedCategory.attributes as CategoryAttributeFromAPI[];
+  }, [selectedCategory]);
+
+  const filteredAttributes = useMemo(() => {
+    if (!searchQuery) return currentAttributes;
+    return currentAttributes.filter(
+      (attr) =>
+        attr.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        attr.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (attr.unit &&
+          attr.unit.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [currentAttributes, searchQuery]);
+
   const availableAttributes = useMemo(() => {
-    const currentAttributeIds = currentAttributes.map(
-      (attr: AttributeFromAPI) => attr.id
-    );
-    return allAttributes.filter(
-      (attr) => !currentAttributeIds.includes(attr.id)
-    );
+    const currentAttributeIds = currentAttributes.map((attr) => attr.id);
+    const globalAttrs = allAttributes as unknown as GlobalAttribute[];
+
+    return globalAttrs.filter((attr) => !currentAttributeIds.includes(attr.id));
   }, [allAttributes, currentAttributes]);
 
-  // Handle selection of existing attribute
-  // Update the handleExistingAttributeSelect function
+  // Add single keyword
+  const handleAddKeyword = async () => {
+    if (!selectedCategory || !newKeyword.trim()) {
+      toast.error("Please enter a keyword");
+      return;
+    }
+
+    const keyword = newKeyword.trim().toLowerCase();
+    if (selectedCategory.keywords.includes(keyword)) {
+      toast.error("Keyword already exists");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      const updatedKeywords = [...selectedCategory.keywords, keyword];
+      formData.append("keywords", updatedKeywords.join(","));
+
+      await updateCategory({
+        id: selectedCategory.id,
+        formData,
+      }).unwrap();
+
+      toast.success(`Keyword "${keyword}" added successfully`);
+      setNewKeyword("");
+      refetchCategories();
+    } catch (error: any) {
+      console.error("Add keyword error:", error);
+      toast.error(error?.data?.message || "Failed to add keyword");
+    }
+  };
+
+  // Add multiple keywords at once
+  const handleAddBulkKeywords = async () => {
+    if (!selectedCategory || !bulkKeywords.trim()) {
+      toast.error("Please enter keywords");
+      return;
+    }
+
+    try {
+      // Parse bulk keywords (comma, newline, or space separated)
+      const newKeywords = bulkKeywords
+        .split(/[\n,]+/)
+        .map((k) => k.trim().toLowerCase())
+        .filter((k) => k.length > 0)
+        .filter((k, index, self) => self.indexOf(k) === index); // Remove duplicates
+
+      if (newKeywords.length === 0) {
+        toast.error("No valid keywords found");
+        return;
+      }
+
+      // Filter out existing keywords
+      const existingKeywords = selectedCategory.keywords || [];
+      const uniqueNewKeywords = newKeywords.filter(
+        (k) => !existingKeywords.includes(k)
+      );
+
+      if (uniqueNewKeywords.length === 0) {
+        toast.error("All keywords already exist");
+        setBulkKeywords("");
+        return;
+      }
+
+      const formData = new FormData();
+      const updatedKeywords = [...existingKeywords, ...uniqueNewKeywords];
+      formData.append("keywords", updatedKeywords.join(","));
+
+      await updateCategory({
+        id: selectedCategory.id,
+        formData,
+      }).unwrap();
+
+      toast.success(`${uniqueNewKeywords.length} keywords added successfully`);
+      setBulkKeywords("");
+      setShowBulkKeywords(false);
+      refetchCategories();
+    } catch (error: any) {
+      console.error("Add bulk keywords error:", error);
+      toast.error(error?.data?.message || "Failed to add keywords");
+    }
+  };
+
+  // Remove keyword
+  const handleRemoveKeyword = async (keyword: string) => {
+    if (!selectedCategory) return;
+
+    try {
+      const formData = new FormData();
+      const updatedKeywords = selectedCategory.keywords.filter(
+        (k) => k !== keyword
+      );
+      formData.append("keywords", updatedKeywords.join(","));
+
+      await updateCategory({
+        id: selectedCategory.id,
+        formData,
+      }).unwrap();
+
+      toast.success(`Keyword "${keyword}" removed`);
+      refetchCategories();
+    } catch (error: any) {
+      console.error("Remove keyword error:", error);
+      toast.error(error?.data?.message || "Failed to remove keyword");
+    }
+  };
+
+  // Clear all keywords
+  const handleClearAllKeywords = async () => {
+    if (!selectedCategory || selectedCategory.keywords.length === 0) return;
+
+    if (
+      !window.confirm(
+        `Are you sure you want to remove all ${selectedCategory.keywords.length} keywords?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("keywords", ""); // Empty string for no keywords
+
+      await updateCategory({
+        id: selectedCategory.id,
+        formData,
+      }).unwrap();
+
+      toast.success("All keywords removed");
+      refetchCategories();
+    } catch (error: any) {
+      console.error("Clear keywords error:", error);
+      toast.error(error?.data?.message || "Failed to clear keywords");
+    }
+  };
+
+  // Copy keywords to clipboard
+  const handleCopyKeywords = () => {
+    if (!selectedCategory || selectedCategory.keywords.length === 0) {
+      toast.error("No keywords to copy");
+      return;
+    }
+
+    const keywordsText = selectedCategory.keywords.join(", ");
+    navigator.clipboard.writeText(keywordsText);
+    toast.success("Keywords copied to clipboard");
+  };
+
+  // Add single tag
+  const handleAddTag = async () => {
+    if (!selectedCategory || !newTag.trim()) {
+      toast.error("Please enter a tag");
+      return;
+    }
+
+    const tag = newTag.trim().toLowerCase();
+    if (selectedCategory.tags.includes(tag)) {
+      toast.error("Tag already exists");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      const updatedTags = [...selectedCategory.tags, tag];
+      formData.append("tags", updatedTags.join(","));
+
+      await updateCategory({
+        id: selectedCategory.id,
+        formData,
+      }).unwrap();
+
+      toast.success(`Tag "${tag}" added successfully`);
+      setNewTag("");
+      refetchCategories();
+    } catch (error: any) {
+      console.error("Add tag error:", error);
+      toast.error(error?.data?.message || "Failed to add tag");
+    }
+  };
+
+  // Add multiple tags at once
+  const handleAddBulkTags = async () => {
+    if (!selectedCategory || !bulkTags.trim()) {
+      toast.error("Please enter tags");
+      return;
+    }
+
+    try {
+      // Parse bulk tags (comma, newline, or space separated)
+      const newTags = bulkTags
+        .split(/[\n,]+/)
+        .map((t) => t.trim().toLowerCase())
+        .filter((t) => t.length > 0)
+        .filter((t, index, self) => self.indexOf(t) === index); // Remove duplicates
+
+      if (newTags.length === 0) {
+        toast.error("No valid tags found");
+        return;
+      }
+
+      // Filter out existing tags
+      const existingTags = selectedCategory.tags || [];
+      const uniqueNewTags = newTags.filter((t) => !existingTags.includes(t));
+
+      if (uniqueNewTags.length === 0) {
+        toast.error("All tags already exist");
+        setBulkTags("");
+        return;
+      }
+
+      const formData = new FormData();
+      const updatedTags = [...existingTags, ...uniqueNewTags];
+      formData.append("tags", updatedTags.join(","));
+
+      await updateCategory({
+        id: selectedCategory.id,
+        formData,
+      }).unwrap();
+
+      toast.success(`${uniqueNewTags.length} tags added successfully`);
+      setBulkTags("");
+      setShowBulkTags(false);
+      refetchCategories();
+    } catch (error: any) {
+      console.error("Add bulk tags error:", error);
+      toast.error(error?.data?.message || "Failed to add tags");
+    }
+  };
+
+  // Remove tag
+  const handleRemoveTag = async (tag: string) => {
+    if (!selectedCategory) return;
+
+    try {
+      const formData = new FormData();
+      const updatedTags = selectedCategory.tags.filter((t) => t !== tag);
+      formData.append("tags", updatedTags.join(","));
+
+      await updateCategory({
+        id: selectedCategory.id,
+        formData,
+      }).unwrap();
+
+      toast.success(`Tag "${tag}" removed`);
+      refetchCategories();
+    } catch (error: any) {
+      console.error("Remove tag error:", error);
+      toast.error(error?.data?.message || "Failed to remove tag");
+    }
+  };
+
+  // Clear all tags
+  const handleClearAllTags = async () => {
+    if (!selectedCategory || selectedCategory.tags.length === 0) return;
+
+    if (
+      !window.confirm(
+        `Are you sure you want to remove all ${selectedCategory.tags.length} tags?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("tags", ""); // Empty string for no tags
+
+      await updateCategory({
+        id: selectedCategory.id,
+        formData,
+      }).unwrap();
+
+      toast.success("All tags removed");
+      refetchCategories();
+    } catch (error: any) {
+      console.error("Clear tags error:", error);
+      toast.error(error?.data?.message || "Failed to clear tags");
+    }
+  };
+
+  // Copy tags to clipboard
+  const handleCopyTags = () => {
+    if (!selectedCategory || selectedCategory.tags.length === 0) {
+      toast.error("No tags to copy");
+      return;
+    }
+
+    const tagsText = selectedCategory.tags.join(", ");
+    navigator.clipboard.writeText(tagsText);
+    toast.success("Tags copied to clipboard");
+  };
+
+  // Import from clipboard for bulk
+  const handleImportFromClipboard = (type: "keywords" | "tags") => {
+    navigator.clipboard
+      .readText()
+      .then((text) => {
+        if (type === "keywords") {
+          setBulkKeywords(text);
+          toast.success("Text imported from clipboard");
+        } else {
+          setBulkTags(text);
+          toast.success("Text imported from clipboard");
+        }
+      })
+      .catch((err) => {
+        toast.error("Failed to read clipboard");
+      });
+  };
+
+  // Export keywords/tags
+  const handleExport = (type: "keywords" | "tags") => {
+    if (!selectedCategory) return;
+
+    const data =
+      type === "keywords" ? selectedCategory.keywords : selectedCategory.tags;
+    if (data.length === 0) {
+      toast.error(`No ${type} to export`);
+      return;
+    }
+
+    const text = data.join("\n");
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${selectedCategory.name}_${type}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast.success(
+      `${type.charAt(0).toUpperCase() + type.slice(1)} exported successfully`
+    );
+  };
+
+  // Rest of the functions remain the same...
   const handleExistingAttributeSelect = (attributeId: string) => {
     setSelectedExistingAttribute(attributeId);
-    const selectedAttr = allAttributes.find((attr) => attr.id === attributeId);
+    const selectedAttr = (allAttributes as unknown as GlobalAttribute[]).find(
+      (attr) => attr.id === attributeId
+    );
     if (selectedAttr) {
       setExistingAttributeValues([]);
       setNewAttribute({
-        name: selectedAttr.name || "", 
-        type: selectedAttr.type || "", 
+        name: selectedAttr.name,
+        type: selectedAttr.type,
+        unit: selectedAttr.unit || "",
         filterable: true,
         isRequired: false,
         values: [],
@@ -142,7 +641,6 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     }
   };
 
-  // Add value to the new attribute values array
   const handleAddValueToNewAttribute = () => {
     if (!newValue.trim()) {
       toast.error("Please enter a value");
@@ -169,7 +667,6 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     setNewValue("");
   };
 
-  // Remove value from the attribute values array
   const handleRemoveValueFromAttribute = (index: number) => {
     if (isCreatingNew) {
       setNewAttribute((prev) => ({
@@ -181,7 +678,6 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     }
   };
 
-  // Create new attribute or link existing attribute to category
   const handleCreateOrLinkAttribute = async () => {
     if (!selectedChildId) {
       toast.error("Please select a category");
@@ -189,30 +685,37 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     }
 
     if (isCreatingNew) {
-      // Create new attribute
-      if (!newAttribute.name) {
+      if (!newAttribute.name.trim()) {
         toast.error("Please provide attribute name");
         return;
       }
 
-      if (newAttribute.type === "SELECT" && newAttribute.values.length === 0) {
-        toast.error("Please add at least one value for SELECT type attribute");
+      if (
+        (newAttribute.type === "SELECT" ||
+          newAttribute.type === "MULTISELECT") &&
+        newAttribute.values.length === 0
+      ) {
+        toast.error(
+          `Please add at least one value for ${newAttribute.type} type attribute`
+        );
         return;
       }
 
       try {
         const attributeData = {
-          name: newAttribute.name,
+          name: newAttribute.name.trim(),
           type: newAttribute.type,
+          unit: newAttribute.unit.trim() || undefined,
           filterable: newAttribute.filterable,
           isRequired: newAttribute.isRequired,
           categoryId: selectedChildId,
-          ...(newAttribute.type === "SELECT" && {
+          ...((newAttribute.type === "SELECT" ||
+            newAttribute.type === "MULTISELECT") && {
             values: newAttribute.values,
           }),
         };
 
-        const result = await createAttribute(attributeData).unwrap();
+        await createAttribute(attributeData).unwrap();
 
         toast.success(
           `Attribute "${newAttribute.name}" created successfully${
@@ -225,6 +728,7 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
         setNewAttribute({
           name: "",
           type: "SELECT",
+          unit: "",
           filterable: true,
           isRequired: false,
           values: [],
@@ -235,13 +739,12 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
         toast.error(error?.data?.message || "Failed to create attribute");
       }
     } else {
-      // Link existing attribute to category
       if (!selectedExistingAttribute) {
         toast.error("Please select an existing attribute");
         return;
       }
 
-      const selectedAttr = allAttributes.find(
+      const selectedAttr = (allAttributes as GlobalAttribute[]).find(
         (attr) => attr.id === selectedExistingAttribute
       );
       if (!selectedAttr) {
@@ -250,15 +753,16 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
       }
 
       try {
-        // Prepare the data in the same format as creating a new attribute
         const attributeData = {
-          name: selectedAttr.name??"",
-          type: selectedAttr.type??"",
+          name: selectedAttr.name,
+          type: selectedAttr.type,
+          unit: selectedAttr.unit,
           filterable: newAttribute.filterable,
           isRequired: newAttribute.isRequired,
           categoryId: selectedChildId,
-          // If it's a SELECT type and we have new values, add them
-          ...(selectedAttr.type === "SELECT" &&
+          attributeId: selectedAttr.id,
+          ...((selectedAttr.type === "SELECT" ||
+            selectedAttr.type === "MULTISELECT") &&
             existingAttributeValues.length > 0 && {
               values: existingAttributeValues,
             }),
@@ -273,12 +777,12 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
 
         toast.success(successMessage);
 
-        // Reset form
         setSelectedExistingAttribute("");
         setExistingAttributeValues([]);
         setNewAttribute({
           name: "",
           type: "SELECT",
+          unit: "",
           filterable: true,
           isRequired: false,
           values: [],
@@ -291,7 +795,6 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     }
   };
 
-  // Update existing attribute
   const handleUpdateAttribute = async () => {
     if (!editingAttribute || !editingAttribute.name) {
       toast.error("Please provide attribute name");
@@ -302,13 +805,13 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
       const updateData = {
         name: editingAttribute.name,
         type: editingAttribute.type,
+        unit: editingAttribute.unit || undefined,
         filterable: editingAttribute.filterable,
-        isRequired: editingAttribute.isisRequired,
-        categoryId: selectedChildId,
+        isRequired: editingAttribute.isRequired,
       };
 
       await updateAttribute({
-        id: editingAttribute.id,
+        id: editingAttribute.categoryAttributeId,
         data: updateData,
       }).unwrap();
 
@@ -322,41 +825,33 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     }
   };
 
-  // Delete attribute
-  const handleDeleteAttribute = async (
-    attributeId: string,
-    attributeName: string
-  ) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete "${attributeName}"? This action cannot be undone.`
-      )
-    ) {
-      return;
-    }
+  const confirmDeleteAttribute = (catAttr: CategoryAttributeFromAPI) => {
+    setAttributeToDelete({
+      id: catAttr.categoryAttributeId,
+      name: catAttr.name,
+      categoryAttributeId: catAttr.categoryAttributeId,
+    });
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteAttribute = async () => {
+    if (!attributeToDelete) return;
 
     try {
-      const categoryAttribute = currentAttributes.find(
-        (attr: AttributeFromAPI) => attr.id === attributeId
+      await deleteAttribute(attributeToDelete.categoryAttributeId).unwrap();
+      toast.success(
+        `Attribute "${attributeToDelete.name}" deleted successfully`
       );
-
-      if (!categoryAttribute) {
-        throw new Error("Category attribute not found");
-      }
-
-      await deleteAttribute(categoryAttribute.id).unwrap();
-
-      toast.success("Attribute deleted successfully");
       setEditingAttribute(null);
+      setShowDeleteDialog(false);
+      setAttributeToDelete(null);
       refetchCategories();
     } catch (error: any) {
-      const errorMessage = error?.data?.message || "Failed to delete attribute";
-      toast.error(errorMessage);
+      toast.error(error?.data?.message || "Failed to delete attribute");
       console.error("Delete error:", error);
     }
   };
 
-  // Add value to existing attribute
   const handleAddAttributeValue = async (
     attributeId: string,
     attributeName: string
@@ -383,12 +878,19 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     }
   };
 
-  // Delete attribute value
   const handleDeleteAttributeValue = async (
     valueId: string,
     value: string,
     attributeName: string
   ) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete value "${value}" from ${attributeName}?`
+      )
+    ) {
+      return;
+    }
+
     try {
       await deleteAttributeValue(valueId).unwrap();
       toast.success(`Value "${value}" deleted from ${attributeName}`);
@@ -398,7 +900,6 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     }
   };
 
-  // Toggle between creating new and using existing
   const handleToggleMode = (mode: boolean) => {
     setIsCreatingNew(mode);
     setSelectedExistingAttribute("");
@@ -406,6 +907,7 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     setNewAttribute({
       name: "",
       type: "SELECT",
+      unit: "",
       filterable: true,
       isRequired: false,
       values: [],
@@ -413,679 +915,1565 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
     setNewValue("");
   };
 
+  const getAttributeIcon = (type: AttributeType) => {
+    switch (type) {
+      case "SELECT":
+        return <CheckSquare className="h-3 w-3" />;
+      case "MULTISELECT":
+        return <List className="h-3 w-3" />;
+      case "TEXT":
+        return <Type className="h-3 w-3" />;
+      case "NUMBER":
+        return <Hash className="h-3 w-3" />;
+      case "BOOLEAN":
+        return <ToggleLeft className="h-3 w-3" />;
+      default:
+        return null;
+    }
+  };
+
+  const getAttributeTypeColor = (type: AttributeType) => {
+    switch (type) {
+      case "SELECT":
+        return "bg-blue-100 text-blue-800 border-blue-200";
+      case "MULTISELECT":
+        return "bg-purple-100 text-purple-800 border-purple-200";
+      case "TEXT":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "NUMBER":
+        return "bg-amber-100 text-amber-800 border-amber-200";
+      case "BOOLEAN":
+        return "bg-pink-100 text-pink-800 border-pink-200";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200";
+    }
+  };
+
   if (categoriesLoading || attributesLoading) {
     return (
-      <div className="flex justify-center py-8">
-        <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
+      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+        <Loader2 className="h-12 w-12 animate-spin text-teal-500" />
+        <p className="text-gray-500">Loading attributes...</p>
       </div>
     );
   }
 
   if (!selectedChildId) {
     return (
-      <div className="flex justify-center py-8 text-gray-500">
-        Please select a category to manage attributes
+      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+        <Filter className="h-16 w-16 text-gray-300" />
+        <p className="text-gray-500 text-lg">
+          Please select a category to manage attributes
+        </p>
+        <p className="text-gray-400 text-sm">
+          Select a category from the sidebar to view and manage its attributes
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Existing Attributes */}
-      {currentAttributes.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="font-medium text-gray-900">
-            Existing Attributes ({currentAttributes.length})
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {currentAttributes.map((attr: AttributeFromAPI) => (
-              <div
-                key={attr.id}
-                className="border border-gray-200 rounded-lg p-4 bg-gray-50 relative"
-              >
-                {editingAttribute?.id === attr.id ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-gray-700">Attribute Name</Label>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          className="h-7 px-2 bg-teal-600 hover:bg-teal-700"
-                          onClick={handleUpdateAttribute}
-                        >
-                          Save
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2"
-                          onClick={() => setEditingAttribute(null)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                    <Input
-                      value={editingAttribute.name}
-                      onChange={(e) =>
-                        setEditingAttribute((prev) =>
-                          prev ? { ...prev, name: e.target.value } : null
-                        )
-                      }
-                      className="bg-white border-gray-300"
-                    />
+    <div ref={componentRef} className="space-y-4 pb-4">
+      {/* Tabs Navigation - Mobile optimized */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 h-12">
+          <TabsTrigger
+            value="keywords"
+            className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+          >
+            <Key className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="truncate">Keywords</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="tags"
+            className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+          >
+            <Tag className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="truncate">Tags</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="attributes"
+            className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+            disabled={!isLeafCategory}
+          >
+            <CheckSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="truncate">Attributes</span>
+          </TabsTrigger>
+        </TabsList>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id={`filterable-${attr.id}`}
-                          checked={editingAttribute.filterable}
-                          onChange={(e) =>
-                            setEditingAttribute((prev) =>
-                              prev
-                                ? { ...prev, filterable: e.target.checked }
-                                : null
-                            )
-                          }
-                          className="rounded text-teal-600 focus:ring-teal-500"
-                        />
-                        <Label
-                          htmlFor={`filterable-${attr.id}`}
-                          className="text-sm"
-                        >
-                          Filterable
-                        </Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id={`isRequired-${attr.id}`}
-                          checked={editingAttribute.isisRequired}
-                          onChange={(e) =>
-                            setEditingAttribute((prev) =>
-                              prev
-                                ? { ...prev, isisRequired: e.target.checked }
-                                : null
-                            )
-                          }
-                          className="rounded text-teal-600 focus:ring-teal-500"
-                        />
-                        <Label
-                          htmlFor={`isRequired-${attr.id}`}
-                          className="text-sm"
-                        >
-                          isRequired
-                        </Label>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {attr.name}
-                        </div>
-                        <div className="text-sm text-gray-500 capitalize flex items-center gap-1">
-                          {attr.type === "SELECT" && (
-                            <CheckSquare className="h-3 w-3" />
-                          )}
-                          {attr.type === "TEXT" && <Type className="h-3 w-3" />}
-                          {attr.type === "NUMBER" && (
-                            <Hash className="h-3 w-3" />
-                          )}
-                          {attr.type === "BOOLEAN" && (
-                            <ToggleLeft className="h-3 w-3" />
-                          )}
-                          {attr.type?.toLowerCase()}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
-                          onClick={() =>
-                            setEditingAttribute({
-                              id: attr.id,
-                              name: attr.name,
-                              slug: attr.slug,
-                              type: attr.type,
-                              values: attr.values || [],
-                              isisRequired: attr.isisRequired,
-                              isForVariant: attr.isForVariant,
-                              filterable: attr.filterable,
-                              createdAt: attr.createdAt,
-                              updatedAt: attr.updatedAt,
-                            })
-                          }
-                          title="Edit attribute"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-100"
-                          onClick={() =>
-                            handleDeleteAttribute(attr.id, attr.name ?? "")
-                          }
-                          title="Delete attribute"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      <div className="flex items-center gap-1">
-                        <div
-                          className={`h-2 w-2 rounded-full ${
-                            attr.filterable ? "bg-teal-500" : "bg-gray-300"
-                          }`}
-                        ></div>
-                        <span className="text-xs text-gray-600">
-                          {attr.filterable ? "Filterable" : "Not filterable"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div
-                          className={`h-2 w-2 rounded-full ${
-                            attr.isisRequired ? "bg-teal-500" : "bg-gray-300"
-                          }`}
-                        ></div>
-                        <span className="text-xs text-gray-600">
-                          {attr.isisRequired ? "isRequired" : "Optional"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-3">
-                      <div className="text-xs font-medium text-gray-700 mb-1">
-                        Values ({attr.values?.length || 0}):
-                      </div>
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {attr.values && attr.values.length > 0 ? (
-                          attr.values.map((value) => (
-                            <div
-                              key={value.id}
-                              className="flex items-center gap-1 px-2 py-1 bg-white border border-gray-200 rounded-md"
-                            >
-                              <span className="text-xs">{value.value}</span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-3 w-3 p-0 text-red-500 hover:text-red-700"
-                                onClick={() =>
-                                  handleDeleteAttributeValue(
-                                    value.id,
-                                    value.value,
-                                    attr.name ?? ""
-                                  )
-                                }
-                                title={`Delete value: ${value.value}`}
-                              >
-                                <X className="h-2 w-2" />
-                              </Button>
-                            </div>
-                          ))
-                        ) : (
-                          <span className="text-xs text-gray-400">
-                            No values
-                          </span>
-                        )}
-                      </div>
-
-                      {attr.type === "SELECT" && (
-                        <div className="flex gap-1">
-                          <Input
-                            placeholder="Add value"
-                            value={addingValueTo === attr.id ? newValue : ""}
-                            onChange={(e) => {
-                              setNewValue(e.target.value);
-                              setAddingValueTo(attr.id);
-                            }}
-                            className="h-7 text-xs"
-                            onKeyPress={(e) => {
-                              if (e.key === "Enter") {
-                                handleAddAttributeValue(
-                                  attr.id,
-                                  attr.name ?? ""
-                                );
-                              }
-                            }}
-                          />
-                          <Button
-                            size="sm"
-                            className="h-7 px-2 bg-teal-600 hover:bg-teal-700"
-                            onClick={() =>
-                              handleAddAttributeValue(attr.id, attr.name ?? "")
-                            }
-                            disabled={
-                              addingValueTo !== attr.id || !newValue.trim()
-                            }
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
+        {/* Keywords Tab */}
+        <TabsContent value="keywords" className="space-y-4">
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex flex-col gap-3">
+                <div>
+                  <CardTitle className="text-lg">Keywords</CardTitle>
+                  <CardDescription className="text-sm">
+                    Add keywords to help customers find products
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyKeywords}
+                    disabled={!selectedCategory?.keywords?.length}
+                    className="flex-1 min-w-[120px]"
+                  >
+                    <Copy className="h-3.5 w-3.5 mr-1.5" />
+                    Copy
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExport("keywords")}
+                    disabled={!selectedCategory?.keywords?.length}
+                    className="flex-1 min-w-[120px]"
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1.5" />
+                    Export
+                  </Button>
+                  {(selectedCategory?.keywords?.length ?? 0) > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearAllKeywords}
+                      className="flex-1 min-w-[120px] border-red-200 text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                      Clear All
+                    </Button>
+                  )}
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Add New/Link Existing Attribute */}
-      <div className="space-y-4 pt-4 border-t border-gray-200">
-        <div className="flex items-center justify-between">
-          <h3 className="font-medium text-gray-900">Add Attribute</h3>
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            <Button
-              variant={isCreatingNew ? "default" : "ghost"}
-              size="sm"
-              className={`h-8 px-3 text-xs ${
-                isCreatingNew
-                  ? "bg-teal-600 hover:bg-teal-700 text-white"
-                  : "text-gray-600"
-              }`}
-              onClick={() => handleToggleMode(true)}
-            >
-              Create New
-            </Button>
-            <Button
-              variant={!isCreatingNew ? "default" : "ghost"}
-              size="sm"
-              className={`h-8 px-3 text-xs ${
-                !isCreatingNew
-                  ? "bg-teal-600 hover:bg-teal-700 text-white"
-                  : "text-gray-600"
-              }`}
-              onClick={() => handleToggleMode(false)}
-              disabled={availableAttributes.length === 0}
-            >
-              <Link className="h-3 w-3 mr-1" />
-              Use Existing
-            </Button>
-          </div>
-        </div>
-
-        {!isCreatingNew && availableAttributes.length === 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <p className="text-sm text-amber-700">
-              All available attributes are already assigned to this category.
-              Create a new attribute instead.
-            </p>
-          </div>
-        )}
-
-        {isCreatingNew ? (
-          // Create New Attribute Form
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="attr-name" className="text-gray-700">
-                  Attribute Name *
-                </Label>
-                <Input
-                  id="attr-name"
-                  placeholder="e.g., Color, Size, Material"
-                  value={newAttribute.name}
-                  onChange={(e) =>
-                    setNewAttribute({ ...newAttribute, name: e.target.value })
-                  }
-                  className="bg-white border-gray-300 focus:ring-teal-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="attr-type" className="text-gray-700">
-                  Type *
-                </Label>
-                <Select
-                  value={newAttribute.type}
-                  onValueChange={(value) =>
-                    setNewAttribute({
-                      ...newAttribute,
-                      type: value,
-                      values: [],
-                    })
-                  }
-                >
-                  <SelectTrigger className="bg-white border-gray-300 focus:ring-teal-500">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SELECT">
-                      Select (Multiple values)
-                    </SelectItem>
-                    <SelectItem value="TEXT">Text</SelectItem>
-                    <SelectItem value="NUMBER">Number</SelectItem>
-                    <SelectItem value="BOOLEAN">Boolean</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="attr-filterable"
-                  checked={newAttribute.filterable}
-                  onChange={(e) =>
-                    setNewAttribute({
-                      ...newAttribute,
-                      filterable: e.target.checked,
-                    })
-                  }
-                  className="rounded text-teal-600 focus:ring-teal-500"
-                />
-                <Label htmlFor="attr-filterable" className="text-gray-700">
-                  Use in filters
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="attr-isRequired"
-                  checked={newAttribute.isRequired}
-                  onChange={(e) =>
-                    setNewAttribute({
-                      ...newAttribute,
-                      isRequired: e.target.checked,
-                    })
-                  }
-                  className="rounded text-teal-600 focus:ring-teal-500"
-                />
-                <Label htmlFor="attr-isRequired" className="text-gray-700">
-                  isRequired for products
-                </Label>
-              </div>
-            </div>
-
-            {/* Attribute Values Section for New Attribute */}
-            {newAttribute.type === "SELECT" && (
-              <div className="space-y-3">
-                <Label className="text-gray-700">Attribute Values *</Label>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Add Section */}
+              <div className="space-y-4">
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Enter value (e.g., Red, Blue, Large, Small)"
-                    value={newValue}
-                    onChange={(e) => setNewValue(e.target.value)}
+                    placeholder="Add keyword..."
+                    value={newKeyword}
+                    onChange={(e) => setNewKeyword(e.target.value)}
                     onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        handleAddValueToNewAttribute();
-                      }
+                      if (e.key === "Enter") handleAddKeyword();
                     }}
+                    disabled={isUpdatingCategory}
                     className="flex-1"
                   />
                   <Button
-                    type="button"
-                    onClick={handleAddValueToNewAttribute}
-                    className="bg-teal-600 hover:bg-teal-700"
-                    disabled={!newValue.trim()}
+                    onClick={handleAddKeyword}
+                    disabled={!newKeyword.trim() || isUpdatingCategory}
+                    size="icon"
+                    className="shrink-0"
                   >
-                    <Plus className="h-4 w-4" />
+                    {isUpdatingCategory ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
 
-                {newAttribute.values.length > 0 && (
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-600">
-                      Added values ({newAttribute.values.length}):
-                    </Label>
+                {/* Bulk Add */}
+                <div className="space-y-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowBulkKeywords(!showBulkKeywords)}
+                    className="w-full"
+                  >
+                    {showBulkKeywords ? "Hide Bulk Add" : "Bulk Add Keywords"}
+                  </Button>
+
+                  {showBulkKeywords && (
+                    <div className="space-y-3 p-3 border rounded-lg bg-gray-50">
+                      <Textarea
+                        placeholder="Enter keywords separated by commas or new lines"
+                        value={bulkKeywords}
+                        onChange={(e) => setBulkKeywords(e.target.value)}
+                        rows={3}
+                        className="resize-none"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleImportFromClipboard("keywords")}
+                          className="flex-1"
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-1.5" />
+                          Import
+                        </Button>
+                        <Button
+                          onClick={handleAddBulkKeywords}
+                          disabled={!bulkKeywords.trim() || isUpdatingCategory}
+                          className="flex-1 bg-teal-600 hover:bg-teal-700"
+                        >
+                          {isUpdatingCategory ? (
+                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                          ) : (
+                            <Upload className="h-3.5 w-3.5 mr-1.5" />
+                          )}
+                          Add All
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Keywords List */}
+              {selectedCategory?.keywords &&
+              selectedCategory.keywords.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {selectedCategory.keywords.length} keywords
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      Click to remove
+                    </span>
+                  </div>
+                  <div className="h-64 overflow-y-auto rounded-lg border p-3">
                     <div className="flex flex-wrap gap-2">
-                      {newAttribute.values.map((value, index) => (
+                      {selectedCategory.keywords.map((keyword, index) => (
                         <div
                           key={index}
-                          className="flex items-center gap-1 bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-sm"
+                          className="inline-flex items-center gap-1.5 bg-gray-100 hover:bg-red-100 hover:text-red-700 px-3 py-1.5 rounded-full text-sm transition-colors cursor-pointer"
+                          onClick={() => handleRemoveKeyword(keyword)}
                         >
-                          <span>{value}</span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-4 w-4 p-0 text-teal-700 hover:text-teal-900 hover:bg-teal-200"
-                            onClick={() =>
-                              handleRemoveValueFromAttribute(index)
-                            }
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
+                          <HashIcon className="h-3 w-3" />
+                          {keyword}
+                          <X className="h-3 w-3" />
                         </div>
                       ))}
                     </div>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          // Use Existing Attribute Form
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="existing-attr" className="text-gray-700">
-                Select Existing Attribute *
-              </Label>
-              <Select
-                value={selectedExistingAttribute}
-                onValueChange={handleExistingAttributeSelect}
-              >
-                <SelectTrigger className="bg-white border-gray-300 focus:ring-teal-500">
-                  <SelectValue placeholder="Choose an attribute to link" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableAttributes.map((attr) => (
-                    <SelectItem key={attr.id} value={attr.id}>
-                      <div className="flex items-center gap-2">
-                        {attr.type === "SELECT" && (
-                          <CheckSquare className="h-3 w-3" />
-                        )}
-                        {attr.type === "TEXT" && <Type className="h-3 w-3" />}
-                        {attr.type === "NUMBER" && <Hash className="h-3 w-3" />}
-                        {attr.type === "BOOLEAN" && (
-                          <ToggleLeft className="h-3 w-3" />
-                        )}
-                        <span>{attr.name}</span>
-                        <span className="text-xs text-gray-500">
-                          ({attr?.type?.toLowerCase()})
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 border rounded-lg bg-gray-50">
+                  <Key className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-600 mb-2">No keywords yet</p>
+                  <p className="text-sm text-gray-500">
+                    Add keywords to improve search visibility
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            {selectedExistingAttribute && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="existing-attr-filterable"
-                      checked={newAttribute.filterable}
-                      onChange={(e) =>
-                        setNewAttribute({
-                          ...newAttribute,
-                          filterable: e.target.checked,
-                        })
-                      }
-                      className="rounded text-teal-600 focus:ring-teal-500"
-                    />
-                    <Label
-                      htmlFor="existing-attr-filterable"
-                      className="text-gray-700"
+        {/* Tags Tab */}
+        <TabsContent value="tags" className="space-y-4">
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex flex-col gap-3">
+                <div>
+                  <CardTitle className="text-lg">Tags</CardTitle>
+                  <CardDescription className="text-sm">
+                    Add tags to organize and filter products
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyTags}
+                    disabled={!selectedCategory?.tags?.length}
+                    className="flex-1 min-w-[120px]"
+                  >
+                    <Copy className="h-3.5 w-3.5 mr-1.5" />
+                    Copy
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExport("tags")}
+                    disabled={!selectedCategory?.tags?.length}
+                    className="flex-1 min-w-[120px]"
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1.5" />
+                    Export
+                  </Button>
+                  {(selectedCategory?.tags?.length ?? 0) > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearAllTags}
+                      className="flex-1 min-w-[120px] border-red-200 text-red-600 hover:bg-red-50"
                     >
-                      Use in filters
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="existing-attr-isRequired"
-                      checked={newAttribute.isRequired}
-                      onChange={(e) =>
-                        setNewAttribute({
-                          ...newAttribute,
-                          isRequired: e.target.checked,
-                        })
-                      }
-                      className="rounded text-teal-600 focus:ring-teal-500"
-                    />
-                    <Label
-                      htmlFor="existing-attr-isRequired"
-                      className="text-gray-700"
-                    >
-                      isRequired for products
-                    </Label>
-                  </div>
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                      Clear All
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Add Section */}
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Add tag..."
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter") handleAddTag();
+                    }}
+                    disabled={isUpdatingCategory}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleAddTag}
+                    disabled={!newTag.trim() || isUpdatingCategory}
+                    size="icon"
+                    className="shrink-0"
+                  >
+                    {isUpdatingCategory ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
 
-                {/* Show existing values and allow adding new ones for SELECT type */}
-                {newAttribute.type === "SELECT" && (
-                  <div className="space-y-3">
-                    <Label className="text-gray-700">
-                      Additional Values (Optional)
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Add additional values for this attribute"
-                        value={newValue}
-                        onChange={(e) => setNewValue(e.target.value)}
-                        onKeyPress={(e) => {
-                          if (e.key === "Enter") {
-                            handleAddValueToNewAttribute();
-                          }
-                        }}
-                        className="flex-1"
-                      />
-                      <Button
-                        type="button"
-                        onClick={handleAddValueToNewAttribute}
-                        className="bg-teal-600 hover:bg-teal-700"
-                        disabled={!newValue.trim()}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
+                {/* Bulk Add */}
+                <div className="space-y-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowBulkTags(!showBulkTags)}
+                    className="w-full"
+                  >
+                    {showBulkTags ? "Hide Bulk Add" : "Bulk Add Tags"}
+                  </Button>
 
-                    {existingAttributeValues.length > 0 && (
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-600">
-                          Additional values to add (
-                          {existingAttributeValues.length}):
-                        </Label>
-                        <div className="flex flex-wrap gap-2">
-                          {existingAttributeValues.map((value, index) => (
-                            <div
-                              key={index}
-                              className="flex items-center gap-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
-                            >
-                              <span>{value}</span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-4 w-4 p-0 text-blue-700 hover:text-blue-900 hover:bg-blue-200"
-                                onClick={() =>
-                                  handleRemoveValueFromAttribute(index)
+                  {showBulkTags && (
+                    <div className="space-y-3 p-3 border rounded-lg bg-gray-50">
+                      <Textarea
+                        placeholder="Enter tags separated by commas or new lines"
+                        value={bulkTags}
+                        onChange={(e) => setBulkTags(e.target.value)}
+                        rows={3}
+                        className="resize-none"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleImportFromClipboard("tags")}
+                          className="flex-1"
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-1.5" />
+                          Import
+                        </Button>
+                        <Button
+                          onClick={handleAddBulkTags}
+                          disabled={!bulkTags.trim() || isUpdatingCategory}
+                          className="flex-1 bg-teal-600 hover:bg-teal-700"
+                        >
+                          {isUpdatingCategory ? (
+                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                          ) : (
+                            <Upload className="h-3.5 w-3.5 mr-1.5" />
+                          )}
+                          Add All
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Tags List */}
+              {(selectedCategory?.tags?.length ?? 0) > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {selectedCategory?.tags?.length || 0} tags
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      Click to remove
+                    </span>
+                  </div>
+                  <div className="h-64 overflow-y-auto rounded-lg border p-3">
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCategory?.tags?.map((tag, index) => (
+                        <div
+                          key={index}
+                          className="inline-flex items-center gap-1.5 bg-teal-100 text-teal-800 hover:bg-red-100 hover:text-red-700 px-3 py-1.5 rounded-full text-sm transition-colors cursor-pointer"
+                          onClick={() => handleRemoveTag(tag)}
+                        >
+                          <Tag className="h-3 w-3" />
+                          {tag}
+                          <X className="h-3 w-3" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 border rounded-lg bg-gray-50">
+                  <Tag className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-600 mb-2">No tags yet</p>
+                  <p className="text-sm text-gray-500">
+                    Add tags to organize and filter products
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Attributes Tab */}
+        <TabsContent value="attributes" className="space-y-4">
+          {!isLeafCategory ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-8">
+                  <FolderTree className="h-12 w-12 text-amber-300 mx-auto mb-3" />
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">
+                    Parent Category
+                  </h3>
+                  <p className="text-gray-600 mb-3 text-sm">
+                    Attributes can only be managed at leaf categories.
+                  </p>
+                  <div className="space-y-1 text-xs text-gray-500">
+                    <p>• Select a leaf category to manage attributes</p>
+                    <p>
+                      • Keywords and tags are still available for this category
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Mobile Layout: Stacked */}
+              <div className="lg:hidden space-y-4">
+                {/* Existing Attributes Card */}
+                <Card>
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">Attributes</CardTitle>
+                        <CardDescription className="text-sm">
+                          {currentAttributes.length} assigned
+                        </CardDescription>
+                      </div>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Search..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-9 w-40"
+                        />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {filteredAttributes.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Filter className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-gray-600">
+                          {searchQuery
+                            ? "No matches found"
+                            : "No attributes yet"}
+                        </p>
+                        {searchQuery && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-3"
+                            onClick={() => setSearchQuery("")}
+                          >
+                            Clear Search
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {filteredAttributes.map((catAttr) => (
+                          <div
+                            key={catAttr.categoryAttributeId}
+                            className="border rounded-lg p-3 bg-white"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h3 className="font-semibold truncate">
+                                    {catAttr.name}
+                                  </h3>
+                                  {catAttr.unit && (
+                                    <span className="text-xs text-gray-500">
+                                      ({catAttr.unit})
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-1.5 mb-2">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-gray-100">
+                                    {getAttributeIcon(catAttr.type)}
+                                    {catAttr.type.toLowerCase()}
+                                  </span>
+                                  {catAttr.isRequired && (
+                                    <span className="px-2 py-0.5 rounded text-xs bg-red-50 text-red-700">
+                                      Required
+                                    </span>
+                                  )}
+                                  {catAttr.filterable && (
+                                    <span className="px-2 py-0.5 rounded text-xs bg-teal-50 text-teal-700">
+                                      Filterable
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex gap-1 ml-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => setEditingAttribute(catAttr)}
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-red-500"
+                                  onClick={() =>
+                                    confirmDeleteAttribute(catAttr)
+                                  }
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Values */}
+                            {(catAttr.type === "SELECT" ||
+                              catAttr.type === "MULTISELECT") &&
+                              catAttr.values &&
+                              catAttr.values.length > 0 && (
+                                <div className="mt-3 pt-3 border-t">
+                                  <div className="flex flex-wrap gap-1.5 mb-2">
+                                    {catAttr.values.map((value) => (
+                                      <span
+                                        key={value.id}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-gray-50 border"
+                                      >
+                                        {value.value}
+                                        <X
+                                          className="h-3 w-3 cursor-pointer"
+                                          onClick={() =>
+                                            handleDeleteAttributeValue(
+                                              value.id,
+                                              value.value,
+                                              catAttr.name
+                                            )
+                                          }
+                                        />
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Input
+                                      placeholder="Add value"
+                                      value={
+                                        addingValueTo === catAttr.id
+                                          ? newValue
+                                          : ""
+                                      }
+                                      onChange={(e) => {
+                                        setNewValue(e.target.value);
+                                        setAddingValueTo(catAttr.id);
+                                      }}
+                                      className="flex-1 text-sm"
+                                      onKeyPress={(e) => {
+                                        if (e.key === "Enter") {
+                                          handleAddAttributeValue(
+                                            catAttr.id,
+                                            catAttr.name
+                                          );
+                                        }
+                                      }}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      className="bg-teal-600 hover:bg-teal-700"
+                                      onClick={() =>
+                                        handleAddAttributeValue(
+                                          catAttr.id,
+                                          catAttr.name
+                                        )
+                                      }
+                                      disabled={
+                                        addingValueTo !== catAttr.id ||
+                                        !newValue.trim()
+                                      }
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Add Attribute Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Add Attribute</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Mode Toggle */}
+                      <div className="flex bg-gray-100 rounded-lg p-1">
+                        <Button
+                          variant={isCreatingNew ? "default" : "ghost"}
+                          size="sm"
+                          className={`flex-1 ${
+                            isCreatingNew
+                              ? "bg-teal-600 text-white"
+                              : "text-gray-600"
+                          }`}
+                          onClick={() => handleToggleMode(true)}
+                        >
+                          Create New
+                        </Button>
+                        <Button
+                          variant={!isCreatingNew ? "default" : "ghost"}
+                          size="sm"
+                          className={`flex-1 ${
+                            !isCreatingNew
+                              ? "bg-teal-600 text-white"
+                              : "text-gray-600"
+                          }`}
+                          onClick={() => handleToggleMode(false)}
+                          disabled={availableAttributes.length === 0}
+                        >
+                          Use Existing
+                        </Button>
+                      </div>
+
+                      {/* Form */}
+                      <div className="space-y-4">
+                        {isCreatingNew ? (
+                          <>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Name *</Label>
+                              <Input
+                                placeholder="e.g., Color, Size"
+                                value={newAttribute.name}
+                                onChange={(e) =>
+                                  setNewAttribute({
+                                    ...newAttribute,
+                                    name: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label className="text-sm">Type *</Label>
+                              <Select
+                                value={newAttribute.type}
+                                onValueChange={(value: AttributeType) =>
+                                  setNewAttribute({
+                                    ...newAttribute,
+                                    type: value,
+                                    values: [],
+                                  })
                                 }
                               >
-                                <X className="h-3 w-3" />
-                              </Button>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="SELECT">Select</SelectItem>
+                                  <SelectItem value="MULTISELECT">
+                                    Multi-Select
+                                  </SelectItem>
+                                  <SelectItem value="TEXT">Text</SelectItem>
+                                  <SelectItem value="NUMBER">Number</SelectItem>
+                                  <SelectItem value="BOOLEAN">
+                                    Boolean
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {newAttribute.type === "NUMBER" && (
+                              <div className="space-y-2">
+                                <Label className="text-sm">
+                                  Unit (Optional)
+                                </Label>
+                                <Input
+                                  placeholder="e.g., kg, cm"
+                                  value={newAttribute.unit}
+                                  onChange={(e) =>
+                                    setNewAttribute({
+                                      ...newAttribute,
+                                      unit: e.target.value,
+                                    })
+                                  }
+                                />
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  id="attr-filterable"
+                                  checked={newAttribute.filterable}
+                                  onChange={(e) =>
+                                    setNewAttribute({
+                                      ...newAttribute,
+                                      filterable: e.target.checked,
+                                    })
+                                  }
+                                  className="rounded"
+                                />
+                                <Label
+                                  htmlFor="attr-filterable"
+                                  className="text-sm"
+                                >
+                                  Filterable
+                                </Label>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  id="attr-isRequired"
+                                  checked={newAttribute.isRequired}
+                                  onChange={(e) =>
+                                    setNewAttribute({
+                                      ...newAttribute,
+                                      isRequired: e.target.checked,
+                                    })
+                                  }
+                                  className="rounded"
+                                />
+                                <Label
+                                  htmlFor="attr-isRequired"
+                                  className="text-sm"
+                                >
+                                  Required
+                                </Label>
+                              </div>
+                            </div>
+
+                            {(newAttribute.type === "SELECT" ||
+                              newAttribute.type === "MULTISELECT") && (
+                              <div className="space-y-3">
+                                <Label className="text-sm">Values *</Label>
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder="Add value"
+                                    value={newValue}
+                                    onChange={(e) =>
+                                      setNewValue(e.target.value)
+                                    }
+                                    onKeyPress={(e) => {
+                                      if (e.key === "Enter") {
+                                        handleAddValueToNewAttribute();
+                                      }
+                                    }}
+                                  />
+                                  <Button
+                                    onClick={handleAddValueToNewAttribute}
+                                    className="bg-teal-600 hover:bg-teal-700"
+                                    disabled={!newValue.trim()}
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                </div>
+
+                                {newAttribute.values.length > 0 && (
+                                  <div className="flex flex-wrap gap-2">
+                                    {newAttribute.values.map((value, index) => (
+                                      <span
+                                        key={index}
+                                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-sm bg-gray-100"
+                                      >
+                                        {value}
+                                        <X
+                                          className="h-3 w-3 cursor-pointer"
+                                          onClick={() =>
+                                            handleRemoveValueFromAttribute(
+                                              index
+                                            )
+                                          }
+                                        />
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <div className="space-y-2">
+                              <Label className="text-sm">
+                                Select Attribute *
+                              </Label>
+                              <Select
+                                value={selectedExistingAttribute}
+                                onValueChange={handleExistingAttributeSelect}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Choose attribute" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {availableAttributes.map((attr) => (
+                                    <SelectItem key={attr.id} value={attr.id}>
+                                      <div className="flex items-center justify-between">
+                                        <span>{attr.name}</span>
+                                        <span className="text-xs text-gray-500">
+                                          {attr.type.toLowerCase()}
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {selectedExistingAttribute && (
+                              <>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      id="existing-filterable"
+                                      checked={newAttribute.filterable}
+                                      onChange={(e) =>
+                                        setNewAttribute({
+                                          ...newAttribute,
+                                          filterable: e.target.checked,
+                                        })
+                                      }
+                                      className="rounded"
+                                    />
+                                    <Label
+                                      htmlFor="existing-filterable"
+                                      className="text-sm"
+                                    >
+                                      Filterable
+                                    </Label>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      id="existing-isRequired"
+                                      checked={newAttribute.isRequired}
+                                      onChange={(e) =>
+                                        setNewAttribute({
+                                          ...newAttribute,
+                                          isRequired: e.target.checked,
+                                        })
+                                      }
+                                      className="rounded"
+                                    />
+                                    <Label
+                                      htmlFor="existing-isRequired"
+                                      className="text-sm"
+                                    >
+                                      Required
+                                    </Label>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label className="text-sm">
+                                    Add Values (Optional)
+                                  </Label>
+                                  <div className="flex gap-2">
+                                    <Input
+                                      placeholder="Add value"
+                                      value={newValue}
+                                      onChange={(e) =>
+                                        setNewValue(e.target.value)
+                                      }
+                                    />
+                                    <Button
+                                      onClick={handleAddValueToNewAttribute}
+                                      className="bg-teal-600 hover:bg-teal-700"
+                                      disabled={!newValue.trim()}
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      <Button
+                        className="w-full bg-teal-600 hover:bg-teal-700 h-11 mt-6"
+                        onClick={handleCreateOrLinkAttribute}
+                        disabled={
+                          isCreating ||
+                          !selectedChildId ||
+                          (isCreatingNew &&
+                            (!newAttribute.name.trim() ||
+                              ((newAttribute.type === "SELECT" ||
+                                newAttribute.type === "MULTISELECT") &&
+                                newAttribute.values.length === 0))) ||
+                          (!isCreatingNew && !selectedExistingAttribute)
+                        }
+                      >
+                        {isCreating ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : isCreatingNew ? (
+                          "Create Attribute"
+                        ) : (
+                          "Link Attribute"
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Desktop Layout: Side by side */}
+              <div className="hidden lg:grid lg:grid-cols-3 gap-6">
+                {/* Existing Attributes */}
+                <div className="lg:col-span-2">
+                  <Card>
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-lg">Attributes</CardTitle>
+                          <CardDescription>
+                            {currentAttributes.length} assigned to this category
+                          </CardDescription>
+                        </div>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            placeholder="Search..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9 w-64"
+                          />
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {filteredAttributes.length === 0 ? (
+                        <div className="text-center py-12">
+                          <Filter className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                          <p className="text-gray-600">
+                            {searchQuery
+                              ? "No matches found"
+                              : "No attributes yet"}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3 max-h-[600px] overflow-y-auto pr-4">
+                          {filteredAttributes.map((catAttr) => (
+                            <div
+                              key={catAttr.categoryAttributeId}
+                              className="border rounded-lg p-4 hover:border-teal-200 transition-colors"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <h3 className="font-semibold">
+                                      {catAttr.name}
+                                    </h3>
+                                    {catAttr.unit && (
+                                      <span className="text-sm text-gray-500">
+                                        ({catAttr.unit})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap gap-2 mb-3">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-gray-100">
+                                      {getAttributeIcon(catAttr.type)}
+                                      {catAttr.type.toLowerCase()}
+                                    </span>
+                                    {catAttr.isRequired && (
+                                      <span className="px-2 py-0.5 rounded text-xs bg-red-50 text-red-700">
+                                        Required
+                                      </span>
+                                    )}
+                                    {catAttr.filterable && (
+                                      <span className="px-2 py-0.5 rounded text-xs bg-teal-50 text-teal-700">
+                                        Filterable
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => setEditingAttribute(catAttr)}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-red-500"
+                                    onClick={() =>
+                                      confirmDeleteAttribute(catAttr)
+                                    }
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Values */}
+                              {(catAttr.type === "SELECT" ||
+                                catAttr.type === "MULTISELECT") &&
+                                catAttr.values &&
+                                catAttr.values.length > 0 && (
+                                  <div className="mt-4 pt-4 border-t">
+                                    <div className="flex flex-wrap gap-2 mb-3">
+                                      {catAttr.values.map((value) => (
+                                        <span
+                                          key={value.id}
+                                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-sm bg-gray-50 border"
+                                        >
+                                          {value.value}
+                                          <X
+                                            className="h-3 w-3 cursor-pointer"
+                                            onClick={() =>
+                                              handleDeleteAttributeValue(
+                                                value.id,
+                                                value.value,
+                                                catAttr.name
+                                              )
+                                            }
+                                          />
+                                        </span>
+                                      ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Input
+                                        placeholder="Add value"
+                                        value={
+                                          addingValueTo === catAttr.id
+                                            ? newValue
+                                            : ""
+                                        }
+                                        onChange={(e) => {
+                                          setNewValue(e.target.value);
+                                          setAddingValueTo(catAttr.id);
+                                        }}
+                                        className="flex-1"
+                                        onKeyPress={(e) => {
+                                          if (e.key === "Enter") {
+                                            handleAddAttributeValue(
+                                              catAttr.id,
+                                              catAttr.name
+                                            );
+                                          }
+                                        }}
+                                      />
+                                      <Button
+                                        size="sm"
+                                        className="bg-teal-600 hover:bg-teal-700"
+                                        onClick={() =>
+                                          handleAddAttributeValue(
+                                            catAttr.id,
+                                            catAttr.name
+                                          )
+                                        }
+                                        disabled={
+                                          addingValueTo !== catAttr.id ||
+                                          !newValue.trim()
+                                        }
+                                      >
+                                        <Plus className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
                             </div>
                           ))}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
 
-                    {/* Show existing values from the selected attribute */}
-                    {(() => {
-                      const selectedAttr = allAttributes.find(
-                        (attr) => attr.id === selectedExistingAttribute
-                      );
-                      return (
-                        selectedAttr?.values &&
-                        selectedAttr.values.length > 0 && (
-                          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                            <Label className="text-sm font-medium text-gray-700">
-                              Existing values in "{selectedAttr.name}" (
-                              {selectedAttr.values.length}):
-                            </Label>
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {selectedAttr.values.map((value) => (
-                                <span
-                                  key={value.id}
-                                  className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs"
+                {/* Add Attribute Form */}
+                <div>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Add Attribute</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-6">
+                        {/* Same desktop form as mobile but with better spacing */}
+                        <div className="flex bg-gray-100 rounded-lg p-1">
+                          <Button
+                            variant={isCreatingNew ? "default" : "ghost"}
+                            size="sm"
+                            className={`flex-1 ${
+                              isCreatingNew
+                                ? "bg-teal-600 text-white"
+                                : "text-gray-600"
+                            }`}
+                            onClick={() => handleToggleMode(true)}
+                          >
+                            Create New
+                          </Button>
+                          <Button
+                            variant={!isCreatingNew ? "default" : "ghost"}
+                            size="sm"
+                            className={`flex-1 ${
+                              !isCreatingNew
+                                ? "bg-teal-600 text-white"
+                                : "text-gray-600"
+                            }`}
+                            onClick={() => handleToggleMode(false)}
+                            disabled={availableAttributes.length === 0}
+                          >
+                            Use Existing
+                          </Button>
+                        </div>
+
+                        {/* Form content - same as mobile but with better labels */}
+                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                          {/* Same form fields as mobile version */}
+                          {isCreatingNew ? (
+                            <>
+                              <div className="space-y-2">
+                                <Label>Name *</Label>
+                                <Input
+                                  placeholder="e.g., Color, Size"
+                                  value={newAttribute.name}
+                                  onChange={(e) =>
+                                    setNewAttribute({
+                                      ...newAttribute,
+                                      name: e.target.value,
+                                    })
+                                  }
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label>Type *</Label>
+                                <Select
+                                  value={newAttribute.type}
+                                  onValueChange={(value: AttributeType) =>
+                                    setNewAttribute({
+                                      ...newAttribute,
+                                      type: value,
+                                      values: [],
+                                    })
+                                  }
                                 >
-                                  {value.value}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )
-                      );
-                    })()}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="SELECT">
+                                      Select
+                                    </SelectItem>
+                                    <SelectItem value="MULTISELECT">
+                                      Multi-Select
+                                    </SelectItem>
+                                    <SelectItem value="TEXT">Text</SelectItem>
+                                    <SelectItem value="NUMBER">
+                                      Number
+                                    </SelectItem>
+                                    <SelectItem value="BOOLEAN">
+                                      Boolean
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
 
-        {/* Action Button */}
-        <Button
-          className="bg-teal-600 hover:bg-teal-700"
-          onClick={handleCreateOrLinkAttribute}
-          disabled={
-            !selectedChildId ||
-            (isCreatingNew &&
-              (!newAttribute.name.trim() ||
-                (newAttribute.type === "SELECT" &&
-                  newAttribute.values.length === 0))) ||
-            (!isCreatingNew && !selectedExistingAttribute)
-          }
+                              {newAttribute.type === "NUMBER" && (
+                                <div className="space-y-2">
+                                  <Label>Unit (Optional)</Label>
+                                  <Input
+                                    placeholder="e.g., kg, cm"
+                                    value={newAttribute.unit}
+                                    onChange={(e) =>
+                                      setNewAttribute({
+                                        ...newAttribute,
+                                        unit: e.target.value,
+                                      })
+                                    }
+                                  />
+                                </div>
+                              )}
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id="attr-filterable"
+                                    checked={newAttribute.filterable}
+                                    onChange={(e) =>
+                                      setNewAttribute({
+                                        ...newAttribute,
+                                        filterable: e.target.checked,
+                                      })
+                                    }
+                                    className="rounded"
+                                  />
+                                  <Label htmlFor="attr-filterable">
+                                    Filterable
+                                  </Label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id="attr-isRequired"
+                                    checked={newAttribute.isRequired}
+                                    onChange={(e) =>
+                                      setNewAttribute({
+                                        ...newAttribute,
+                                        isRequired: e.target.checked,
+                                      })
+                                    }
+                                    className="rounded"
+                                  />
+                                  <Label htmlFor="attr-isRequired">
+                                    Required
+                                  </Label>
+                                </div>
+                              </div>
+
+                              {(newAttribute.type === "SELECT" ||
+                                newAttribute.type === "MULTISELECT") && (
+                                <div className="space-y-3">
+                                  <Label>Values *</Label>
+                                  <div className="flex gap-2">
+                                    <Input
+                                      placeholder="Add value"
+                                      value={newValue}
+                                      onChange={(e) =>
+                                        setNewValue(e.target.value)
+                                      }
+                                      onKeyPress={(e) => {
+                                        if (e.key === "Enter") {
+                                          handleAddValueToNewAttribute();
+                                        }
+                                      }}
+                                    />
+                                    <Button
+                                      onClick={handleAddValueToNewAttribute}
+                                      className="bg-teal-600 hover:bg-teal-700"
+                                      disabled={!newValue.trim()}
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+
+                                  {newAttribute.values.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {newAttribute.values.map(
+                                        (value, index) => (
+                                          <span
+                                            key={index}
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-sm bg-gray-100"
+                                          >
+                                            {value}
+                                            <X
+                                              className="h-3 w-3 cursor-pointer"
+                                              onClick={() =>
+                                                handleRemoveValueFromAttribute(
+                                                  index
+                                                )
+                                              }
+                                            />
+                                          </span>
+                                        )
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <div className="space-y-2">
+                                <Label>Select Attribute *</Label>
+                                <Select
+                                  value={selectedExistingAttribute}
+                                  onValueChange={handleExistingAttributeSelect}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Choose attribute" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableAttributes.map((attr) => (
+                                      <SelectItem key={attr.id} value={attr.id}>
+                                        <div className="flex items-center justify-between">
+                                          <span>{attr.name}</span>
+                                          <span className="text-sm text-gray-500">
+                                            {attr.type.toLowerCase()}
+                                          </span>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              {selectedExistingAttribute && (
+                                <>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        id="existing-filterable"
+                                        checked={newAttribute.filterable}
+                                        onChange={(e) =>
+                                          setNewAttribute({
+                                            ...newAttribute,
+                                            filterable: e.target.checked,
+                                          })
+                                        }
+                                        className="rounded"
+                                      />
+                                      <Label htmlFor="existing-filterable">
+                                        Filterable
+                                      </Label>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        id="existing-isRequired"
+                                        checked={newAttribute.isRequired}
+                                        onChange={(e) =>
+                                          setNewAttribute({
+                                            ...newAttribute,
+                                            isRequired: e.target.checked,
+                                          })
+                                        }
+                                        className="rounded"
+                                      />
+                                      <Label htmlFor="existing-isRequired">
+                                        Required
+                                      </Label>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <Label>Add Values (Optional)</Label>
+                                    <div className="flex gap-2">
+                                      <Input
+                                        placeholder="Add value"
+                                        value={newValue}
+                                        onChange={(e) =>
+                                          setNewValue(e.target.value)
+                                        }
+                                      />
+                                      <Button
+                                        onClick={handleAddValueToNewAttribute}
+                                        className="bg-teal-600 hover:bg-teal-700"
+                                        disabled={!newValue.trim()}
+                                      >
+                                        <Plus className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+
+                        <Button
+                          className="w-full bg-teal-600 hover:bg-teal-700 h-11"
+                          onClick={handleCreateOrLinkAttribute}
+                          disabled={
+                            isCreating ||
+                            !selectedChildId ||
+                            (isCreatingNew &&
+                              (!newAttribute.name.trim() ||
+                                ((newAttribute.type === "SELECT" ||
+                                  newAttribute.type === "MULTISELECT") &&
+                                  newAttribute.values.length === 0))) ||
+                            (!isCreatingNew && !selectedExistingAttribute)
+                          }
+                        >
+                          {isCreating ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Processing...
+                            </>
+                          ) : isCreatingNew ? (
+                            "Create Attribute"
+                          ) : (
+                            "Link Attribute"
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Edit Attribute Dialog */}
+      {editingAttribute && (
+        <Dialog
+          open={!!editingAttribute}
+          onOpenChange={() => setEditingAttribute(null)}
         >
-          {isCreatingNew ? (
-            <>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Attribute
-              {newAttribute.values.length > 0
-                ? ` with ${newAttribute.values.length} values`
-                : ""}
-            </>
-          ) : (
-            <>
-              <Link className="h-4 w-4 mr-2" />
-              Link Attribute
-              {existingAttributeValues.length > 0
-                ? ` with ${existingAttributeValues.length} additional values`
-                : ""}
-            </>
-          )}
-        </Button>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Attribute</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input
+                  value={editingAttribute.name}
+                  onChange={(e) =>
+                    setEditingAttribute({
+                      ...editingAttribute,
+                      name: e.target.value,
+                    })
+                  }
+                />
+              </div>
 
-        {/* Help text */}
-        {isCreatingNew &&
-          newAttribute.type === "SELECT" &&
-          newAttribute.values.length === 0 && (
-            <p className="text-sm text-amber-600">
-              Please add at least one value for SELECT type attributes
-            </p>
-          )}
+              {editingAttribute.type === "NUMBER" && (
+                <div className="space-y-2">
+                  <Label>Unit</Label>
+                  <Input
+                    value={editingAttribute.unit || ""}
+                    onChange={(e) =>
+                      setEditingAttribute({
+                        ...editingAttribute,
+                        unit: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., kg, cm"
+                  />
+                </div>
+              )}
 
-        {!isCreatingNew &&
-          !selectedExistingAttribute &&
-          availableAttributes.length > 0 && (
-            <p className="text-sm text-blue-600">
-              Select an existing attribute to link it to this category
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="edit-filterable"
+                    checked={editingAttribute.filterable}
+                    onChange={(e) =>
+                      setEditingAttribute({
+                        ...editingAttribute,
+                        filterable: e.target.checked,
+                      })
+                    }
+                    className="rounded"
+                  />
+                  <Label htmlFor="edit-filterable">Filterable</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="edit-isRequired"
+                    checked={editingAttribute.isRequired}
+                    onChange={(e) =>
+                      setEditingAttribute({
+                        ...editingAttribute,
+                        isRequired: e.target.checked,
+                      })
+                    }
+                    className="rounded"
+                  />
+                  <Label htmlFor="edit-isRequired">Required</Label>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setEditingAttribute(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdateAttribute}
+                disabled={isUpdating}
+                className="bg-teal-600 hover:bg-teal-700"
+              >
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Delete Attribute
+            </DialogTitle>
+            <DialogDescription>
+              Delete "{attributeToDelete?.name}"?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-sm text-red-700">
+              This will remove the attribute from this category.
             </p>
-          )}
-      </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAttribute}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

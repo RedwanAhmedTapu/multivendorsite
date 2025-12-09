@@ -129,12 +129,12 @@ export function AdminSidebar({
           `}</style>
 
           {sections.map((section, sectionIdx) => (
-            <ul key={sectionIdx} className="space-y-1">
+            <ul key={sectionIdx} className="space-y-2">
               {section.items.map((item) => (
                 <li key={item.title}>
                   {item.subItems ? (
                     /* Parent Menu with Dropdown */
-                    <div>
+                    <div className="space-y-2">
                       <button
                         onClick={() => toggleMenu(item.title)}
                         className={`

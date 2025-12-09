@@ -5,13 +5,13 @@ import { useGetCategoriesQuery } from '@/features/apiSlice';
 import { Category } from '@/types/type';
 
 interface Props {
-  onSelect: (id: string, path: string, isLeaf: boolean, attributes: any[], specifications: any[]) => void;
+  onSelect: (id: string, path: string, isLeaf: boolean, attributes: any[]) => void;
 }
 
 const CategoryTreeSelectorItem: React.FC<{
   category: Category;
   selectedCategoryId?: string | null;
-  onSelectCategory: (id: string, path: string, isLeaf: boolean, attributes: any[], specifications: any[]) => void;
+  onSelectCategory: (id: string, path: string, isLeaf: boolean, attributes: any[]) => void;
   parentPath?: string;
   searchQuery?: string;
 }> = ({ category, selectedCategoryId, onSelectCategory, parentPath = '', searchQuery = '' }) => {
@@ -46,7 +46,7 @@ const CategoryTreeSelectorItem: React.FC<{
             : ''
         }`}
         onClick={() =>
-          onSelectCategory(category.id, currentPath, isLeaf, category.attributes || [], category.specifications || [])
+          onSelectCategory(category.id, currentPath, isLeaf, category.attributes || [])
         }
       >
         <button
@@ -101,23 +101,23 @@ export default function CategoryTreeSelector({ onSelect }: Props) {
   const [selectedPath, setSelectedPath] = useState<string>('');
   const [isLeafCategory, setIsLeafCategory] = useState<boolean>(false);
   const [categoryAttributes, setCategoryAttributes] = useState<any[]>([]);
-  const [categorySpecifications, setCategorySpecifications] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandAll, setExpandAll] = useState(false);
+  
+  // Calculate attribute statistics
+  const requiredAttributesCount = categoryAttributes.filter(attr => attr.isRequired).length;
+  const optionalAttributesCount = categoryAttributes.length - requiredAttributesCount;
 
   const handleSelectCategory = (
     id: string,
     path: string,
     isLeaf: boolean,
-    attributes: any[],
-    specifications: any[]
+    attributes: any[]
   ) => {
     setSelectedId(id);
     setSelectedPath(path);
     setIsLeafCategory(isLeaf);
-    setCategoryAttributes(attributes);
-    setCategorySpecifications(specifications);
-    onSelect(id, path, isLeaf, attributes, specifications);
+    setCategoryAttributes(attributes || []);
+    onSelect(id, path, isLeaf, attributes || []);
   };
 
   const handleClearSelection = () => {
@@ -125,7 +125,7 @@ export default function CategoryTreeSelector({ onSelect }: Props) {
     setSelectedPath('');
     setIsLeafCategory(false);
     setCategoryAttributes([]);
-    setCategorySpecifications([]);
+    onSelect('', '', false, []);
   };
 
   const handleClearSearch = () => {
@@ -160,6 +160,8 @@ export default function CategoryTreeSelector({ onSelect }: Props) {
           )}
         </div>
       </div>
+      
+      {/* Selected Category Info */}
       {selectedId && (
         <div className='p-2.5 border border-teal-200 rounded-lg bg-teal-50'>
           <div className='flex items-start justify-between gap-2'>
@@ -176,9 +178,17 @@ export default function CategoryTreeSelector({ onSelect }: Props) {
                   </span>
                 )}
                 {categoryAttributes.length > 0 && (
-                  <span className='text-[10px] text-gray-600'>
-                    {categoryAttributes.length} attributes
-                  </span>
+                  <div className='flex gap-1'>
+                    <span className='text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded'>
+                      {requiredAttributesCount} required
+                    </span>
+                    <span className='text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded'>
+                      {optionalAttributesCount} optional
+                    </span>
+                    <span className='text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded'>
+                      {categoryAttributes.length} total
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
@@ -192,6 +202,8 @@ export default function CategoryTreeSelector({ onSelect }: Props) {
           </div>
         </div>
       )}
+      
+      {/* Category Tree */}
       <div className='border border-gray-200 rounded-lg overflow-hidden'>
         <div className='bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center justify-between'>
           <span className='text-xs font-medium text-gray-700'>Categories</span>
@@ -222,12 +234,82 @@ export default function CategoryTreeSelector({ onSelect }: Props) {
           )}
         </div>
       </div>
+      
+      {/* Warning for non-leaf categories */}
       {selectedId && !isLeafCategory && (
         <div className='flex items-start gap-2 p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg'>
           <span className='text-yellow-600 text-xs mt-0.5'>⚠️</span>
           <p className='text-xs text-yellow-800'>
-            Please select a leaf category (one without subcategories) to continue.
+            Please select a leaf category (one without subcategories) to add products.
           </p>
+        </div>
+      )}
+      
+      {/* Instructions */}
+      {!selectedId && (
+        <div className='p-2.5 bg-blue-50 border border-blue-200 rounded-lg'>
+          <p className='text-xs text-blue-800'>
+            <span className='font-medium'>Instructions:</span> Select a category to view its attributes. 
+            Leaf categories (marked with green badge) can be used for product creation.
+          </p>
+        </div>
+      )}
+      
+      {/* Attribute Summary (if category selected) */}
+      {selectedId && isLeafCategory && (
+        <div className='p-2.5 bg-gray-50 border border-gray-200 rounded-lg'>
+          <div className='flex items-center justify-between mb-2'>
+            <p className='text-xs font-medium text-gray-700'>Category Attributes Summary</p>
+            <span className='text-xs text-gray-500'>{categoryAttributes.length} attributes</span>
+          </div>
+          
+          {categoryAttributes.length === 0 ? (
+            <p className='text-xs text-gray-500'>No attributes defined for this category</p>
+          ) : (
+            <div className='space-y-1'>
+              {/* Required Attributes */}
+              {requiredAttributesCount > 0 && (
+                <div className='flex items-center justify-between'>
+                  <div className='flex items-center gap-1'>
+                    <div className='w-1.5 h-1.5 bg-red-500 rounded-full'></div>
+                    <span className='text-xs text-red-700'>Required Attributes</span>
+                  </div>
+                  <span className='text-xs font-medium text-red-700'>{requiredAttributesCount}</span>
+                </div>
+              )}
+              
+              {/* Optional Attributes */}
+              {optionalAttributesCount > 0 && (
+                <div className='flex items-center justify-between'>
+                  <div className='flex items-center gap-1'>
+                    <div className='w-1.5 h-1.5 bg-blue-500 rounded-full'></div>
+                    <span className='text-xs text-blue-700'>Optional Attributes</span>
+                  </div>
+                  <span className='text-xs font-medium text-blue-700'>{optionalAttributesCount}</span>
+                </div>
+              )}
+              
+              {/* Attribute Types Breakdown */}
+              <div className='pt-2 border-t border-gray-200'>
+                <p className='text-xs font-medium text-gray-600 mb-1'>Attribute Types:</p>
+                <div className='grid grid-cols-2 gap-1'>
+                  {(() => {
+                    const typeCounts: Record<string, number> = {};
+                    categoryAttributes.forEach(attr => {
+                      typeCounts[attr.type] = (typeCounts[attr.type] || 0) + 1;
+                    });
+                    
+                    return Object.entries(typeCounts).map(([type, count]) => (
+                      <div key={type} className='flex items-center justify-between text-xs'>
+                        <span className='text-gray-600'>{type}</span>
+                        <span className='font-medium text-gray-700'>{count}</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

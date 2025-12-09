@@ -9,7 +9,7 @@ import { authApi } from "../features/authApi";
 import authReducer from "../features/authSlice";
 import { sliderApi } from "../features/sliderApi";
 import { productApi } from "../features/productApi";
-import { attrSpecSlice } from "@/features/attrSpecSlice";
+import { attributeSlice } from "@/features/attrSpecSlice";
 import { vendorManageApi } from "../features/vendorManageApi";
 import { customerManageApi } from "../features/customerManageApi";
 import { chatApi } from "../features/chatApi";
@@ -30,7 +30,7 @@ const apiMiddlewares = [
   authApi.middleware,
   sliderApi.middleware,
   productApi.middleware,
-  attrSpecSlice.middleware,
+  attributeSlice.middleware,
   vendorManageApi.middleware,
   customerManageApi.middleware,
   chatApi.middleware,
@@ -50,7 +50,7 @@ const apiReducers = {
   [authApi.reducerPath]: authApi.reducer,
   [sliderApi.reducerPath]: sliderApi.reducer,
   [productApi.reducerPath]: productApi.reducer,
-  [attrSpecSlice.reducerPath]: attrSpecSlice.reducer,
+  [attributeSlice.reducerPath]: attributeSlice.reducer,
   [vendorManageApi.reducerPath]: vendorManageApi.reducer,
   [customerManageApi.reducerPath]: customerManageApi.reducer,
   [chatApi.reducerPath]: chatApi.reducer,

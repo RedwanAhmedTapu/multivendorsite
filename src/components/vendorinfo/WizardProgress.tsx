@@ -53,7 +53,7 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
   getStepStatus 
 }) => {
   return (
-    <div className="mb-8 sticky top-0 z-40 bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 border-b border-teal-100/50 shadow-sm transition-all duration-300">
+    <div className="mb-8  bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 border-b border-teal-100/50 shadow-sm transition-all duration-300">
       <div className="max-w-6xl mx-auto px-4 py-4">
         {/* Compact Header for Sticky Mode */}
         <div className="flex items-center justify-between mb-4">
