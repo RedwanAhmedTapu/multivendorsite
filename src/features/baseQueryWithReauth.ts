@@ -5,7 +5,7 @@ import type { RootState } from "@/store/store";
 
 // Core fetchBaseQuery with credentials + headers
 const rawBaseQuery = fetchBaseQuery({
-  baseUrl: "http://localhost:5000/api",
+  baseUrl: "https://api.finixmart.com.bd/api",
   credentials: "include", // allows cookies
   prepareHeaders: (headers, { getState }) => {
     const token = (getState() as RootState).auth.accessToken;
