@@ -38,6 +38,7 @@
     "@reduxjs/toolkit": "^2.8.2",
     "@tanstack/react-table": "^8.21.3",
     "@tinymce/tinymce-react": "^6.3.0",
+    "axios": "^1.13.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -57,6 +58,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "tinymce": "^8.0.2",
+    "use-debounce": "^10.0.6",
     "zod": "^4.1.8"
   },
   "devDependencies": {

@@ -1,3 +1,5 @@
+
+
 "use client";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
@@ -21,9 +23,10 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import ProductDescriptionEditor from "@/components/productdescription/ProductDescriptionl";
 import ShippingWarrantyForm from "./ShippingWarrantyForm";
-import { RightSidebar,RightSidebarProvider } from "@/app/vendor-dashboard/rightbar/RightSidebar";
-
+import { RightSidebar, RightSidebarProvider } from "@/app/vendor-dashboard/rightbar/RightSidebar";
 import { ProductCreationWizard } from "@/components/wizard/vendorrightsidewizard/ProductCreationWizard";
+import { Loader2 } from "lucide-react";
+import { translateProductName } from "@/utils/translate";
 
 // Main Form Component
 function AddProductFormContent() {
@@ -37,7 +40,6 @@ function AddProductFormContent() {
   const [images, setImages] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
-  // UNIFIED: Single attributes array
   const [attributes, setAttributes] = useState<ProductAttributeInput[]>([]);
   const [variantInputs, setVariantInputs] = useState<ProductVariantInput[]>([]);
   const [variantNameParts, setVariantNameParts] = useState<
@@ -47,14 +49,76 @@ function AddProductFormContent() {
     useState<ProductShippingWarrantyInput | null>(null);
 
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const [createProduct, { isLoading }] = useCreateProductMutation();
 
   const { user } = useSelector((state: RootState) => state.auth);
-  const vendorId = user?.vendorId;
-  const userRole = user?.role as "VENDOR" | "ADMIN";
+  const vendorId = user?.vendorId || ""; // Ensure it's always a string
+  const userRole = user?.role as "VENDOR" | "ADMIN" || "VENDOR"; // Default value
 
   const formRef = useRef<HTMLDivElement>(null);
+
+  // Translation timeout reference
+  const translationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-translate when English name changes
+  useEffect(() => {
+    if (name.trim()) {
+      // Clear previous timeout
+      if (translationTimeoutRef.current) {
+        clearTimeout(translationTimeoutRef.current);
+      }
+
+      // Set new timeout to debounce translation
+      translationTimeoutRef.current = setTimeout(async () => {
+        if (name.trim() && !nameBn.trim()) {
+          // Only auto-translate if Bengali field is empty
+          await translateName();
+        }
+      }, 1000);
+    }
+
+    return () => {
+      if (translationTimeoutRef.current) {
+        clearTimeout(translationTimeoutRef.current);
+      }
+    };
+  }, [name]);
+
+  // Translation function
+  const translateName = async () => {
+    if (!name.trim()) return;
+
+    setIsTranslating(true);
+    try {
+      const translatedName = await translateProductName(name);
+      setNameBn(translatedName || ""); // Ensure it's always a string
+    } catch (error) {
+      console.error("Translation error:", error);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  // Manual translation button handler
+  const handleManualTranslate = async () => {
+    if (!name.trim()) {
+      alert("Please enter an English name first");
+      return;
+    }
+    await translateName();
+  };
+
+  // Handle English name change
+  const handleNameChange = (value: string) => {
+    setName(value);
+  };
+
+  // Handle Bengali name change
+  const handleNameBnChange = (value: string) => {
+    setNameBn(value || ""); // Ensure it's never undefined
+  };
 
   // Handle category selection
   const handleCategorySelect = useCallback((
@@ -63,23 +127,23 @@ function AddProductFormContent() {
     isLeaf: boolean,
     categoryAttrs: Attribute[]
   ) => {
-    setCategoryId(id);
+    setCategoryId(id || null);
     setIsLeafCategory(isLeaf);
-    setCategoryAttributes(categoryAttrs);
+    setCategoryAttributes(categoryAttrs || []);
 
-    // Separate required attributes
-    const requiredAttrs = categoryAttrs.filter(attr => attr.isRequired);
+    const requiredAttrs = (categoryAttrs || []).filter(attr => attr.isRequired);
     setRequiredAttributes(requiredAttrs);
 
-    // Initialize variant name parts with display values
     const initialParts: Record<string, VariantNamePart> = {};
-    categoryAttrs.forEach((attr) => {
-      initialParts[attr.id] = {
-        name: attr.name,
-        value: "",
-        displayValue: "",
-        include: false,
-      };
+    (categoryAttrs || []).forEach((attr) => {
+      if (attr.id) {
+        initialParts[attr.id] = {
+          name: attr.name || "",
+          value: "",
+          displayValue: "",
+          include: false,
+        };
+      }
     });
     setVariantNameParts(initialParts);
   }, []);
@@ -95,9 +159,9 @@ function AddProductFormContent() {
     setVariantNameParts((prev) => ({
       ...prev,
       [fieldId]: { 
-        name: fieldName, 
+        name: fieldName || "", 
         value, 
-        displayValue,
+        displayValue: displayValue || "",
         include: includeInVariant 
       },
     }));
@@ -109,7 +173,7 @@ function AddProductFormContent() {
       .filter(part => part.include && part.displayValue)
       .map(part => `${part.name}: ${part.displayValue}`);
     
-    return parts.join(' | ');
+    return parts.join(' | ') || "";
   }, [variantNameParts]);
 
   // Validate required fields
@@ -126,7 +190,7 @@ function AddProductFormContent() {
     // Required attributes
     requiredAttributes.forEach(attr => {
       const filledAttribute = attributes.find(a => a.attributeId === attr.id);
-      if (!filledAttribute ) {
+      if (!filledAttribute) {
         errors[`attribute-${attr.id}`] = true;
       }
     });
@@ -164,7 +228,7 @@ function AddProductFormContent() {
   // Convert uploaded image URLs to ProductImageInput[]
   const convertImages = useCallback((): ProductImageInput[] =>
     images.map((url, index) => ({
-      url,
+      url: url || "",
       altText: `${name} image ${index + 1}`,
       sortOrder: index,
     })), [images, name]);
@@ -182,7 +246,6 @@ function AddProductFormContent() {
       return;
     }
 
-    // Check if all variants have required fields
     const invalidVariants = variantInputs.filter(
       (v) => !v.sku || !v.price || v.price <= 0
     );
@@ -192,7 +255,6 @@ function AddProductFormContent() {
       return;
     }
 
-    // Check for special price validation
     const invalidPricing = variantInputs.filter(
       (v) => v.specialPrice && v.specialPrice >= v.price
     );
@@ -203,7 +265,7 @@ function AddProductFormContent() {
     }
 
     const productData: CreateProductData = {
-      name,
+      name: name || "",
       nameBn: nameBn || undefined,
       description: description || undefined,
       categoryId: categoryId || "",
@@ -253,21 +315,22 @@ function AddProductFormContent() {
     setVariantNameParts({});
     setShippingWarranty(null);
     setValidationErrors({});
+    setIsTranslating(false);
   }, []);
 
   // Form data for wizard - memoized to prevent unnecessary re-renders
   const formData = useMemo(() => ({
-    name,
-    nameBn,
-    categoryId,
-    isLeafCategory,
-    images,
-    videoUrl,
-    description,
-    attributes,
-    variants: variantInputs,
-    shippingWarranty,
-    requiredAttributes,
+    name: name || "",
+    nameBn: nameBn || "",
+    categoryId: categoryId || "",
+    isLeafCategory: isLeafCategory || false,
+    images: images || [],
+    videoUrl: videoUrl || "",
+    description: description || "",
+    attributes: attributes || [],
+    variants: variantInputs || [],
+    shippingWarranty: shippingWarranty || null,
+    requiredAttributes: requiredAttributes || [],
   }), [
     name, nameBn, categoryId, isLeafCategory, images, videoUrl, 
     description, attributes, variantInputs, shippingWarranty, requiredAttributes
@@ -295,7 +358,7 @@ function AddProductFormContent() {
                 </label>
                 <Input
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="Enter product name"
                   required
                   className={validationErrors.productName ? "border-red-500" : ""}
@@ -305,14 +368,44 @@ function AddProductFormContent() {
                 )}
               </div>
               <div>
-                <label className="block font-medium mb-2">
-                  Product Name (Bengali)
-                </label>
-                <Input
-                  value={nameBn}
-                  onChange={(e) => setNameBn(e.target.value)}
-                  placeholder="Enter product name in Bengali"
-                />
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block font-medium">
+                    Product Name (Bengali)
+                  </label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleManualTranslate}
+                    disabled={isTranslating || !name.trim()}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    {isTranslating ? (
+                      <>
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        Translating...
+                      </>
+                    ) : (
+                      "↻ Auto-translate"
+                    )}
+                  </Button>
+                </div>
+                <div className="relative">
+                  <Input
+                    value={nameBn}
+                    onChange={(e) => handleNameBnChange(e.target.value)}
+                    placeholder="Auto-translated from English"
+                    className={isTranslating ? "opacity-50" : ""}
+                  />
+                  {isTranslating && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Auto-translates from English. You can edit if needed.
+                </p>
               </div>
             </div>
 
@@ -353,7 +446,7 @@ function AddProductFormContent() {
               <VideoUploader
                 videoUrl={videoUrl}
                 setVideoUrl={setVideoUrl}
-                vendorId={vendorId || ""}
+                vendorId={vendorId}
                 userRole={userRole}
               />
             </div>
@@ -361,7 +454,7 @@ function AddProductFormContent() {
             {/* Specifications and Attributes */}
             {isLeafCategory && (
               <SpecAttributeManager
-                categoryId={categoryId}
+                categoryId={categoryId || ""}
                 attributes={attributes}
                 setAttributes={setAttributes}
                 categoryAttributes={categoryAttributes}
@@ -423,7 +516,7 @@ function AddProductFormContent() {
               <Button
                 onClick={handleSubmit}
                 disabled={isLoading}
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                className="flex-1 bg-teal-600 hover:bg-teal-700"
                 size="lg"
               >
                 {isLoading ? (
@@ -437,6 +530,7 @@ function AddProductFormContent() {
               </Button>
               <Button
                 variant="outline"
+                className="bg-amber-200"
                 onClick={() => {
                   if (
                     confirm(
@@ -456,49 +550,9 @@ function AddProductFormContent() {
         </Card>
       </div>
 
-      {/* Right Sidebar */}
+      {/* Right Sidebar - Only Wizard */}
       <RightSidebar
         wizardComponent={<ProductCreationWizard formData={formData} />}
-        instructionsComponent={
-          <div className="space-y-4">
-            <h3 className="font-bold text-lg">Product Creation Guide</h3>
-            <div className="space-y-3">
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <h4 className="font-medium text-blue-800">Required Fields</h4>
-                <ul className="text-sm text-blue-700 mt-2 space-y-1">
-                  <li>• Product Name</li>
-                  <li>• Category (Leaf Level)</li>
-                  <li>• Product Images (Min 1)</li>
-                  <li>• Required Attributes</li>
-                  <li>• Product Variants (Min 1)</li>
-                  <li>• Shipping & Warranty Info</li>
-                </ul>
-              </div>
-              <div className="p-3 bg-green-50 rounded-lg">
-                <h4 className="font-medium text-green-800">Best Practices</h4>
-                <ul className="text-sm text-green-700 mt-2 space-y-1">
-                  <li>• Use high-quality product images</li>
-                  <li>• Set accurate variant prices</li>
-                  <li>• Provide detailed specifications</li>
-                  <li>• Set appropriate stock levels</li>
-                  <li>• Review before submission</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        }
-        settingsComponent={
-          <div className="space-y-4">
-            <h3 className="font-bold text-lg">Form Settings</h3>
-            <div className="space-y-3">
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-700">
-                  Configure your product creation preferences here.
-                </p>
-              </div>
-            </div>
-          </div>
-        }
       />
     </div>
   );

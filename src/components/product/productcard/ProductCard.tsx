@@ -130,27 +130,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               {/* Badges Container */}
               <div className="absolute top-2 left-2 sm:top-3 sm:left-3 flex flex-col gap-2 z-10">
                 {hasFreeShipping && (
-                  <Badge className="bg-[#00A9E0] hover:bg-[#0095C9] text-white px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-sm font-semibold flex items-center gap-1 shadow-md">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="12"
-                      height="12"
-                      className="sm:w-3 sm:h-3"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <rect x="1" y="3" width="15" height="13" />
-                      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-                      <circle cx="5.5" cy="18.5" r="2.5" />
-                      <circle cx="18.5" cy="18.5" r="2.5" />
-                    </svg>
-                    <span className="hidden xs:inline">FREE DELIVERY</span>
-                    <span className="xs:hidden">FREE</span>
-                  </Badge>
+                  <Image
+                    src="/public/tag/Envío gratuito destacado.png"
+                    alt="free shipping badge"
+                  />
                 )}
               </div>
 
@@ -264,7 +247,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
                   {/* Category */}
                   {product.category && (
-                    <Badge variant="outline" className="text-gray-500 text-xs w-fit">
+                    <Badge
+                      variant="outline"
+                      className="text-gray-500 text-xs w-fit"
+                    >
                       {product.category.name}
                     </Badge>
                   )}
@@ -316,25 +302,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Top Left Badge - Free Shipping */}
         <div className="absolute top-3 left-3 z-10">
           {hasFreeShipping && (
-            <Badge className="bg-[#00A9E0] hover:bg-[#0095C9] text-white px-3 py-1 text-xs font-semibold flex items-center gap-1 shadow-md">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="1" y="3" width="15" height="13" />
-                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-                <circle cx="5.5" cy="18.5" r="2.5" />
-                <circle cx="18.5" cy="18.5" r="2.5" />
-              </svg>
-              FREE DELIVERY
-            </Badge>
+            <Image
+              src="/public/tag/Envío gratuito destacado.png"
+              alt="free shipping badge"
+            />
           )}
         </div>
       </div>
@@ -412,10 +383,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             {storeName}
           </span>
           {isVerified && (
-            <Badge className="bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white px-2 py-0.5 text-xs font-semibold shadow-lg border-0 flex items-center gap-1 flex-shrink-0 transition-all duration-200">
-              <BadgeCheck className="w-3 h-3" />
-              Verified
-            </Badge>
+            <Image
+              src="/public/tag/Gemini_Generated_Image_f56micf56micf56m.png"
+              alt="free shipping badge"
+            />
           )}
         </div>
       </CardContent>

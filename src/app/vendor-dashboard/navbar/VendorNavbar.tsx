@@ -127,35 +127,7 @@ export function VendorNavbar({
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
       <div className="h-16 px-4 sm:px-6 flex items-center justify-between">
-        {/* Left section */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden text-gray-600 hover:text-teal-600 hover:bg-gray-100"
-            onClick={onMobileMenuClick}
-          >
-            <Menu className="w-5 h-5" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="hidden lg:flex text-gray-600 hover:text-teal-600 hover:bg-gray-100"
-            onClick={onMenuClick}
-          >
-            <Menu className="w-5 h-5" />
-          </Button>
-
-          <div className="hidden md:flex items-center gap-2">
-            <div className="p-1.5 bg-teal-500 rounded-md">
-              <Store className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-lg font-bold text-gray-900">
-              FinixMart Vendor
-            </span>
-          </div>
-        </div>
+       
 
         {/* Center - Search */}
         <div className="flex-1 max-w-2xl mx-4 relative" ref={searchRef}>

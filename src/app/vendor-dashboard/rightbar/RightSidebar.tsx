@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState, createContext, useContext, useCallback, useMemo } from "react";
-import { X, ChevronRight, BookOpen, Settings, Zap } from "lucide-react";
+import React, { useState, createContext, useContext, useCallback, useMemo, useEffect } from "react";
+import { X, ChevronRight, CheckCircle2, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
 
 export type WizardStep = {
   id: string;
@@ -15,17 +14,14 @@ export type WizardStep = {
   required: boolean;
 };
 
-export type RightSidebarMode = "wizard" | "instructions" | "settings";
-
 interface RightSidebarContextType {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-  mode: RightSidebarMode;
-  setMode: (mode: RightSidebarMode) => void;
   wizardSteps: WizardStep[];
   currentStep: number;
   setCurrentStep: (step: number) => void;
   updateStepCompletion: (stepId: string, completed: boolean) => void;
+  updateAllSteps: (steps: Partial<Record<string, boolean>>) => void;
 }
 
 const RightSidebarContext = createContext<RightSidebarContextType | undefined>(undefined);
@@ -46,7 +42,6 @@ export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({
   children,
 }) => {
   const [isOpen, setIsOpen] = useState(true);
-  const [mode, setMode] = useState<RightSidebarMode>("wizard");
   const [wizardSteps, setWizardSteps] = useState<WizardStep[]>([
     { id: "basic-info", title: "Basic Information", completed: false, required: true },
     { id: "media", title: "Media Upload", completed: false, required: true },
@@ -61,23 +56,29 @@ export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({
   const updateStepCompletion = useCallback((stepId: string, completed: boolean) => {
     setWizardSteps(prev => 
       prev.map(step => 
-        step.id === stepId && step.completed !== completed 
-          ? { ...step, completed } 
-          : step
+        step.id === stepId ? { ...step, completed } : step
       )
+    );
+  }, []);
+
+  const updateAllSteps = useCallback((steps: Partial<Record<string, boolean>>) => {
+    setWizardSteps(prev => 
+      prev.map(step => ({
+        ...step,
+        completed: steps[step.id] !== undefined ? steps[step.id]! : step.completed
+      }))
     );
   }, []);
 
   const contextValue = useMemo(() => ({
     isOpen,
     setIsOpen,
-    mode,
-    setMode,
     wizardSteps,
     currentStep,
     setCurrentStep,
     updateStepCompletion,
-  }), [isOpen, mode, wizardSteps, currentStep, updateStepCompletion]);
+    updateAllSteps,
+  }), [isOpen, wizardSteps, currentStep, updateStepCompletion, updateAllSteps]);
 
   return (
     <RightSidebarContext.Provider value={contextValue}>
@@ -87,30 +88,19 @@ export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({
 };
 
 interface RightSidebarProps {
-  wizardComponent?: React.ReactNode;
-  instructionsComponent?: React.ReactNode;
-  settingsComponent?: React.ReactNode;
+  wizardComponent: React.ReactNode;
 }
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({
   wizardComponent,
-  instructionsComponent,
-  settingsComponent,
 }) => {
-  const { isOpen, setIsOpen, mode } = useRightSidebar();
+  const { isOpen, setIsOpen, wizardSteps } = useRightSidebar();
 
-  const renderContent = () => {
-    switch (mode) {
-      case "wizard":
-        return wizardComponent;
-      case "instructions":
-        return instructionsComponent;
-      case "settings":
-        return settingsComponent;
-      default:
-        return wizardComponent;
-    }
-  };
+  // Calculate completion percentage
+  const completionPercentage = useMemo(() => {
+    const completed = wizardSteps.filter(step => step.completed).length;
+    return Math.round((completed / wizardSteps.length) * 100);
+  }, [wizardSteps]);
 
   if (!isOpen) {
     return (
@@ -126,61 +116,49 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   return (
     <div className="fixed right-0 top-0 h-full w-96 bg-white border-l shadow-xl z-50 flex flex-col transition-all duration-300">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center gap-3">
-          <ModeSelector />
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-lg">Creation Wizard</h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsOpen(false)}
+            className="h-8 w-8 p-0"
+          >
+            <X className="w-4 h-4" />
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsOpen(false)}
-          className="h-8 w-8 p-0"
-        >
-          <X className="w-4 h-4" />
-        </Button>
+        
+        {/* Progress Bar */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-600">Progress</span>
+            <span className="font-semibold text-blue-600">{completionPercentage}%</span>
+          </div>
+          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-blue-600 transition-all duration-500 ease-out"
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Content */}
       <ScrollArea className="flex-1 p-4">
-        {renderContent()}
+        {wizardComponent}
       </ScrollArea>
 
       {/* Footer */}
       <div className="p-4 border-t bg-gray-50">
-        <div className="text-xs text-gray-500">
-          <p>💡 Complete all steps for successful product creation</p>
+        <div className="text-xs text-gray-500 space-y-1">
+          <p className="flex items-center gap-2">
+            <CheckCircle2 className="w-3 h-3 text-green-600" />
+            {wizardSteps.filter(s => s.completed).length} of {wizardSteps.length} steps completed
+          </p>
+          <p className="text-gray-400">Fill all required fields to proceed</p>
         </div>
       </div>
-    </div>
-  );
-};
-
-const ModeSelector: React.FC = () => {
-  const { mode, setMode } = useRightSidebar();
-  
-  const modes = [
-    { id: "wizard", label: "Wizard", icon: <Zap className="w-4 h-4" /> },
-    { id: "instructions", label: "Guide", icon: <BookOpen className="w-4 h-4" /> },
-    { id: "settings", label: "Settings", icon: <Settings className="w-4 h-4" /> },
-  ];
-
-  return (
-    <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-      {modes.map((m) => (
-        <button
-          key={m.id}
-          onClick={() => setMode(m.id as RightSidebarMode)}
-          className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
-            mode === m.id
-              ? "bg-white shadow-sm text-blue-600"
-              : "text-gray-600 hover:text-gray-900"
-          )}
-        >
-          {m.icon}
-          {m.label}
-        </button>
-      ))}
     </div>
   );
 };

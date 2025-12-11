@@ -6,7 +6,7 @@ import { RootState } from "@/store/store";
 import { Image as ImageIcon, X, Upload } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner"; // FIXED: Import toast function directly from sonner
+import { toast } from "sonner"; 
 import { 
   useUploadMultipleFilesMutation,
   useCheckQuotaMutation,

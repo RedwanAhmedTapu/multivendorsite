@@ -1,9 +1,6 @@
-"use client";
-
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { CheckCircle, AlertCircle, Image, Package, Settings, Tag, FileText, Truck } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
-import { useRightSidebar, WizardStep } from "@/app/vendor-dashboard/rightbar/RightSidebar";
+import React, { useEffect } from "react";
+import { CheckCircle2, Circle, AlertCircle } from "lucide-react";
+import { useRightSidebar } from "@/app/vendor-dashboard/rightbar/RightSidebar";
 
 interface ProductCreationWizardProps {
   formData: {
@@ -21,168 +18,202 @@ interface ProductCreationWizardProps {
   };
 }
 
-export const ProductCreationWizard: React.FC<ProductCreationWizardProps> = ({ formData }) => {
-  const { updateStepCompletion, setCurrentStep } = useRightSidebar();
-  const [allRequiredFields, setAllRequiredFields] = useState<string[]>([]);
-  const [completedSteps, setCompletedSteps] = useState<Record<string, boolean>>({});
+export const ProductCreationWizard: React.FC<ProductCreationWizardProps> = ({
+  formData,
+}) => {
+  const { wizardSteps, updateAllSteps } = useRightSidebar();
 
-  const steps = useMemo<WizardStep[]>(() => [
-    { id: "basic-info", title: "Basic Information", description: "Product name, category, and basic details", icon: <Tag className="w-4 h-4" />, completed: false, required: true },
-    { id: "media", title: "Media Upload", description: "Product images and video", icon: <Image className="w-4 h-4" />, completed: false, required: true },
-    { id: "attributes", title: "Attributes & Specifications", description: "Product specifications and features", icon: <Settings className="w-4 h-4" />, completed: false, required: true },
-    { id: "variants", title: "Product Variants", description: "Manage different product variations", icon: <Package className="w-4 h-4" />, completed: false, required: true },
-    { id: "description", title: "Description & Details", description: "Product description and additional info", icon: <FileText className="w-4 h-4" />, completed: false, required: false },
-    { id: "shipping-warranty", title: "Shipping & Warranty", description: "Shipping details and warranty information", icon: <Truck className="w-4 h-4" />, completed: false, required: true },
-    { id: "review", title: "Review & Submit", description: "Final review before submission", icon: <CheckCircle className="w-4 h-4" />, completed: false, required: true },
-  ], []);
+  // Update completion status based on form data
+  useEffect(() => {
+    const completionStatus: Partial<Record<string, boolean>> = {};
 
-  const calculateCompletionStatus = useCallback(() => {
-    const requiredFields: string[] = [];
-    const newCompletedSteps: Record<string, boolean> = {};
+    // 1. Basic Info - name and leaf category selected
+    completionStatus["basic-info"] = !!(
+      formData.name.trim() &&
+      formData.categoryId &&
+      formData.isLeafCategory
+    );
 
-    // Step 1: Basic Info
-    const basicInfoCompleted = Boolean(formData.name && formData.categoryId && formData.isLeafCategory);
-    if (!formData.name) requiredFields.push("productName");
-    if (!formData.categoryId || !formData.isLeafCategory) requiredFields.push("categorySelector");
-    newCompletedSteps["basic-info"] = basicInfoCompleted;
+    // 2. Media - at least one image
+    completionStatus["media"] = formData.images.length > 0;
 
-    // Step 2: Media
-    const mediaCompleted = formData.images.length > 0;
-    if (!mediaCompleted) requiredFields.push("productImages");
-    newCompletedSteps["media"] = mediaCompleted;
+    // 3. Attributes - FIXED: Only complete if leaf category selected AND all required attributes filled
+    if (formData.isLeafCategory && formData.categoryId) {
+      // If there are required attributes, check if they're all filled
+      if (formData.requiredAttributes.length > 0) {
+        const requiredAttrsFilled = formData.requiredAttributes.every((reqAttr) =>
+          formData.attributes.some((attr) => attr.attributeId === reqAttr.id)
+        );
+        completionStatus["attributes"] = requiredAttrsFilled;
+      } else {
+        // No required attributes, but still need leaf category
+        completionStatus["attributes"] = true;
+      }
+    } else {
+      // Not a leaf category yet, can't be complete
+      completionStatus["attributes"] = false;
+    }
 
-    // ✅ Step 3: Attributes (FIXED)
-    const attributesCompleted = formData.requiredAttributes.every(attr => {
-      const filled = formData.attributes.find(a => a.attributeId === attr.id);
-      return filled && (
-        filled.valueString?.trim() !== "" ||
-        filled.valueNumber !== undefined ||
-        filled.valueBoolean !== undefined ||
-        !!filled.attributeValueId
-      );
-    });
+    // 4. Variants - at least one variant with valid data
+    const hasValidVariant = formData.variants.some(
+      (v) => v.sku && v.price && v.price > 0
+    );
+    completionStatus["variants"] = hasValidVariant;
 
-    formData.requiredAttributes.forEach(attr => {
-      const filled = formData.attributes.find(a => a.attributeId === attr.id);
-      const hasValue = filled && (
-        filled.valueString?.trim() !== "" ||
-        filled.valueNumber !== undefined ||
-        filled.valueBoolean !== undefined ||
-        !!filled.attributeValueId
-      );
-      if (!hasValue) requiredFields.push(`attribute-${attr.id}`);
-    });
+    // 5. Description - optional, mark as complete only if has actual content
+    completionStatus["description"] = formData.description.trim().length > 0;
 
-    newCompletedSteps["attributes"] = attributesCompleted;
-
-    // Step 4: Variants
-    const variantsCompleted = formData.variants.length > 0 &&
-      formData.variants.every(v => v.sku && v.price && v.price > 0);
-
-    if (!variantsCompleted) requiredFields.push("variantsSection");
-
-    newCompletedSteps["variants"] = variantsCompleted;
-
-    // Step 5: Description (optional)
-    newCompletedSteps["description"] = true;
-
-    // Step 6: Shipping & Warranty
-    const shippingCompleted = Boolean(
-      formData.shippingWarranty?.packageWeightValue &&
+    // 6. Shipping & Warranty - both fields required
+    completionStatus["shipping-warranty"] = !!(
       formData.shippingWarranty?.warrantyType &&
       formData.shippingWarranty?.warrantyDetails
     );
 
-    if (!formData.shippingWarranty?.packageWeightValue) requiredFields.push("packageWeight");
-    if (!formData.shippingWarranty?.warrantyType) requiredFields.push("warrantyType");
-    if (!formData.shippingWarranty?.warrantyDetails) requiredFields.push("warrantyDetails");
+    // 7. Review - all required steps completed
+    const allRequiredComplete = 
+      completionStatus["basic-info"] &&
+      completionStatus["media"] &&
+      completionStatus["attributes"] &&
+      completionStatus["variants"] &&
+      completionStatus["shipping-warranty"];
+    completionStatus["review"] = allRequiredComplete;
 
-    newCompletedSteps["shipping-warranty"] = shippingCompleted;
-
-    // Step 7: Review
-    newCompletedSteps["review"] =
-      basicInfoCompleted &&
-      mediaCompleted &&
-      attributesCompleted &&
-      variantsCompleted &&
-      shippingCompleted;
-
-    return { requiredFields, completedSteps: newCompletedSteps };
-  }, [formData]);
-
-  useEffect(() => {
-    const { requiredFields, completedSteps: newCompletedSteps } = calculateCompletionStatus();
-    setAllRequiredFields(requiredFields);
-    setCompletedSteps(newCompletedSteps);
-
-    Object.entries(newCompletedSteps).forEach(([stepId, completed]) => {
-      updateStepCompletion(stepId, completed);
-    });
-  }, [calculateCompletionStatus, updateStepCompletion]);
-
-  const completionPercentage = useMemo(() => {
-    const completedCount = Object.values(completedSteps).filter(Boolean).length;
-    return Math.round((completedCount / steps.length) * 100);
-  }, [completedSteps, steps.length]);
-
-  const scrollToField = useCallback((fieldId: string) => {
-    const el = document.getElementById(fieldId);
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    el.classList.add("border-red-500", "ring-2", "ring-red-200");
-    setTimeout(() => {
-      el.classList.remove("border-red-500", "ring-2", "ring-red-200");
-    }, 3000);
-  }, []);
+    updateAllSteps(completionStatus);
+  }, [
+    formData.name,
+    formData.categoryId,
+    formData.isLeafCategory,
+    formData.images,
+    formData.attributes,
+    formData.variants,
+    formData.description,
+    formData.shippingWarranty,
+    formData.requiredAttributes,
+    updateAllSteps,
+  ]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
+      {wizardSteps.map((step, index) => {
+        const isCompleted = step.completed;
+        const isRequired = step.required;
 
-      {/* Progress Overview */}
-      <div className="bg-gradient-to-r from-blue-50 to-green-50 p-4 rounded-lg border border-blue-100">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-bold text-lg text-gray-900">Product Creation Wizard</h3>
-          <div className="text-2xl font-bold text-blue-600">{completionPercentage}%</div>
-        </div>
-        <Progress value={completionPercentage} className="h-2" />
-      </div>
-
-      {/* Steps */}
-      <div className="space-y-3">
-        {steps.map((step, index) => (
+        return (
           <div
             key={step.id}
-            className={`p-3 rounded-lg border ${completedSteps[step.id] ? "border-green-200 bg-green-50" : "border-gray-200"}`}
-            onClick={() => setCurrentStep(index)}
+            className={`p-3 rounded-lg border-2 transition-all ${
+              isCompleted
+                ? "bg-green-50 border-green-200"
+                : isRequired
+                ? "bg-white border-gray-200 hover:border-blue-200"
+                : "bg-gray-50 border-gray-100"
+            }`}
           >
-            <div className="flex items-center gap-3">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${completedSteps[step.id] ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-600"}`}>
-                {completedSteps[step.id] ? <CheckCircle className="w-5 h-5" /> : step.icon}
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                {isCompleted ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                ) : isRequired ? (
+                  <AlertCircle className="w-5 h-5 text-amber-500" />
+                ) : (
+                  <Circle className="w-5 h-5 text-gray-400" />
+                )}
               </div>
-              <div className="flex-1">
-                <h4 className="font-medium">{step.title}</h4>
-                <p className="text-sm text-gray-500">{step.description}</p>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1">
+                    <h4 className={`font-medium text-sm ${
+                      isCompleted ? "text-green-900" : "text-gray-900"
+                    }`}>
+                      {step.title}
+                    </h4>
+                    {isRequired && !isCompleted && (
+                      <p className="text-xs text-amber-600 mt-0.5">Required</p>
+                    )}
+                    {!isRequired && (
+                      <p className="text-xs text-gray-500 mt-0.5">Optional</p>
+                    )}
+                  </div>
+                  <span className="text-xs font-medium text-gray-400">
+                    {index + 1}/{wizardSteps.length}
+                  </span>
+                </div>
+
+                {/* Step-specific details */}
+                {step.id === "basic-info" && (
+                  <div className="mt-2 text-xs text-gray-600 space-y-1">
+                    <p className={formData.name ? "text-green-600" : ""}>
+                      • Product name {formData.name ? "✓" : ""}
+                    </p>
+                    <p className={formData.categoryId && formData.isLeafCategory ? "text-green-600" : ""}>
+                      • Leaf category {formData.categoryId && formData.isLeafCategory ? "✓" : ""}
+                    </p>
+                  </div>
+                )}
+
+                {step.id === "media" && (
+                  <div className="mt-2 text-xs text-gray-600">
+                    <p className={formData.images.length > 0 ? "text-green-600" : ""}>
+                      • Images: {formData.images.length}/10 {formData.images.length > 0 ? "✓" : ""}
+                    </p>
+                  </div>
+                )}
+
+                {step.id === "attributes" && (
+                  <div className="mt-2 text-xs text-gray-600 space-y-1">
+                    {!formData.isLeafCategory ? (
+                      <p className="text-amber-600">• Select a leaf category first</p>
+                    ) : formData.requiredAttributes.length === 0 ? (
+                      <p className="text-green-600">• No required attributes ✓</p>
+                    ) : (
+                      <p className={
+                        formData.attributes.filter(a => 
+                          formData.requiredAttributes.some(r => r.id === a.attributeId)
+                        ).length === formData.requiredAttributes.length ? "text-green-600" : ""
+                      }>
+                        • Required: {formData.attributes.filter(a => 
+                          formData.requiredAttributes.some(r => r.id === a.attributeId)
+                        ).length}/{formData.requiredAttributes.length}
+                        {formData.attributes.filter(a => 
+                          formData.requiredAttributes.some(r => r.id === a.attributeId)
+                        ).length === formData.requiredAttributes.length ? " ✓" : ""}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {step.id === "variants" && (
+                  <div className="mt-2 text-xs text-gray-600">
+                    <p className={formData.variants.length > 0 ? "text-green-600" : ""}>
+                      • Variants: {formData.variants.length} {formData.variants.length > 0 ? "✓" : ""}
+                    </p>
+                  </div>
+                )}
+
+                {step.id === "description" && (
+                  <div className="mt-2 text-xs text-gray-600">
+                    <p className={formData.description ? "text-green-600" : "text-gray-500"}>
+                      • {formData.description ? `${formData.description.length} characters ✓` : "Not added yet"}
+                    </p>
+                  </div>
+                )}
+
+                {step.id === "shipping-warranty" && (
+                  <div className="mt-2 text-xs text-gray-600 space-y-1">
+                    <p className={formData.shippingWarranty?.warrantyType ? "text-green-600" : ""}>
+                      • Warranty type {formData.shippingWarranty?.warrantyType ? "✓" : ""}
+                    </p>
+                    <p className={formData.shippingWarranty?.warrantyDetails ? "text-green-600" : ""}>
+                      • Warranty details {formData.shippingWarranty?.warrantyDetails ? "✓" : ""}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* Required Field Summary */}
-      {allRequiredFields.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <h4 className="font-medium text-red-800 mb-2">
-            {allRequiredFields.length} Required Fields Missing
-          </h4>
-
-          <div className="space-y-2 text-sm text-red-700">
-            {!formData.name && <button onClick={() => scrollToField("productName")}>• Product Name</button>}
-            {!formData.categoryId && <button onClick={() => scrollToField("categorySelector")}>• Category</button>}
-            {formData.images.length === 0 && <button onClick={() => scrollToField("productImages")}>• Images</button>}
-          </div>
-        </div>
-      )}
-
+        );
+      })}
     </div>
   );
 };

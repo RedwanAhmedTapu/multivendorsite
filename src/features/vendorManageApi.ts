@@ -57,7 +57,11 @@ export interface VendorWithDetails extends Vendor {
     flags: number;
   };
 }
-
+export interface VerificationStatusRequest {
+  approvedBy?: string; // For verify endpoint
+  rejectionReason?: string; // For reject endpoint
+  reason?: string; // For suspend endpoint
+}
 export interface CreateVendorRequest {
   storeName: string;
   email?: string;
@@ -498,7 +502,7 @@ export interface Folder {
 export const vendorManageApi = createApi({
   reducerPath: "vendorManageApi",
   baseQuery: baseQueryWithReauth,
-  tagTypes: [
+   tagTypes: [
     "Vendor",
     "VendorCommission",
     "VendorPayout",
@@ -581,6 +585,80 @@ export const vendorManageApi = createApi({
         method: "DELETE",
       }),
       invalidatesTags: ["Vendor"],
+    }),
+     // ================================
+    // VERIFICATION STATUS MANAGEMENT (NEW)
+    // ================================
+
+    // Update verification status to UNDER_REVIEW
+    setUnderReview: builder.mutation<Vendor, string>({
+      query: (vendorId) => ({
+        url: `/vendormanagement/${vendorId}/verification/under-review`,
+        method: "PATCH",
+      }),
+      invalidatesTags: (result, error, vendorId) => [
+        { type: "Vendor", id: vendorId },
+      ],
+    }),
+
+    // Verify vendor - approve documents
+    verifyVendorVerification: builder.mutation<
+      Vendor,
+      { vendorId: string; approvedBy?: string }
+    >({
+      query: ({ vendorId, approvedBy }) => ({
+        url: `/vendormanagement/${vendorId}/verification/verify`,
+        method: "PATCH",
+        body: { approvedBy },
+      }),
+      invalidatesTags: (result, error, { vendorId }) => [
+        { type: "Vendor", id: vendorId },
+        { type: "VendorDocument", id: vendorId },
+        { type: "VendorOnboarding", id: vendorId },
+      ],
+    }),
+
+    // Reject vendor verification
+    rejectVendorVerification: builder.mutation<
+      Vendor,
+      { vendorId: string; rejectionReason: string }
+    >({
+      query: ({ vendorId, rejectionReason }) => ({
+        url: `/vendormanagement/${vendorId}/verification/reject`,
+        method: "PATCH",
+        body: { rejectionReason },
+      }),
+      invalidatesTags: (result, error, { vendorId }) => [
+        { type: "Vendor", id: vendorId },
+        { type: "VendorDocument", id: vendorId },
+      ],
+    }),
+
+    // Suspend vendor verification
+    suspendVendorVerification: builder.mutation<
+      Vendor,
+      { vendorId: string; reason?: string }
+    >({
+      query: ({ vendorId, reason }) => ({
+        url: `/vendormanagement/${vendorId}/verification/suspend`,
+        method: "PATCH",
+        body: { reason },
+      }),
+      invalidatesTags: (result, error, { vendorId }) => [
+        { type: "Vendor", id: vendorId },
+      ],
+    }),
+
+    // Request re-verification after rejection
+    requestReVerificationStatus: builder.mutation<Vendor, string>({
+      query: (vendorId) => ({
+        url: `/vendormanagement/${vendorId}/verification/request-reverification`,
+        method: "POST",
+      }),
+      invalidatesTags: (result, error, vendorId) => [
+        { type: "Vendor", id: vendorId },
+        { type: "VendorDocument", id: vendorId },
+      ],
     }),
 
     // ================================
@@ -1127,47 +1205,7 @@ export const vendorManageApi = createApi({
       ],
     }),
 
-    // ================================
-    // VERIFICATION MANAGEMENT
-    // ================================
-
-    // Verify vendor (Admin only)
-    verifyVendor: builder.mutation<Vendor, string>({
-      query: (vendorId) => ({
-        url: `/vendormanagement/${vendorId}/verify`,
-        method: "PATCH",
-      }),
-      invalidatesTags: (result, error, vendorId) => [
-        { type: "Vendor", id: vendorId },
-      ],
-    }),
-
-    // Reject vendor (Admin only) - FIXED VERSION
-    rejectVendor: builder.mutation<
-      Vendor,
-      { vendorId: string; data: VendorVerificationRequest }
-    >({
-      query: ({ vendorId, data }) => ({
-        url: `/vendormanagement/${vendorId}/reject`,
-        method: "PATCH",
-        body: data,
-      }),
-      invalidatesTags: (result, error, { vendorId }) => [
-        { type: "Vendor", id: vendorId },
-      ],
-    }),
-
-    // Request re-verification
-    requestReVerification: builder.mutation<Vendor, string>({
-      query: (vendorId) => ({
-        url: `/vendormanagement/${vendorId}/request-reverification`,
-        method: "PATCH",
-      }),
-      invalidatesTags: (result, error, vendorId) => [
-        { type: "Vendor", id: vendorId },
-      ],
-    }),
-
+   
     // ================================
     // COMPLETE PROFILE MANAGEMENT
     // ================================
@@ -1379,10 +1417,12 @@ export const {
   useGetOnboardingStatusQuery,
   useGetSettingsQuery,
   useUpdateSettingsMutation,
-  // vendor verification
-  useVerifyVendorMutation,
-  useRejectVendorMutation,
-  useRequestReVerificationMutation,
+   // Verification Status Management 
+  useSetUnderReviewMutation,
+  useVerifyVendorVerificationMutation,
+  useRejectVendorVerificationMutation,
+  useSuspendVendorVerificationMutation,
+  useRequestReVerificationStatusMutation,
   // vendor complete profile where need
   useGetCompleteVendorProfileQuery,
   // Vendor CRUD

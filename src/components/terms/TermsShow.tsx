@@ -4,7 +4,9 @@ import React from "react";
 import { useGetActiveTermsQuery } from "../../features/termsApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Globe, Hash, Type, FileText, Loader2, Calendar } from "lucide-react";
+import { Hash, FileText, Loader2, Calendar } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Container } from "../Container";
 
 interface TermsShowProps {
   type?: "GENERAL" | "PRIVACY_POLICY" | "VENDOR_AGREEMENT" | "CUSTOMER_TERMS" | "DELIVERY_TERMS" | "RETURN_POLICY";
@@ -12,30 +14,151 @@ interface TermsShowProps {
   className?: string;
 }
 
-// Format date as "9 Sep, 2025"
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  const day = date.getDate();
-  const month = date.toLocaleString('default', { month: 'short' });
-  const year = date.getFullYear();
-  return `${day} ${month}, ${year}`;
+// Helper function to validate type
+const isValidType = (type: string | undefined): type is TermsShowProps['type'] => {
+  const validTypes = [
+    "GENERAL",
+    "PRIVACY_POLICY", 
+    "VENDOR_AGREEMENT",
+    "CUSTOMER_TERMS",
+    "DELIVERY_TERMS",
+    "RETURN_POLICY"
+  ];
+  return validTypes.includes(type as any);
 };
 
-export default function TermsShow({ type = "GENERAL", title, className = "" }: TermsShowProps) {
-  const { data: terms, isLoading, error } = useGetActiveTermsQuery({ type });
+// Format date as "9 Sep, 2025"
+const formatDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return "Invalid date";
+    }
+    const day = date.getDate();
+    const month = date.toLocaleString('default', { month: 'short' });
+    const year = date.getFullYear();
+    return `${day} ${month}, ${year}`;
+  } catch (error) {
+    console.error("Error formatting date:", error);
+    return "Date unavailable";
+  }
+};
+
+// Get default title based on type
+const getDefaultTitle = (type: TermsShowProps['type']): string => {
+  switch (type) {
+    case "PRIVACY_POLICY":
+      return "Privacy Policy";
+    case "VENDOR_AGREEMENT":
+      return "Vendor Agreement";
+    case "CUSTOMER_TERMS":
+      return "Customer Terms & Conditions";
+    case "DELIVERY_TERMS":
+      return "Delivery Terms";
+    case "RETURN_POLICY":
+      return "Return & Refund Policy";
+    case "GENERAL":
+    default:
+      return "Terms & Conditions";
+  }
+};
+
+export default function TermsShow({ 
+  type: propType = "GENERAL", 
+  title: propTitle, 
+  className = "" 
+}: TermsShowProps) {
+  const searchParams = useSearchParams();
+  const queryType = searchParams.get('type');
+  
+  // Determine which type to use: query param > prop > default
+  let finalType: TermsShowProps['type'] = propType;
+  if (queryType && isValidType(queryType)) {
+    finalType = queryType;
+  }
+  
+  const { data: terms, isLoading, error } = useGetActiveTermsQuery({ type: finalType });
+
+  // Use provided title, terms title, or default based on type
+  const displayTitle = propTitle || terms?.title || getDefaultTitle(finalType);
 
   if (isLoading) {
-    return (
-      <div className={`flex justify-center items-center min-h-[400px] ${className}`}>
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-gray-600">Loading terms and conditions...</p>
+  return (
+    <Container className={` ${className}`}>
+      <div className="animate-pulse">
+        {/* Header skeleton */}
+        <div className="p-6 rounded-t-lg bg-gradient-to-r from-gray-50 to-gray-100">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
+            <div className="flex-1">
+              {/* Title skeleton */}
+              <div className="h-10 bg-gray-300 rounded-lg w-3/4 mb-4 animate-pulse"></div>
+              
+              {/* Badges skeleton */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <div className="h-6 bg-gray-300 rounded-full w-20 animate-pulse"></div>
+                <div className="h-6 bg-gray-300 rounded-full w-32 animate-pulse"></div>
+              </div>
+            </div>
+            
+            {/* Date skeleton */}
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 bg-gray-300 rounded-full animate-pulse"></div>
+              <div className="h-4 bg-gray-300 rounded w-40 animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Content skeleton */}
+        <div className="pt-2 pb-10 px-4 md:px-6 space-y-6">
+          {/* Paragraph skeletons */}
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="space-y-3">
+              <div className="h-4 bg-gray-200 rounded animate-pulse" style={{ 
+                width: i % 4 === 0 ? '90%' : i % 4 === 1 ? '85%' : i % 4 === 2 ? '95%' : '80%' 
+              }}></div>
+              <div className="h-4 bg-gray-200 rounded animate-pulse" style={{ 
+                width: i % 4 === 0 ? '70%' : i % 4 === 1 ? '65%' : i % 4 === 2 ? '75%' : '60%' 
+              }}></div>
+              <div className="h-4 bg-gray-200 rounded animate-pulse" style={{ 
+                width: i % 4 === 0 ? '80%' : i % 4 === 1 ? '75%' : i % 4 === 2 ? '85%' : '70%' 
+              }}></div>
+            </div>
+          ))}
+          
+          {/* List skeleton */}
+          <div className="space-y-2">
+            <div className="h-6 bg-gray-300 rounded w-32 animate-pulse mb-4"></div>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-2 ml-4">
+                <div className="h-2 w-2 bg-gray-300 rounded-full animate-pulse"></div>
+                <div className="h-4 bg-gray-200 rounded w-64 animate-pulse"></div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Document info skeleton */}
+          <div className="mt-12 pt-8 border-t border-gray-200">
+            <div className="h-6 bg-gray-300 rounded w-48 animate-pulse mb-4"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="h-4 bg-gray-300 rounded w-32 animate-pulse"></div>
+                <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-4 bg-gray-300 rounded w-40 animate-pulse"></div>
+                <div className="h-8 bg-gray-200 rounded w-full animate-pulse"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    );
-  }
+    </Container>
+  );
+}
 
   if (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     return (
       <div className={`flex justify-center items-center min-h-[400px] ${className}`}>
         <Card className="w-full max-w-2xl mx-4">
@@ -43,7 +166,9 @@ export default function TermsShow({ type = "GENERAL", title, className = "" }: T
             <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-800 mb-2">Unable to Load Content</h3>
             <p className="text-gray-600 mb-4">
-              We're having trouble loading the terms and conditions at this time.
+              {errorMessage.includes("Network") 
+                ? "Network error. Please check your connection." 
+                : "We're having trouble loading the terms and conditions at this time."}
             </p>
             <button 
               onClick={() => window.location.reload()} 
@@ -63,9 +188,11 @@ export default function TermsShow({ type = "GENERAL", title, className = "" }: T
         <Card className="w-full max-w-2xl mx-4">
           <CardContent className="pt-8 pb-6 text-center">
             <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">No Terms Available</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">
+              {getDefaultTitle(finalType)} Not Available
+            </h3>
             <p className="text-gray-600">
-              There are no terms and conditions available for this section yet.
+              There are no {getDefaultTitle(finalType).toLowerCase()} available at this time.
             </p>
           </CardContent>
         </Card>
@@ -74,22 +201,24 @@ export default function TermsShow({ type = "GENERAL", title, className = "" }: T
   }
 
   return (
-    <div className={`max-w-7xl mx-auto px-4 py-8 ${className}`}>
-      <Card className="shadow-none overflow-hidden border-0">
-        <CardHeader className="p-6 rounded-md bg-gradient-to-r from-blue-50 to-indigo-50">
+    <Container className={` ${className}`}>
+      <Card className="shadow-none overflow-hidden  bg-transparent border-none  ots-font">
+        <CardHeader className="p-6 rounded-t-lg bg-gradient-to-r from-blue-50 to-indigo-50">
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
             <div className="flex-1">
-              <CardTitle className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
-                {title || terms.title}
+              <CardTitle className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
+                {displayTitle}
               </CardTitle>
-              <div className="flex flex-wrap gap-3">
-                <Badge variant="secondary" className="px-3 py-1 flex items-center gap-1 bg-blue-100 text-blue-800">
-                  <Hash className="w-4 h-4" /> v{terms.version}
+              <div className="flex flex-wrap gap-2 items-center">
+                <Badge variant="secondary" className="px-3 py-1 flex items-center gap-1 bg-blue-100 text-blue-800 border border-blue-200">
+                  <Hash className="w-3.5 h-3.5" /> v{terms.version}
                 </Badge>
-                
+                <Badge variant="outline" className="px-3 py-1 text-gray-600">
+                  {finalType.replace(/_/g, ' ').toLowerCase()}
+                </Badge>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-600 bg-white px-3 py-2 rounded-lg shadow-sm">
+            <div className="flex items-center gap-2 text-sm text-gray-600 bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-200">
               <Calendar className="w-4 h-4" />
               <span>Last updated: {formatDate(terms.updatedAt)}</span>
             </div>
@@ -108,7 +237,7 @@ export default function TermsShow({ type = "GENERAL", title, className = "" }: T
                 <FileText className="w-5 h-5" />
                 Document Information
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700 bg-gray-50 p-4 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700 bg-gray-50 p-4 rounded-lg border border-gray-200">
                 {terms.metaTitle && (
                   <div>
                     <span className="font-medium text-gray-900 block mb-1">Meta Title:</span>
@@ -309,6 +438,6 @@ export default function TermsShow({ type = "GENERAL", title, className = "" }: T
           }
         }
       `}</style>
-    </div>
+    </Container>
   );
 }
