@@ -1,5 +1,11 @@
 "use client";
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -21,11 +27,28 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import ProductDescriptionEditor from "@/components/productdescription/ProductDescriptionl";
 import ShippingWarrantyForm from "./ShippingWarrantyForm";
-import { RightSidebar, RightSidebarProvider } from "@/app/vendor-dashboard/rightbar/RightSidebar";
+import {
+  RightSidebar,
+  RightSidebarProvider,
+} from "@/app/vendor-dashboard/rightbar/RightSidebar";
 import { ProductCreationWizard } from "@/components/wizard/vendorrightsidewizard/ProductCreationWizard";
-import { Loader2, Search, X, AlertCircle, Check } from "lucide-react";
+import { Loader2, Search, AlertCircle, Check } from "lucide-react";
 import { translateProductName } from "@/utils/translate";
 import { useGetCategoriesQuery } from "@/features/apiSlice";
+
+// Define types for category data structure
+interface Category {
+  id: string;
+  name: string;
+  attributes?: Attribute[];
+  children?: Category[];
+}
+
+interface CategorySuggestion {
+  id: string;
+  name: string;
+  fullPath: string;
+}
 
 // Main Form Component
 function AddProductFormContent() {
@@ -47,21 +70,22 @@ function AddProductFormContent() {
   const [shippingWarranty, setShippingWarranty] =
     useState<ProductShippingWarrantyInput | null>(null);
 
-  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+  const [validationErrors, setValidationErrors] = useState<
+    Record<string, boolean>
+  >({});
   const [isTranslating, setIsTranslating] = useState(false);
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
-  const [suggestedCategories, setSuggestedCategories] = useState<Array<{
-    id: string;
-    name: string;
-    fullPath: string;
-  }>>([]);
+  const [suggestedCategories, setSuggestedCategories] = useState<
+    CategorySuggestion[]
+  >([]);
 
   const [createProduct, { isLoading }] = useCreateProductMutation();
-  const { data: categories, isLoading: categoriesLoading } = useGetCategoriesQuery();
+  const { data: categories, isLoading: categoriesLoading } =
+    useGetCategoriesQuery();
 
   const { user } = useSelector((state: RootState) => state.auth);
   const vendorId = user?.vendorId || "";
-  const userRole = user?.role as "VENDOR" | "ADMIN" || "VENDOR";
+  const userRole = (user?.role as "VENDOR" | "ADMIN") || "VENDOR";
 
   const formRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -89,86 +113,104 @@ function AddProductFormContent() {
   }, [name, validateNameLength]);
 
   // Find category suggestions based on product name
-  const findCategorySuggestions = useCallback((productName: string) => {
-    if (!categories || !productName.trim() || productName.trim().length < 10) {
-      setSuggestedCategories([]);
-      return;
-    }
+  const findCategorySuggestions = useCallback(
+    (productName: string) => {
+      if (
+        !categories ||
+        !productName.trim() ||
+        productName.trim().length < 10
+      ) {
+        setSuggestedCategories([]);
+        return;
+      }
 
-    const searchTerms = productName.toLowerCase().split(/\s+/).filter(term => term.length > 2);
-    if (searchTerms.length === 0) return;
+      const searchTerms = productName
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((term) => term.length > 2);
+      if (searchTerms.length === 0) return;
 
-    const suggestions: Array<{ id: string; name: string; fullPath: string; matchScore: number }> = [];
+      const suggestions: Array<{
+        id: string;
+        name: string;
+        fullPath: string;
+        matchScore: number;
+      }> = [];
 
-    const traverseCategories = (
-      categoryList: any[],
-      currentPath: string[] = [],
-      parentNames: string[] = []
-    ) => {
-      categoryList.forEach(category => {
-        const fullPath = [...currentPath, category.name];
-        const allNames = [...parentNames, category.name];
-        const categoryText = allNames.join(" ").toLowerCase();
+      const traverseCategories = (
+        categoryList: Category[],
+        currentPath: string[] = [],
+        parentNames: string[] = []
+      ) => {
+        categoryList.forEach((category: Category) => {
+          const fullPath = [...currentPath, category.name];
+          const allNames = [...parentNames, category.name];
+          const categoryText = allNames.join(" ").toLowerCase();
 
-        // Calculate match score
-        let matchScore = 0;
-        searchTerms.forEach(term => {
-          if (categoryText.includes(term)) {
-            matchScore += term.length * 2; // Weight by term length
-          }
-        });
-
-        // Also check if category name contains any search term
-        const categoryNameLower = category.name.toLowerCase();
-        searchTerms.forEach(term => {
-          if (categoryNameLower.includes(term)) {
-            matchScore += term.length * 3; // Higher weight for exact category name match
-          }
-        });
-
-        // Add to suggestions if there's a match
-        if (matchScore > 0) {
-          suggestions.push({
-            id: category.id,
-            name: category.name,
-            fullPath: fullPath.join(" > "),
-            matchScore
+          // Calculate match score
+          let matchScore = 0;
+          searchTerms.forEach((term) => {
+            if (categoryText.includes(term)) {
+              matchScore += term.length * 2; // Weight by term length
+            }
           });
-        }
 
-        // Recursively traverse children
-        if (category.children && category.children.length > 0) {
-          traverseCategories(category.children, fullPath, allNames);
-        }
-      });
-    };
+          // Also check if category name contains any search term
+          const categoryNameLower = category.name.toLowerCase();
+          searchTerms.forEach((term) => {
+            if (categoryNameLower.includes(term)) {
+              matchScore += term.length * 3; // Higher weight for exact category name match
+            }
+          });
 
-    traverseCategories(categories);
+          // Add to suggestions if there's a match
+          if (matchScore > 0) {
+            suggestions.push({
+              id: category.id,
+              name: category.name,
+              fullPath: fullPath.join(" > "),
+              matchScore,
+            });
+          }
 
-    // Sort by match score and take top 5
-    const sortedSuggestions = suggestions
-      .sort((a, b) => b.matchScore - a.matchScore)
-      .slice(0, 5)
-      .map(({ id, name, fullPath }) => ({ id, name, fullPath }));
+          // Recursively traverse children
+          if (category.children && category.children.length > 0) {
+            traverseCategories(category.children, fullPath, allNames);
+          }
+        });
+      };
 
-    setSuggestedCategories(sortedSuggestions);
-    setShowCategorySuggestions(sortedSuggestions.length > 0);
-  }, [categories]);
+      traverseCategories(categories as Category[]);
+
+      // Sort by match score and take top 5
+      const sortedSuggestions = suggestions
+        .sort((a, b) => b.matchScore - a.matchScore)
+        .slice(0, 5)
+        .map(({ id, name, fullPath }) => ({ id, name, fullPath }));
+
+      setSuggestedCategories(sortedSuggestions);
+      setShowCategorySuggestions(sortedSuggestions.length > 0);
+    },
+    [categories]
+  );
 
   // Handle English name change with category suggestions
-  const handleNameChange = useCallback((value: string) => {
-    setName(value);
+  const handleNameChange = useCallback(
+    (value: string) => {
+      setName(value);
 
-    // Clear previous timeout
-    if (suggestionTimeoutRef.current) {
-      clearTimeout(suggestionTimeoutRef.current);
-    }
+      // Clear previous timeout
+      if (suggestionTimeoutRef.current) {
+        clearTimeout(suggestionTimeoutRef.current);
+      }
 
-    // Debounce category suggestion
-    suggestionTimeoutRef.current = setTimeout(() => {
-      findCategorySuggestions(value);
-    }, 500);
-  }, [findCategorySuggestions]);
+      // Debounce category suggestion
+      suggestionTimeoutRef.current = setTimeout(() => {
+        findCategorySuggestions(value);
+      }, 500);
+    },
+    [findCategorySuggestions]
+  );
 
   // Auto-translate when English name changes
   useEffect(() => {
@@ -195,7 +237,7 @@ function AddProductFormContent() {
         clearTimeout(suggestionTimeoutRef.current);
       }
     };
-  }, [name]);
+  }, [name, nameBn]);
 
   // Close category suggestions when clicking outside
   useEffect(() => {
@@ -245,36 +287,44 @@ function AddProductFormContent() {
     setNameBn(value || "");
   };
 
-  // Handle category selection from suggestions
-  const handleCategorySuggestionSelect = (categoryId: string, fullPath: string) => {
-    // Find the category object from categories data
-    const findCategoryById = (cats: any[]): any => {
+  // Find category by ID helper function
+  const findCategoryById = useCallback(
+    (cats: Category[], targetId: string): Category | null => {
       for (const cat of cats) {
-        if (cat.id === categoryId) {
+        if (cat.id === targetId) {
           return cat;
         }
         if (cat.children && cat.children.length > 0) {
-          const found = findCategoryById(cat.children);
+          const found = findCategoryById(cat.children, targetId);
           if (found) return found;
         }
       }
       return null;
-    };
+    },
+    []
+  );
 
-    const category = findCategoryById(categories || []);
+  // Handle category selection from suggestions
+  const handleCategorySuggestionSelect = (
+    categoryId: string,
+    fullPath: string
+  ) => {
+    // Find the category object from categories data
+    const category = findCategoryById((categories as Category[]) || [], categoryId);
+    
     if (category) {
       const isLeaf = !category.children || category.children.length === 0;
-      const attributes = category.attributes || [];
-      
+      const categoryAttrs: Attribute[] = category.attributes || [];
+
       setCategoryId(categoryId);
       setIsLeafCategory(isLeaf);
-      setCategoryAttributes(attributes);
-      
-      const requiredAttrs = attributes.filter(attr => attr.isRequired);
+      setCategoryAttributes(categoryAttrs);
+
+      const requiredAttrs = categoryAttrs.filter((attr: Attribute) => attr.isRequired);
       setRequiredAttributes(requiredAttrs);
 
       const initialParts: Record<string, VariantNamePart> = {};
-      attributes.forEach((attr) => {
+      categoryAttrs.forEach((attr: Attribute) => {
         if (attr.id) {
           initialParts[attr.id] = {
             name: attr.name || "",
@@ -286,71 +336,68 @@ function AddProductFormContent() {
       });
       setVariantNameParts(initialParts);
 
-      // Call the original onSelect callback
-      const onSelect = (id: string, path: string, isLeaf: boolean, attributes: any[]) => {
-        // This would be called by CategoryTreeSelector, but we're bypassing it
-      };
-      onSelect(categoryId, fullPath, isLeaf, attributes);
-
       // Hide suggestions
       setShowCategorySuggestions(false);
     }
   };
 
   // Handle category selection from tree selector
-  const handleCategorySelect = useCallback((
-    id: string,
-    path: string,
-    isLeaf: boolean,
-    categoryAttrs: Attribute[]
-  ) => {
-    setCategoryId(id || null);
-    setIsLeafCategory(isLeaf);
-    setCategoryAttributes(categoryAttrs || []);
+  const handleCategorySelect = useCallback(
+    (id: string, path: string, isLeaf: boolean, categoryAttrs: Attribute[]) => {
+      setCategoryId(id || null);
+      setIsLeafCategory(isLeaf);
+      setCategoryAttributes(categoryAttrs || []);
 
-    const requiredAttrs = (categoryAttrs || []).filter(attr => attr.isRequired);
-    setRequiredAttributes(requiredAttrs);
+      const requiredAttrs = (categoryAttrs || []).filter(
+        (attr: Attribute) => attr.isRequired
+      );
+      setRequiredAttributes(requiredAttrs);
 
-    const initialParts: Record<string, VariantNamePart> = {};
-    (categoryAttrs || []).forEach((attr) => {
-      if (attr.id) {
-        initialParts[attr.id] = {
-          name: attr.name || "",
-          value: "",
-          displayValue: "",
-          include: false,
-        };
-      }
-    });
-    setVariantNameParts(initialParts);
-  }, []);
+      const initialParts: Record<string, VariantNamePart> = {};
+      (categoryAttrs || []).forEach((attr: Attribute) => {
+        if (attr.id) {
+          initialParts[attr.id] = {
+            name: attr.name || "",
+            value: "",
+            displayValue: "",
+            include: false,
+          };
+        }
+      });
+      setVariantNameParts(initialParts);
+    },
+    []
+  );
 
   // Handle attribute value change - store display value
-  const handleVariantFieldChange = useCallback((
-    fieldId: string,
-    fieldName: string,
-    value: any,
-    displayValue: string,
-    includeInVariant: boolean
-  ) => {
-    setVariantNameParts((prev) => ({
-      ...prev,
-      [fieldId]: { 
-        name: fieldName || "", 
-        value, 
-        displayValue: displayValue || "",
-        include: includeInVariant 
-      },
-    }));
-  }, []);
+  const handleVariantFieldChange = useCallback(
+    (
+      fieldId: string,
+      fieldName: string,
+      value: any,
+      displayValue: string,
+      includeInVariant: boolean
+    ) => {
+      setVariantNameParts((prev) => ({
+        ...prev,
+        [fieldId]: {
+          name: fieldName || "",
+          value,
+          displayValue: displayValue || "",
+          include: includeInVariant,
+        },
+      }));
+    },
+    []
+  );
 
   // Generate variant name using display values
   const generateVariantName = useCallback((): string => {
     const parts = Object.values(variantNameParts)
-      .filter(part => part.include && part.displayValue)
-      .map(part => `${part.name}: ${part.displayValue}`);
-    
-    return parts.join(' | ') || "";
+      .filter((part) => part.include && part.displayValue)
+      .map((part) => `${part.name}: ${part.displayValue}`);
+
+    return parts.join(" | ") || "";
   }, [variantNameParts]);
 
   // Validate required fields
@@ -361,28 +408,38 @@ function AddProductFormContent() {
     if (!name) errors.productName = true;
     if (nameValidationError) errors.productNameLength = true;
     if (!categoryId || !isLeafCategory) errors.categorySelector = true;
-    
+
     // Media
     if (images.length === 0) errors.productImages = true;
-    
+
     // Required attributes
-    requiredAttributes.forEach(attr => {
-      const filledAttribute = attributes.find(a => a.attributeId === attr.id);
+    requiredAttributes.forEach((attr: Attribute) => {
+      const filledAttribute = attributes.find((a) => a.attributeId === attr.id);
       if (!filledAttribute) {
         errors[`attribute-${attr.id}`] = true;
       }
     });
-    
+
     // Variants
     if (variantInputs.length === 0) errors.variantsSection = true;
-    
+
     // Shipping & Warranty
     if (!shippingWarranty?.warrantyType) errors.warrantyType = true;
     if (!shippingWarranty?.warrantyDetails) errors.warrantyDetails = true;
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
-  }, [name, nameValidationError, categoryId, isLeafCategory, images, requiredAttributes, attributes, variantInputs, shippingWarranty]);
+  }, [
+    name,
+    nameValidationError,
+    categoryId,
+    isLeafCategory,
+    images,
+    requiredAttributes,
+    attributes,
+    variantInputs,
+    shippingWarranty,
+  ]);
 
   // Scroll to first error
   const scrollToFirstError = useCallback(() => {
@@ -393,29 +450,36 @@ function AddProductFormContent() {
 
     const firstErrorId = errorFields[0];
     const errorElement = document.getElementById(firstErrorId);
-    
+
     if (errorElement) {
       errorElement.scrollIntoView({ behavior: "smooth", block: "center" });
       errorElement.classList.add("border-red-500", "ring-2", "ring-red-200");
       setTimeout(() => {
-        errorElement.classList.remove("border-red-500", "ring-2", "ring-red-200");
+        errorElement.classList.remove(
+          "border-red-500",
+          "ring-2",
+          "ring-red-200"
+        );
       }, 3000);
     }
   }, [validationErrors]);
 
   // Convert uploaded image URLs to ProductImageInput[]
-  const convertImages = useCallback((): ProductImageInput[] =>
-    images.map((url, index) => ({
-      url: url || "",
-      altText: `${name} image ${index + 1}`,
-      sortOrder: index,
-    })), [images, name]);
+  const convertImages = useCallback(
+    (): ProductImageInput[] =>
+      images.map((url, index) => ({
+        url: url || "",
+        altText: `${name} image ${index + 1}`,
+        sortOrder: index,
+      })),
+    [images, name]
+  );
 
   // Handle submit with validation
   const handleSubmit = async () => {
     // Validate name length first
     if (nameValidationError) {
-      setValidationErrors(prev => ({ ...prev, productNameLength: true }));
+      setValidationErrors((prev) => ({ ...prev, productNameLength: true }));
       alert(`⚠️ ${nameValidationError}`);
       return;
     }
@@ -506,22 +570,34 @@ function AddProductFormContent() {
   }, []);
 
   // Form data for wizard - memoized to prevent unnecessary re-renders
-  const formData = useMemo(() => ({
-    name: name || "",
-    nameBn: nameBn || "",
-    categoryId: categoryId || "",
-    isLeafCategory: isLeafCategory || false,
-    images: images || [],
-    videoUrl: videoUrl || "",
-    description: description || "",
-    attributes: attributes || [],
-    variants: variantInputs || [],
-    shippingWarranty: shippingWarranty || null,
-    requiredAttributes: requiredAttributes || [],
-  }), [
-    name, nameBn, categoryId, isLeafCategory, images, videoUrl, 
-    description, attributes, variantInputs, shippingWarranty, requiredAttributes
-  ]);
+  const formData = useMemo(
+    () => ({
+      name: name || "",
+      nameBn: nameBn || "",
+      categoryId: categoryId || "",
+      isLeafCategory: isLeafCategory || false,
+      images: images || [],
+      videoUrl: videoUrl || "",
+      description: description || "",
+      attributes: attributes || [],
+      variants: variantInputs || [],
+      shippingWarranty: shippingWarranty || null,
+      requiredAttributes: requiredAttributes || [],
+    }),
+    [
+      name,
+      nameBn,
+      categoryId,
+      isLeafCategory,
+      images,
+      videoUrl,
+      description,
+      attributes,
+      variantInputs,
+      shippingWarranty,
+      requiredAttributes,
+    ]
+  );
 
   return (
     <div className="flex gap-6">
@@ -539,7 +615,13 @@ function AddProductFormContent() {
           <CardContent className="space-y-6">
             {/* Product Name - Required */}
             <div id="productName" className="relative">
-              <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${validationErrors.productName ? 'border-l-4 border-red-500 pl-4' : ''}`}>
+              <div
+                className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
+                  validationErrors.productName
+                    ? "border-l-4 border-red-500 pl-4"
+                    : ""
+                }`}
+              >
                 <div className="relative">
                   <label className="block font-medium mb-2">
                     Product Name <span className="text-red-500">*</span>
@@ -557,17 +639,26 @@ function AddProductFormContent() {
                       placeholder="Enter product name (min 10 characters)"
                       required
                       maxLength={255}
-                      className={`pl-10 ${validationErrors.productName || validationErrors.productNameLength ? "border-red-500" : ""}`}
+                      className={`pl-10 ${
+                        validationErrors.productName ||
+                        validationErrors.productNameLength
+                          ? "border-red-500"
+                          : ""
+                      }`}
                     />
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    {name.length > 0 && name.length >= 10 && !nameValidationError && (
-                      <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
-                    )}
+                    {name.length > 0 &&
+                      name.length >= 10 &&
+                      !nameValidationError && (
+                        <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
+                      )}
                   </div>
-                  
+
                   {/* Validation messages */}
                   {validationErrors.productName && (
-                    <p className="text-sm text-red-500 mt-1">Product name is required</p>
+                    <p className="text-sm text-red-500 mt-1">
+                      Product name is required
+                    </p>
                   )}
                   {nameValidationError && (
                     <div className="flex items-center gap-1 text-sm text-red-500 mt-1">
@@ -592,7 +683,9 @@ function AddProductFormContent() {
                       variant="ghost"
                       size="sm"
                       onClick={handleManualTranslate}
-                      disabled={isTranslating || !name.trim() || name.length < 10}
+                      disabled={
+                        isTranslating || !name.trim() || name.length < 10
+                      }
                       className="text-xs text-blue-600 hover:text-blue-800"
                     >
                       {isTranslating ? (
@@ -609,7 +702,11 @@ function AddProductFormContent() {
                     <Input
                       value={nameBn}
                       onChange={(e) => handleNameBnChange(e.target.value)}
-                      placeholder={name.length >= 10 ? "Auto-translated from English" : "Enter English name first"}
+                      placeholder={
+                        name.length >= 10
+                          ? "Auto-translated from English"
+                          : "Enter English name first"
+                      }
                       maxLength={255}
                       className={isTranslating ? "opacity-50" : ""}
                       disabled={name.length < 10}
@@ -621,39 +718,53 @@ function AddProductFormContent() {
                     )}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    {name.length >= 10 
+                    {name.length >= 10
                       ? "Auto-translates from English. You can edit if needed."
                       : "Enter at least 10 characters in English name to enable translation"}
                   </p>
                 </div>
               </div>
-
-             
             </div>
 
             {/* Category Selection - Required */}
-<div id="categorySelector" className={validationErrors.categorySelector ? 'border-l-4 border-red-500 pl-4' : ''}>
-  <label className="block font-medium mb-2">
-    Category <span className="text-red-500">*</span>
-    {categoryId && (
-      <span className="ml-2 text-xs font-normal text-teal-600">
-        ✓ Selected
-      </span>
-    )}
-  </label>
-  <CategoryTreeSelector 
-    onSelect={handleCategorySelect}
-    productName={name} // Pass product name
-    suggestedCategories={suggestedCategories} 
-    onSuggestionSelect={handleCategorySuggestionSelect}
-  />
-  {validationErrors.categorySelector && (
-    <p className="text-sm text-red-500 mt-1">Please select a leaf category</p>
-  )}
-</div>
+            <div
+              id="categorySelector"
+              className={
+                validationErrors.categorySelector
+                  ? "border-l-4 border-red-500 pl-4"
+                  : ""
+              }
+            >
+              <label className="block font-medium mb-2">
+                Category <span className="text-red-500">*</span>
+                {categoryId && (
+                  <span className="ml-2 text-xs font-normal text-teal-600">
+                    ✓ Selected
+                  </span>
+                )}
+              </label>
+              <CategoryTreeSelector
+                onSelect={handleCategorySelect}
+                productName={name} // Pass product name
+                suggestedCategories={suggestedCategories}
+                onSuggestionSelect={handleCategorySuggestionSelect}
+              />
+              {validationErrors.categorySelector && (
+                <p className="text-sm text-red-500 mt-1">
+                  Please select a leaf category
+                </p>
+              )}
+            </div>
 
             {/* Product Images - Required */}
-            <div id="productImages" className={validationErrors.productImages ? 'border-l-4 border-red-500 pl-4' : ''}>
+            <div
+              id="productImages"
+              className={
+                validationErrors.productImages
+                  ? "border-l-4 border-red-500 pl-4"
+                  : ""
+              }
+            >
               <label className="block font-medium mb-2">
                 Product Images <span className="text-red-500">*</span>
                 {images.length > 0 && (
@@ -663,15 +774,22 @@ function AddProductFormContent() {
                 )}
               </label>
               {validationErrors.productImages && (
-                <p className="text-sm text-red-500 mb-2">At least one image is required</p>
+                <p className="text-sm text-red-500 mb-2">
+                  At least one image is required
+                </p>
               )}
-              <ImageUploader images={images} setImages={setImages} maxImages={10} />
+              <ImageUploader
+                images={images}
+                setImages={setImages}
+                maxImages={10}
+              />
             </div>
 
             {/* Product Video - Optional */}
             <div>
               <label className="block font-medium mb-2">
-                Product Video <span className="text-sm text-gray-500">(Optional)</span>
+                Product Video{" "}
+                <span className="text-sm text-gray-500">(Optional)</span>
               </label>
               <VideoUploader
                 videoUrl={videoUrl}
@@ -696,9 +814,18 @@ function AddProductFormContent() {
 
             {/* Variants */}
             {isLeafCategory && (
-              <div id="variantsSection" className={validationErrors.variantsSection ? 'border-l-4 border-red-500 pl-4' : ''}>
+              <div
+                id="variantsSection"
+                className={
+                  validationErrors.variantsSection
+                    ? "border-l-4 border-red-500 pl-4"
+                    : ""
+                }
+              >
                 {validationErrors.variantsSection && (
-                  <p className="text-sm text-red-500 mb-2">At least one variant is required</p>
+                  <p className="text-sm text-red-500 mb-2">
+                    At least one variant is required
+                  </p>
                 )}
                 <VariantManager
                   variants={variantInputs}
@@ -725,9 +852,7 @@ function AddProductFormContent() {
 
             {/* Description - Optional */}
             <div>
-              <label className="block font-medium mb-2">
-                Description
-              </label>
+              <label className="block font-medium mb-2">Description</label>
               <ProductDescriptionEditor
                 value={description}
                 onChange={setDescription}
@@ -745,7 +870,9 @@ function AddProductFormContent() {
             <div className="flex gap-4 pt-6 border-t">
               <Button
                 onClick={handleSubmit}
-                disabled={isLoading || !!nameValidationError || name.length < 10}
+                disabled={
+                  isLoading || !!nameValidationError || name.length < 10
+                }
                 className="flex-1 bg-teal-600 hover:bg-teal-700"
                 size="lg"
               >
