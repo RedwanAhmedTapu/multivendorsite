@@ -119,7 +119,71 @@ export const ExpertCustomerServiceIcon: React.FC<
     <path d="M12.42 19.5l-1.41 1.41c1.38 1.38 3.18 2.060 4.99 2.060s3.62-0.69 4.99-2.060l-1.41-1.41c-1.98 1.97-5.19 1.97-7.16 0z"></path>
   </svg>
 );
+// Competitive Price Icon
+export const CompetitivePriceIcon: React.FC<React.SVGProps<SVGSVGElement>> = (
+  props
+) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="32"
+    height="32"
+    viewBox="0 0 32 32"
+    {...props}
+  >
+    <title>competitive-price-taka</title>
+    {/* Outer circle */}
+    <path
+      fill="currentColor"
+      d="M16 2C8.28 2 2 8.28 2 16s6.28 14 14 14 14-6.28 14-14S23.72 2 16 2zm0 26C9.38 28 4 22.62 4 16S9.38 4 16 4s12 5.38 12 12-5.38 12-12 12z"
+    />
+    {/* Top horizontal line */}
+    <path
+      fill="currentColor"
+      d="M21.5 11h-11c-0.55 0-1-0.45-1-1s0.45-1 1-1h11c0.55 0 1 0.45 1 1s-0.45 1-1 1z"
+    />
+    {/* Bottom horizontal line */}
+    <path
+      fill="currentColor"
+      d="M21.5 23h-11c-0.55 0-1-0.45-1-1s0.45-1 1-1h11c0.55 0 1 0.45 1 1s-0.45 1-1 1z"
+    />
+    {/* Taka Symbol ৳ */}
+    <path
+      fill="currentColor"
+      d="M14.5 13h-1.5v8h1.5v-8z"
+    />
+    <path
+      fill="currentColor"
+      d="M14.5 13.5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v4c0 1.38-1.12 2.5-2.5 2.5s-2.5-1.12-2.5-2.5v-0.5h1.5v0.5c0 0.55 0.45 1 1 1s1-0.45 1-1v-4c0-0.55-0.45-1-1-1s-1 0.45-1 1v0.5h-1.5v-0.5z"
+    />
+    <path
+      fill="currentColor"
+      d="M11 16h8v1.5h-8v-1.5z"
+    />
+  </svg>
+);
 
+// Authentic Products Icon
+export const AuthenticProductsIcon: React.FC<React.SVGProps<SVGSVGElement>> = (
+  props
+) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="32"
+    height="32"
+    viewBox="0 0 32 32"
+    {...props}
+  >
+    <title>authentic-products</title>
+    <path
+      fill="currentColor"
+      d="M28 6H4C2.9 6 2 6.9 2 8v16c0 1.1 0.9 2 2 2h24c1.1 0 2-0.9 2-2V8c0-1.1-0.9-2-2-2zm0 18H4V8h24v16z"
+    />
+    <path
+      fill="currentColor"
+      d="M22.71 12.29l-8 8c-0.18 0.18-0.43 0.29-0.71 0.29s-0.53-0.11-0.71-0.29l-4-4c-0.39-0.39-0.39-1.02 0-1.41s1.02-0.39 1.41 0L14 17.59l7.29-7.29c0.39-0.39 1.02-0.39 1.41 0s0.39 1.02 0 1.41z"
+    />
+  </svg>
+);
 // Export all icons as a single object
 export const Icons = {
   FreeShipping: FreeShippingIcon,
@@ -127,6 +191,8 @@ export const Icons = {
   Return: ReturnIcon,
   Brands: BrandsIcon,
   Customer: ExpertCustomerServiceIcon,
+  CompetitivePrice: CompetitivePriceIcon,
+  AuthenticProducts: AuthenticProductsIcon,
 };
 
 export interface BenefitItem {
@@ -149,6 +215,16 @@ export interface BenefitsSectionProps {
 
 const defaultBenefits: BenefitItem[] = [
   {
+    icon: <CompetitivePriceIcon />,
+    title: "Competitive Price",
+    description: " Best Prices Everyday",
+  },
+  {
+    icon: <AuthenticProductsIcon />,
+    title: "Authentic Products",
+    description: "Brand Warranty",
+  },
+  {
     icon: <FreeShippingIcon />,
     title: "Fast Shipping",
     description: "Fast and reliable delivery",
@@ -156,22 +232,22 @@ const defaultBenefits: BenefitItem[] = [
   {
     icon: <SecurePaymentIcon />,
     title: "Secure Payments",
-    description: "Encrypted and safe transactions",
+    description: " safe transactions",
   },
   {
     icon: <ReturnIcon />,
     title: "Easy Returns",
-    description: "Quick and hassle-free returns",
+    description: "hassle-free returns",
   },
-  //   {
-  //     icon: <BrandsIcon />,
-  //     title: "Top Brands",
-  //     description: "Premium and trusted brand",
-  //   },
+  // {
+  //   icon: <BrandsIcon />,
+  //   title: "Top Brands",
+  //   description: "Premium and trusted brand",
+  // },
   {
     icon: <ExpertCustomerServiceIcon />,
-    title: "Expert Customer Service",
-    description: "Choose chat or call us anytime",
+    title: "Expert Service",
+    description: "chat or call us anytime",
   },
 ];
 
@@ -181,7 +257,7 @@ const BenefitsSection: React.FC<BenefitsSectionProps> = ({
   subtitle = "Experience the advantages of working with our platform",
   columns = 4,
   variant = "default",
-  iconSize = "medium",
+  iconSize = "small",
   className = "",
   showDivider = false,
   centered = true,
@@ -221,6 +297,8 @@ const BenefitsSection: React.FC<BenefitsSectionProps> = ({
       if (iconType === SecurePaymentIcon) return "SecurePayment";
       if (iconType === ReturnIcon) return "Return";
       if (iconType === BrandsIcon) return "Brands";
+      if (iconType === CompetitivePriceIcon) return "CompetitivePrice";
+      if (iconType === AuthenticProductsIcon) return "AuthenticProducts";
 
       // Check props for title
       if (
@@ -241,43 +319,46 @@ const BenefitsSection: React.FC<BenefitsSectionProps> = ({
     Brands: "bg-orange-50 text-orange-600",
     Worldwide: "bg-blue-50 text-blue-600",
     ExpertCustomerService: "bg-indigo-50 text-indigo-600",
+    CompetitivePrice: "bg-red-50 text-red-600",
+    AuthenticProducts: "bg-teal-50 text-teal-600",
   };
 
   // Default variant
   return (
-      <Container className="py-4">
-        <div className=" grid grid-cols-4 divide-x-2  divide-gray-400  gap-6 overflow-x-auto">
-          {benefits.map((benefit, index) => {
-            const iconName = getIconName(benefit.icon);
-            const bgColorClass =
-              iconBgColors[iconName]?.replace("text-", "") || "bg-blue-50";
+    <Container className="">
+      <div className=" grid grid-cols-3 2xl:grid-cols-6 justify-items-center-safe py-4    gap-1    bg-teal-50 rounded-sm">
+        {benefits.map((benefit, index) => {
+          const iconName = getIconName(benefit.icon);
+          const bgColorClass =
+            iconBgColors[iconName]?.replace("text-", "") || "bg-blue-50";
 
-            return (
-              <div
-                key={index}
-                className="hidden lg:flex items-start gap-1.5 p-2 text-left flex-shrink-0"
-              >
-                {benefit.icon && (
-                  <div className={`p-1.5 rounded-full ${bgColorClass}`}>
-                    <div className={`${iconSizes[iconSize]} scale-110`}>
-                      {cloneIcon(benefit.icon)}
-                    </div>
+          return (
+            <div
+              key={index}
+              className="hidden md:flex items-start gap-2 p-1.5 text-left flex-shrink-0  rounded-sm"
+            >
+              {benefit.icon && (
+                <div className={`p-1.5 rounded-full ${bgColorClass}`}>
+                  <div className={`${iconSizes[iconSize]} scale-110`}>
+                    {cloneIcon(benefit.icon)}
                   </div>
-                )}
-
-                <div>
-                  <h3 className="text-md font-semibold text-gray-900">
-                    {benefit.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 leading-tight">
-                    {benefit.description}
-                  </p>
                 </div>
+              )}
+
+              {/* Text Content */}
+              <div className="flex-1 min-w-0">
+                <h3 className=" sm:text-sm font-semibold text-gray-900 mb-1 group-hover:text-teal-600 transition-colors">
+                  {benefit.title}
+                </h3>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  {benefit.description}
+                </p>
               </div>
-            );
-          })}
-        </div>
-       </Container>
+            </div>
+          );
+        })}
+      </div>
+    </Container>
   );
 };
 

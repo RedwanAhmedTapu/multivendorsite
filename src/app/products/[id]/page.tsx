@@ -49,24 +49,50 @@ const ProductImage = ({ src, alt, ...props }: any) => {
   );
 };
 
-// Helper function to calculate product weight
+// Helper function to calculate product weight - FIXED
 const calculateProductWeight = (product: any): number => {
-  if (product?.variants?.[0]?.weight) {
-    return product.variants[0].weight;
+  try {
+    // First check if variant has weight
+    if (product?.variants?.[0]?.weight) {
+      return product.variants[0].weight;
+    }
+
+    // Default weights based on category
+    const defaultWeights: { [key: string]: number } = {
+      electronics: 1000,
+      phones: 1000,
+      android: 1000,
+      iphone: 1000,
+      mobile: 1000,
+      clothing: 200,
+      fashion: 200,
+      books: 300,
+      stationery: 300,
+      home: 500,
+      furniture: 500,
+      kitchen: 500,
+      default: 500,
+    };
+
+    // Get category name safely - FIXED: access product.category.name, not product.category
+    const categoryName = product?.category?.name;
+    
+    if (typeof categoryName === 'string') {
+      const lowerCategory = categoryName.toLowerCase();
+      
+      // Check each key to see if it's in the category name
+      for (const [key, weight] of Object.entries(defaultWeights)) {
+        if (lowerCategory.includes(key)) {
+          return weight;
+        }
+      }
+    }
+
+    return defaultWeights.default;
+  } catch (error) {
+    console.error('Error calculating product weight:', error);
+    return 500; // Default weight
   }
-
-  // Default weights based on category
-  const defaultWeights: { [key: string]: number } = {
-    electronics: 1000,
-    clothing: 200,
-    books: 300,
-    home: 500,
-    default: 500,
-  };
-
-  return (
-    defaultWeights[product?.category?.toLowerCase()] || defaultWeights.default
-  );
 };
 
 // Helper function to get product images
@@ -104,6 +130,8 @@ const SingleProduct = () => {
     zone: any;
     area: any;
   } | null>(null);
+  
+  console.log(product, "product");
 
   const productWeight = product ? calculateProductWeight(product) : 500;
   const productImages = product ? getProductImages(product) : [];

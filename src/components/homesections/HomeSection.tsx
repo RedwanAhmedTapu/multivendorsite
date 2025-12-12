@@ -131,7 +131,7 @@ const HeroSlider = () => {
         </div>
 
         {/* Right Section - Download App */}
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full bg-teal-50 rounded-sm">
           <div className="rounded-sm  h-full flex flex-col justify-center">
             <DownloadApp />
           </div>

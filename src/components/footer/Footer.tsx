@@ -288,18 +288,18 @@ const Footer = () => {
         <div className="">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6 md:gap-4">
             {/* Copyright */}
-            <p className="text-gray-600 text-sm text-center md:text-left">
+            <p className="text-gray-600 w-1/2 text-sm text-center md:text-left">
               Copyright © 2025 <span className="font-semibold">FinixMart</span>, All rights reserved.
             </p>
 
             {/* Payment Methods */}
-            <div className="flex flex-wrap items-center justify-center gap-3 md:gap-4">
+            <div className="w-1/2   flex flex-wrap items-center justify-center gap-3 md:gap-4">
              <Image
-                src="/footer/ssl-commerz-bangladesh.png"
+                src="/footer/sslcommerz-banner.png"
                 width={300}
                 height={300}
                 alt="SSL Commerz Banner"
-                className="h-8 object-contain"
+                className="w-full sm:h-12 object-contain"
               />
             </div>
           </div>
