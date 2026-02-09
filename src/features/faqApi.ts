@@ -85,28 +85,30 @@ export const faqApi = createApi({
 
   endpoints: (builder) => ({
     // ------- Get all FAQs with filtering and pagination -------
-    getFaqs: builder.query<FaqListResponse, FaqQuery | void>({
-      query: (params) => {
-        const queryParams = new URLSearchParams();
-        
-        if (params && params.category) queryParams.append("category", params.category);
-        if (params && params.isActive !== undefined) queryParams.append("isActive", String(params.isActive));
-        if (params && params.search) queryParams.append("search", params.search);
-        if (params && params.page) queryParams.append("page", String(params.page));
-        if (params && params.limit) queryParams.append("limit", String(params.limit));
+   getFaqs: builder.query<FaqListResponse, FaqQuery | void>({
+  query: (params) => {
+    const queryParams = new URLSearchParams();
+    
+    if (params && params.category) queryParams.append("category", params.category);
+    if (params && params.isActive !== undefined) {
+      // Send as JSON boolean in URL or use a custom serializer
+      queryParams.append("isActive", params.isActive ? "true" : "false");
+    }
+    if (params && params.search) queryParams.append("search", params.search);
+    if (params && params.page) queryParams.append("page", String(params.page));
+    if (params && params.limit) queryParams.append("limit", String(params.limit));
 
-        const queryString = queryParams.toString();
-        return `/faqs${queryString ? `?${queryString}` : ""}`;
-      },
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.data.map(({ id }) => ({ type: "Faqs" as const, id })),
-              { type: "Faqs", id: "LIST" },
-            ]
-          : [{ type: "Faqs", id: "LIST" }],
-    }),
-
+    const queryString = queryParams.toString();
+    return `/faqs${queryString ? `?${queryString}` : ""}`;
+  },
+  providesTags: (result) =>
+    result
+      ? [
+          ...result.data.map(({ id }) => ({ type: "Faqs" as const, id })),
+          { type: "Faqs", id: "LIST" },
+        ]
+      : [{ type: "Faqs", id: "LIST" }],
+}),
     // ------- Get FAQ by ID -------
     getFaqById: builder.query<FaqResponse, string>({
       query: (id) => `/faqs/${id}`,

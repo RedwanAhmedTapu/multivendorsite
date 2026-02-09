@@ -1,10 +1,16 @@
 "use client";
 
-import React, { useState, createContext, useContext, useCallback, useMemo, useEffect } from "react";
-import { X, ChevronRight, CheckCircle2, Circle } from "lucide-react";
+import React, {
+  useState,
+  createContext,
+  useContext,
+  useCallback,
+  useMemo,
+} from "react";
+import { ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
+/* -------------------- Types -------------------- */
 export type WizardStep = {
   id: string;
   title: string;
@@ -24,24 +30,24 @@ interface RightSidebarContextType {
   updateAllSteps: (steps: Partial<Record<string, boolean>>) => void;
 }
 
-const RightSidebarContext = createContext<RightSidebarContextType | undefined>(undefined);
+const RightSidebarContext =
+  createContext<RightSidebarContextType | undefined>(undefined);
 
 export const useRightSidebar = () => {
-  const context = useContext(RightSidebarContext);
-  if (!context) {
+  const ctx = useContext(RightSidebarContext);
+  if (!ctx) {
     throw new Error("useRightSidebar must be used within RightSidebarProvider");
   }
-  return context;
+  return ctx;
 };
 
-interface RightSidebarProviderProps {
-  children: React.ReactNode;
-}
-
-export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({
+/* -------------------- Provider -------------------- */
+export const RightSidebarProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [isOpen, setIsOpen] = useState(true);
+  const [currentStep, setCurrentStep] = useState(0);
+
   const [wizardSteps, setWizardSteps] = useState<WizardStep[]>([
     { id: "basic-info", title: "Basic Information", completed: false, required: true },
     { id: "media", title: "Media Upload", completed: false, required: true },
@@ -51,114 +57,150 @@ export const RightSidebarProvider: React.FC<RightSidebarProviderProps> = ({
     { id: "shipping-warranty", title: "Shipping & Warranty", completed: false, required: true },
     { id: "review", title: "Review & Submit", completed: false, required: true },
   ]);
-  const [currentStep, setCurrentStep] = useState(0);
 
   const updateStepCompletion = useCallback((stepId: string, completed: boolean) => {
-    setWizardSteps(prev => 
-      prev.map(step => 
-        step.id === stepId ? { ...step, completed } : step
-      )
+    setWizardSteps((prev) =>
+      prev.map((s) => (s.id === stepId ? { ...s, completed } : s))
     );
   }, []);
 
-  const updateAllSteps = useCallback((steps: Partial<Record<string, boolean>>) => {
-    setWizardSteps(prev => 
-      prev.map(step => ({
-        ...step,
-        completed: steps[step.id] !== undefined ? steps[step.id]! : step.completed
-      }))
-    );
-  }, []);
+  const updateAllSteps = useCallback(
+    (steps: Partial<Record<string, boolean>>) => {
+      setWizardSteps((prev) =>
+        prev.map((s) => ({
+          ...s,
+          completed: steps[s.id] ?? s.completed,
+        }))
+      );
+    },
+    []
+  );
 
-  const contextValue = useMemo(() => ({
-    isOpen,
-    setIsOpen,
-    wizardSteps,
-    currentStep,
-    setCurrentStep,
-    updateStepCompletion,
-    updateAllSteps,
-  }), [isOpen, wizardSteps, currentStep, updateStepCompletion, updateAllSteps]);
+  const value = useMemo(
+    () => ({
+      isOpen,
+      setIsOpen,
+      wizardSteps,
+      currentStep,
+      setCurrentStep,
+      updateStepCompletion,
+      updateAllSteps,
+    }),
+    [isOpen, wizardSteps, currentStep, updateStepCompletion, updateAllSteps]
+  );
 
   return (
-    <RightSidebarContext.Provider value={contextValue}>
+    <RightSidebarContext.Provider value={value}>
       {children}
     </RightSidebarContext.Provider>
   );
 };
 
-interface RightSidebarProps {
-  wizardComponent: React.ReactNode;
-}
-
-export const RightSidebar: React.FC<RightSidebarProps> = ({
+/* -------------------- Sidebar -------------------- */
+export const RightSidebar: React.FC<{ wizardComponent: React.ReactNode }> = ({
   wizardComponent,
 }) => {
   const { isOpen, setIsOpen, wizardSteps } = useRightSidebar();
 
-  // Calculate completion percentage
   const completionPercentage = useMemo(() => {
-    const completed = wizardSteps.filter(step => step.completed).length;
+    const completed = wizardSteps.filter((s) => s.completed).length;
     return Math.round((completed / wizardSteps.length) * 100);
   }, [wizardSteps]);
 
-  if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-blue-600 text-white p-3 rounded-l-lg shadow-lg hover:bg-blue-700 transition-all"
-      >
-        <ChevronRight className="w-5 h-5" />
-      </button>
-    );
-  }
-
   return (
-    <div className="fixed right-0 top-0 h-full w-96 bg-white border-l shadow-xl z-50 flex flex-col transition-all duration-300">
-      {/* Header */}
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-lg">Creation Wizard</h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsOpen(false)}
-            className="h-8 w-8 p-0"
+    <>
+      {/* ================= MOBILE ================= */}
+      <div className="lg:hidden w-full">
+        <div className="bg-white border rounded-lg shadow-sm">
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="w-full p-4 flex items-center justify-between hover:bg-gray-50"
           >
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-        
-        {/* Progress Bar */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Progress</span>
-            <span className="font-semibold text-blue-600">{completionPercentage}%</span>
-          </div>
-          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-blue-600 transition-all duration-500 ease-out"
-              style={{ width: `${completionPercentage}%` }}
-            />
-          </div>
+            <div className="flex-1">
+              <div className="flex justify-between mb-2">
+                <h3 className="font-semibold">Creation Wizard</h3>
+                <span className="text-sm font-semibold text-blue-600">
+                  {completionPercentage}%
+                </span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full">
+                <div
+                  className="h-full bg-blue-600 transition-all"
+                  style={{ width: `${completionPercentage}%` }}
+                />
+              </div>
+            </div>
+            {isOpen ? (
+              <ChevronUp className="w-5 h-5 text-gray-500" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-gray-500" />
+            )}
+          </button>
+
+          {isOpen && (
+            <>
+              <div className="border-t p-4 max-h-96 overflow-y-auto">
+                {wizardComponent}
+              </div>
+              <div className="p-4 border-t bg-gray-50 text-xs text-gray-500">
+                <p className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3 h-3 text-green-600" />
+                  {wizardSteps.filter((s) => s.completed).length} of{" "}
+                  {wizardSteps.length} steps completed
+                </p>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Content */}
-      <ScrollArea className="flex-1 p-4">
-        {wizardComponent}
-      </ScrollArea>
+      {/* ================= DESKTOP (FIXED STICKY) ================= */}
+      <div className="hidden lg:block">
+        <aside className=" bg-white border rounded-lg shadow-sm flex flex-col">
+          {/* Header */}
+          <div className="p-4 border-b">
+            <div className="flex justify-between mb-3">
+              <h3 className="font-semibold text-lg">Creation Wizard</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsOpen(!isOpen)}
+              >
+                {isOpen ? <ChevronUp /> : <ChevronDown />}
+              </Button>
+            </div>
 
-      {/* Footer */}
-      <div className="p-4 border-t bg-gray-50">
-        <div className="text-xs text-gray-500 space-y-1">
-          <p className="flex items-center gap-2">
-            <CheckCircle2 className="w-3 h-3 text-green-600" />
-            {wizardSteps.filter(s => s.completed).length} of {wizardSteps.length} steps completed
-          </p>
-          <p className="text-gray-400">Fill all required fields to proceed</p>
-        </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Progress</span>
+                <span className="font-semibold text-blue-600">
+                  {completionPercentage}%
+                </span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full">
+                <div
+                  className="h-full bg-blue-600 transition-all"
+                  style={{ width: `${completionPercentage}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Content (NO SCROLL AREA) */}
+          {isOpen && <div className="p-4">{wizardComponent}</div>}
+
+          {/* Footer */}
+          {isOpen && (
+            <div className="p-4 border-t bg-gray-50 text-xs text-gray-500">
+              <p className="flex items-center gap-2">
+                <CheckCircle2 className="w-3 h-3 text-green-600" />
+                {wizardSteps.filter((s) => s.completed).length} of{" "}
+                {wizardSteps.length} steps completed
+              </p>
+            </div>
+          )}
+        </aside>
       </div>
-    </div>
+    </>
   );
 };

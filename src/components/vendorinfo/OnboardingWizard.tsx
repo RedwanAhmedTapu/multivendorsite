@@ -1,5 +1,5 @@
 // components/vendor/OnboardingWizard.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   useGetVendorByIdQuery,
@@ -68,10 +68,21 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  
+  // Edit mode state
+  const [editMode, setEditMode] = useState<Record<WizardStep, boolean>>({
+    'store-info': false,
+    'address': false,
+    'account-type': false,
+    'documents': false,
+    'bank-info': false
+  });
 
+  // Refs to prevent infinite loops
   const initialStepDetermined = useRef(false);
+  const formsInitialized = useRef(false);
 
-  // API hooks - Single source of truth for vendor data
+  // API hooks
   const { data: vendor, refetch: refetchVendor, isLoading: vendorLoading } = useGetVendorByIdQuery(vendorId);
   const { data: onboardingStatus, refetch: refetchOnboarding, isLoading: statusLoading } = useGetOnboardingStatusQuery(vendorId);
   const { data: completeProfile, refetch: refetchProfile, isLoading: profileLoading } = useGetCompleteVendorProfileQuery(vendorId);
@@ -80,6 +91,15 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
   const [updatePersonalInfo] = useCreateOrUpdatePersonalInfoMutation();
   const [updateAddress] = useCreateOrUpdateAddressMutation();
   const [updateBankInfo] = useCreateOrUpdateBankInfoMutation();
+
+  // Memoize profile and status data to prevent unnecessary re-renders
+  const profileData = useMemo(() => {
+    return completeProfile?.data || completeProfile;
+  }, [completeProfile]);
+
+  const statusData = useMemo(() => {
+    return onboardingStatus?.data || onboardingStatus;
+  }, [onboardingStatus]);
 
   // Form hooks
   const storeInfoForm = useForm<UpdateVendorProfileRequest & { email?: string }>({ 
@@ -121,46 +141,30 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
     }
   });
 
-  // Debug logging
+  // Initialize forms ONCE when data is available
   useEffect(() => {
-    if (completeProfile) {
-      console.log('📊 COMPLETE PROFILE DATA:', completeProfile);
-    }
-  }, [completeProfile]);
-
-  // Set form default values from vendor data
-  useEffect(() => {
-    if (completeProfile) {
-      console.log('🔄 Setting ALL form data from complete profile:', {
-        storeName: completeProfile.storeName,
-        hasPickupAddress: !!completeProfile.pickupAddress,
-        hasPersonalInfo: !!completeProfile.personalInfo,
-        hasBankInfo: !!completeProfile.bankInfo,
-        hasDocuments: !!completeProfile.documents,
-        accountType: completeProfile.accountType,
-        businessType: completeProfile.businessType
-      });
+    if (profileData && !formsInitialized.current) {
+      console.log('🔄 Initializing forms with profile data (ONE TIME)');
       
       // Store Info
-      if (completeProfile.storeName) {
+      if (profileData.storeName) {
         storeInfoForm.reset({
-          storeName: completeProfile.storeName,
-          email: completeProfile.user?.email || ''
-        });
+          storeName: profileData.storeName,
+          email: profileData.user?.email || ''
+        }, { keepDefaultValues: false });
       }
 
       // Address
-      if (completeProfile.pickupAddress) {
-        const address = completeProfile.pickupAddress;
-        console.log('📍 Setting address data:', address);
-        addressForm.reset({
-          detailsAddress: address.detailsAddress || '',
-          city: address.city || '',
-          zone: address.zone || '',
-          area: address.area || ''
-        });
+      if (profileData.pickupAddress) {
+        const address = profileData.pickupAddress;
+        if (address.detailsAddress && address.city && address.zone && address.area) {
+          addressForm.reset({
+            detailsAddress: address.detailsAddress,
+            city: address.city,
+            zone: address.zone,
+            area: address.area
+          }, { keepDefaultValues: false });
 
-        if (address.city && address.zone && address.area) {
           setSelectedLocation({
             city: address.city,
             zone: address.zone,
@@ -170,104 +174,152 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
       }
 
       // Account Type & Business Type
-      if (completeProfile.accountType) {
-        console.log('👤 Setting account type:', completeProfile.accountType);
-        setAccountType(completeProfile.accountType);
+      if (profileData.accountType) {
+        setAccountType(profileData.accountType);
       }
       
-      if (completeProfile.businessType) {
-        console.log('🏢 Setting business type:', completeProfile.businessType);
-        setBusinessType(completeProfile.businessType as BusinessType);
+      if (profileData.businessType) {
+        setBusinessType(profileData.businessType as BusinessType);
       }
 
       // Personal Info
-      if (completeProfile.personalInfo) {
-        const personalInfo = completeProfile.personalInfo;
-        console.log('📝 Setting personal info:', personalInfo);
+      if (profileData.personalInfo) {
         personalInfoForm.reset({
-          idNumber: personalInfo.idNumber || '',
-          idName: personalInfo.idName || '',
-          companyName: personalInfo.companyName || '',
-          businessRegNo: personalInfo.businessRegNo || '',
-          taxIdNumber: personalInfo.taxIdNumber || ''
-        });
+          idNumber: profileData.personalInfo.idNumber || '',
+          idName: profileData.personalInfo.idName || '',
+          companyName: profileData.personalInfo.companyName || '',
+          businessRegNo: profileData.personalInfo.businessRegNo || '',
+          taxIdNumber: profileData.personalInfo.taxIdNumber || ''
+        }, { keepDefaultValues: false });
       }
 
       // Bank Info
-      if (completeProfile.bankInfo) {
-        const bankInfo = completeProfile.bankInfo;
-        console.log('🏦 Setting bank info:', bankInfo);
+      if (profileData.bankInfo) {
         bankInfoForm.reset({
-          accountName: bankInfo.accountName || '',
-          accountNumber: bankInfo.accountNumber || '',
-          bankName: bankInfo.bankName || '',
-          branchName: bankInfo.branchName || ''
-        });
+          accountName: profileData.bankInfo.accountName || '',
+          accountNumber: profileData.bankInfo.accountNumber || '',
+          bankName: profileData.bankInfo.bankName || '',
+          branchName: profileData.bankInfo.branchName || ''
+        }, { keepDefaultValues: false });
       }
-    }
-  }, [completeProfile, storeInfoForm, addressForm, personalInfoForm, bankInfoForm]);
 
-  // Determine initial step ONLY ONCE when component mounts
+      formsInitialized.current = true;
+      console.log('✅ Forms initialized successfully');
+    }
+  }, [profileData]);
+
+  // Determine initial step ONCE when component mounts
   useEffect(() => {
-    if (onboardingStatus && completeProfile && !statusLoading && !profileLoading && !initialStepDetermined.current) {
-      console.log('🎯 Determining INITIAL step with actual data:', {
-        storeName: completeProfile.storeName,
-        addressComplete: onboardingStatus.addressComplete,
-        personalInfoComplete: onboardingStatus.personalInfoComplete,
-        bankInfoComplete: onboardingStatus.bankInfoComplete,
-        documentsComplete: onboardingStatus.documentsComplete,
-        overallComplete: onboardingStatus.overallComplete
+    if (statusData && profileData && !statusLoading && !profileLoading && !initialStepDetermined.current) {
+      console.log('🎯 Determining INITIAL step (ONE TIME):', {
+        storeName: profileData.storeName,
+        addressComplete: statusData.addressComplete,
+        accountType: profileData.accountType,
+        documentsComplete: statusData.documentsComplete,
+        bankInfoComplete: statusData.bankInfoComplete,
+        overallComplete: statusData.overallComplete
       });
       
-      if (!completeProfile.storeName) {
-        console.log('➡️ Initial step: store-info (no store name)');
-        setCurrentStep('store-info');
-      } else if (!onboardingStatus.addressComplete) {
-        console.log('➡️ Initial step: address (address incomplete)');
-        setCurrentStep('address');
-      } else if (!onboardingStatus.personalInfoComplete || !onboardingStatus.bankInfoComplete) {
-        console.log('➡️ Initial step: account-type (personal/bank info incomplete)');
-        setCurrentStep('account-type');
-      } else if (!onboardingStatus.documentsComplete) {
-        console.log('➡️ Initial step: documents (documents incomplete)');
-        setCurrentStep('documents');
-      } else if (!onboardingStatus.overallComplete) {
-        console.log('➡️ Initial step: bank-info (overall incomplete)');
-        setCurrentStep('bank-info');
-      } else {
-        console.log('➡️ All steps completed - onboarding done');
+      let targetStep: WizardStep = 'store-info';
+      
+      if (!profileData.storeName) {
+        targetStep = 'store-info';
+      } else if (!statusData.addressComplete) {
+        targetStep = 'address';
+      } else if (!profileData.accountType) {
+        targetStep = 'account-type';
+      } else if (!statusData.documentsComplete) {
+        targetStep = 'documents';
+      } else if (!statusData.bankInfoComplete) {
+        targetStep = 'bank-info';
+      } else if (statusData.overallComplete) {
+        console.log('✅ All steps completed - calling onComplete');
         onComplete?.();
+        initialStepDetermined.current = true;
+        return;
       }
       
+      console.log(`➡️ Initial step set to: ${targetStep}`);
+      setCurrentStep(targetStep);
       initialStepDetermined.current = true;
     }
-  }, [onboardingStatus, completeProfile, statusLoading, profileLoading, onComplete]);
+  }, [statusData, profileData, statusLoading, profileLoading]);
 
   const clearError = (field: string) => {
-    if (errors[field]) {
-      setErrors(prev => {
+    setErrors(prev => {
+      if (prev[field]) {
         const newErrors = { ...prev };
         delete newErrors[field];
         return newErrors;
-      });
-    }
+      }
+      return prev;
+    });
   };
 
   const handleAvatarChange = (file: File | null) => {
     setAvatarFile(file);
   };
 
-  // Store info submission with avatar
+  // Check if step is completed
+  const isStepCompleted = (step: WizardStep): boolean => {
+    if (!profileData || !statusData) return false;
+    
+    switch (step) {
+      case 'store-info':
+        return !!profileData.storeName;
+      case 'address':
+        return statusData.addressComplete || false;
+      case 'account-type':
+        return !!profileData.accountType;
+      case 'documents':
+        return statusData.documentsComplete || false;
+      case 'bank-info':
+        return statusData.bankInfoComplete || false;
+      default:
+        return false;
+    }
+  };
+
+  // Handle step navigation from wizard progress
+  const handleStepNavigation = (step: WizardStep) => {
+    console.log('🔘 Step clicked:', step, 'Current step:', currentStep);
+    
+    // Only allow navigation to completed steps or current step
+    if (isStepCompleted(step) || step === currentStep) {
+      console.log('✅ Navigation allowed to:', step);
+      
+      // Exit edit mode for current step if active
+      if (editMode[currentStep]) {
+        setEditMode(prev => ({
+          ...prev,
+          [currentStep]: false
+        }));
+      }
+      
+      // Navigate to the clicked step
+      setCurrentStep(step);
+      
+      // Clear any errors
+      setErrors({});
+    } else {
+      console.log('❌ Navigation blocked - step not completed:', step);
+    }
+  };
+
+  // Toggle edit mode
+  const toggleEditMode = (step: WizardStep) => {
+    setEditMode(prev => ({
+      ...prev,
+      [step]: !prev[step]
+    }));
+  };
+
+  // Store info submission
   const handleStep1Submit = async (data: UpdateVendorProfileRequest & { email?: string }, avatarFile?: File | null) => {
     setIsSubmitting(true);
     setErrors({});
     
     try {
-      console.log('📤 Submitting store info:', { 
-        storeName: data.storeName,
-        hasAvatarFile: !!avatarFile 
-      });
-      
       const formData = new FormData();
       formData.append('storeName', data.storeName || '');
       
@@ -275,12 +327,10 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
         formData.append('avatar', avatarFile);
       }
       
-      const result = await updateVendorProfile({
+      await updateVendorProfile({
         id: vendorId,
         formData: formData
       }).unwrap();
-      
-      console.log('✅ Store info update successful:', result);
       
       await new Promise(resolve => setTimeout(resolve, 800));
       
@@ -290,14 +340,16 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
         refetchProfile()
       ]);
       
-      console.log('✅ All data refetched after store info update');
-      console.log('🚀 Manually progressing to address step');
-      setCurrentStep('address');
+      if (editMode['store-info']) {
+        setEditMode(prev => ({ ...prev, 'store-info': false }));
+      } else {
+        setCurrentStep('address');
+      }
       
     } catch (error: any) {
       console.error('❌ Failed to update store info:', error);
       setErrors({
-        submit: error?.message || error?.data?.message || 'Failed to update store information. Please try again.'
+        submit: error?.message || error?.data?.message || 'Failed to update store information.'
       });
     } finally {
       setIsSubmitting(false);
@@ -317,14 +369,10 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
         area: data.area,
       };
 
-      console.log('📤 Submitting address data:', addressData);
-
-      const result = await updateAddress({ 
+      await updateAddress({ 
         vendorId, 
         data: addressData 
       }).unwrap();
-      
-      console.log('✅ Address update successful:', result);
       
       await new Promise(resolve => setTimeout(resolve, 800));
       
@@ -334,14 +382,16 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
         refetchVendor()
       ]);
       
-      console.log('✅ All data refetched after address update');
-      console.log('🚀 Manually progressing to account-type step');
-      setCurrentStep('account-type');
+      if (editMode['address']) {
+        setEditMode(prev => ({ ...prev, 'address': false }));
+      } else {
+        setCurrentStep('account-type');
+      }
       
     } catch (error: any) {
       console.error('❌ Failed to update address:', error);
       setErrors({
-        submit: error?.data?.message || 'Failed to update address information. Please try again.'
+        submit: error?.data?.message || 'Failed to update address information.'
       });
     } finally {
       setIsSubmitting(false);
@@ -349,10 +399,13 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
   };
 
   const handleAccountTypeNext = async () => {
-    console.log('🚀 Moving to documents step with account type:', accountType);
-    // Refetch profile to ensure we have latest accountType
     await refetchProfile();
-    setCurrentStep('documents');
+    
+    if (editMode['account-type']) {
+      setEditMode(prev => ({ ...prev, 'account-type': false }));
+    } else {
+      setCurrentStep('documents');
+    }
   };
 
   // Documents submit handler
@@ -371,46 +424,38 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
     setErrors({});
     
     try {
-      console.log('📤 Processing documents step with payload:', payload);
-
-      // Update business type if provided
       if (payload.businessType) {
         setBusinessType(payload.businessType);
-        console.log('🏢 Business type set to:', payload.businessType);
       }
-
-      // Personal info is already saved in DocumentsStep component
-      // Documents are already uploaded in DocumentsStep component
       
-      // Add delay to ensure backend processes everything
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      // Refetch all data to get updated status
       await Promise.all([
         refetchOnboarding(), 
         refetchProfile(),
         refetchVendor()
       ]);
       
-      console.log('✅ Documents step completed successfully');
-      console.log('🚀 Moving to bank-info step');
-      setCurrentStep('bank-info');
+      if (editMode['documents']) {
+        setEditMode(prev => ({ ...prev, 'documents': false }));
+      } else {
+        setCurrentStep('bank-info');
+      }
       
     } catch (error: any) {
       console.error('❌ Failed to complete documents step:', error);
       setErrors({
-        submit: error?.data?.message || 'Failed to complete document step. Please try again.'
+        submit: error?.data?.message || 'Failed to complete document step.'
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Final submission (Bank Info)
+  // Bank info submission
   const handleFinalSubmit = async () => {
     const bankData = bankInfoForm.getValues();
 
-    // Validate bank info
     if (!bankData.accountName || !bankData.accountNumber || !bankData.bankName || !bankData.branchName) {
       setErrors({ submit: 'Please complete all bank information fields' });
       return;
@@ -420,27 +465,26 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
     setErrors({});
     
     try {
-      console.log('📤 Submitting final bank data:', bankData);
-
-      // Submit bank info
       await updateBankInfo({ 
         vendorId, 
         data: bankData 
       }).unwrap();
 
-      // Refetch all data to ensure UI is up to date
       await Promise.all([
         refetchOnboarding(), 
         refetchProfile(), 
         refetchVendor()
       ]);
       
-      console.log('✅ Onboarding completed successfully!');
-      onComplete?.();
+      if (editMode['bank-info']) {
+        setEditMode(prev => ({ ...prev, 'bank-info': false }));
+      } else {
+        onComplete?.();
+      }
     } catch (error: any) {
       console.error('❌ Failed to update bank info:', error);
       setErrors({
-        submit: error?.data?.message || 'Failed to update bank information. Please try again.'
+        submit: error?.data?.message || 'Failed to update bank information.'
       });
     } finally {
       setIsSubmitting(false);
@@ -448,26 +492,22 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
   };
 
   const getStepStatus = (stepKey: WizardStep) => {
-    const stepOrder: WizardStep[] = ['store-info', 'address', 'account-type', 'documents', 'bank-info'];
-    const currentStepIndex = stepOrder.indexOf(currentStep);
-    const stepIndex = stepOrder.indexOf(stepKey);
-    
-    if (stepIndex < currentStepIndex) return 'completed';
-    if (stepIndex === currentStepIndex) return 'current';
+    if (isStepCompleted(stepKey)) return 'completed';
+    if (stepKey === currentStep) return 'current';
     return 'pending';
   };
 
   const calculateProgress = () => {
-    if (!onboardingStatus) return 0;
+    if (!statusData || !profileData) return 0;
     
     let completed = 0;
     const total = 5;
     
-    if (completeProfile?.storeName) completed++;
-    if (onboardingStatus.addressComplete) completed++;
-    if (accountType) completed++;
-    if (onboardingStatus.documentsComplete) completed++;
-    if (onboardingStatus.personalInfoComplete && onboardingStatus.bankInfoComplete) completed++;
+    if (profileData.storeName) completed++;
+    if (statusData.addressComplete) completed++;
+    if (profileData.accountType) completed++;
+    if (statusData.documentsComplete) completed++;
+    if (statusData.bankInfoComplete) completed++;
     
     return (completed / total) * 100;
   };
@@ -475,19 +515,142 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
   const progress = calculateProgress();
   const isLoading = vendorLoading || statusLoading || profileLoading;
 
+  // Render completed step summary
+  const renderStepSummary = (step: WizardStep) => {
+    if (!profileData) return null;
+
+    let title = '';
+    let content: React.ReactNode = null;
+
+    switch (step) {
+      case 'store-info':
+        title = 'Store Information';
+        content = (
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              {profileData.avatar && (
+                <img 
+                  src={profileData.avatar} 
+                  alt="Store avatar" 
+                  className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
+                />
+              )}
+              <div>
+                <p className="text-sm text-gray-600">Store Name</p>
+                <p className="font-semibold text-gray-900">{profileData.storeName}</p>
+              </div>
+            </div>
+          </div>
+        );
+        break;
+
+      case 'address':
+        title = 'Pickup Address';
+        const address = profileData.pickupAddress;
+        content = address ? (
+          <div className="space-y-2">
+            <div>
+              <p className="text-sm text-gray-600">Location</p>
+              <p className="font-semibold text-gray-900">
+                {address.area}, {address.zone}, {address.city}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Detailed Address</p>
+              <p className="text-gray-900">{address.detailsAddress}</p>
+            </div>
+          </div>
+        ) : null;
+        break;
+
+      case 'account-type':
+        title = 'Account Type';
+        content = (
+          <div className="space-y-2">
+            <div>
+              <p className="text-sm text-gray-600">Account Type</p>
+              <p className="font-semibold text-gray-900">{profileData.accountType}</p>
+            </div>
+            {profileData.businessType && (
+              <div>
+                <p className="text-sm text-gray-600">Business Type</p>
+                <p className="font-semibold text-gray-900">{profileData.businessType}</p>
+              </div>
+            )}
+          </div>
+        );
+        break;
+
+      case 'documents':
+        title = 'Documents';
+        content = (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600">
+              {profileData.documents?.length || 0} document(s) uploaded
+            </p>
+          </div>
+        );
+        break;
+
+      case 'bank-info':
+        title = 'Bank Information';
+        const bankInfo = profileData.bankInfo;
+        content = bankInfo ? (
+          <div className="space-y-2">
+            <div>
+              <p className="text-sm text-gray-600">Account Name</p>
+              <p className="font-semibold text-gray-900">{bankInfo.accountName}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Bank Name</p>
+              <p className="text-gray-900">{bankInfo.bankName}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Account Number</p>
+              <p className="text-gray-900">****{bankInfo.accountNumber?.slice(-4)}</p>
+            </div>
+          </div>
+        ) : null;
+        break;
+    }
+
+    return (
+      <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6 mb-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-3">
+              <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <h3 className="text-lg font-bold text-green-900">{title} Completed</h3>
+            </div>
+            {content}
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleEditMode(step)}
+            className="ml-4 px-4 py-2 bg-white border-2 border-green-600 text-green-700 rounded-lg hover:bg-green-50 font-semibold transition-colors"
+          >
+            {editMode[step] ? 'Cancel Edit' : 'Edit'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (isLoading) {
     return <LoadingState />;
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-6 bg-white ">
+    <div className="max-w-7xl mx-auto p-6 bg-white">
       <WizardProgress 
         progress={progress}
         currentStep={currentStep}
         getStepStatus={getStepStatus}
+        onStepClick={handleStepNavigation}
       />
 
-      {/* Global Error Display */}
       {errors.submit && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
           <div className="flex">
@@ -499,74 +662,103 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ vendorId, onComplet
         </div>
       )}
 
-      {/* Form Content */}
       <div className="border-t pt-6">
         {currentStep === 'store-info' && (
-          <StoreInfoStep
-            form={storeInfoForm}
-            onSubmit={handleStep1Submit}
-            isSubmitting={isSubmitting}
-            vendor={completeProfile}
-            onClearError={clearError}
-            onAvatarChange={handleAvatarChange}
-            avatarPreview={completeProfile?.avatar}
-          />
+          <>
+            {isStepCompleted('store-info') && !editMode['store-info'] ? (
+              renderStepSummary('store-info')
+            ) : (
+              <StoreInfoStep
+                form={storeInfoForm}
+                onSubmit={handleStep1Submit}
+                isSubmitting={isSubmitting}
+                vendor={profileData}
+                onClearError={clearError}
+                onAvatarChange={handleAvatarChange}
+                avatarPreview={profileData?.avatar}
+              />
+            )}
+          </>
         )}
 
         {currentStep === 'address' && (
-          <AddressStep
-            form={addressForm}
-            onSubmit={handleStep2Submit}
-            isSubmitting={isSubmitting}
-            onBack={() => setCurrentStep('store-info')}
-            onClearError={clearError}
-            onLocationSelected={setSelectedLocation}
-            selectedLocation={selectedLocation}
-            existingAddress={completeProfile?.pickupAddress}
-          />
+          <>
+            {isStepCompleted('address') && !editMode['address'] ? (
+              renderStepSummary('address')
+            ) : (
+              <AddressStep
+                form={addressForm}
+                onSubmit={handleStep2Submit}
+                isSubmitting={isSubmitting}
+                onBack={() => setCurrentStep('store-info')}
+                onClearError={clearError}
+                onLocationSelected={setSelectedLocation}
+                selectedLocation={selectedLocation}
+                existingAddress={profileData?.pickupAddress}
+              />
+            )}
+          </>
         )}
 
         {currentStep === 'account-type' && (
-          <AccountTypeStep
-            accountType={accountType}
-            onAccountTypeChange={setAccountType}
-            onNext={handleAccountTypeNext}
-            onBack={() => setCurrentStep('address')}
-            showBackButton={true}
-            vendorId={vendorId}
-            completeProfile={completeProfile}
-          />
+          <>
+            {isStepCompleted('account-type') && !editMode['account-type'] ? (
+              renderStepSummary('account-type')
+            ) : (
+              <AccountTypeStep
+                accountType={accountType}
+                onAccountTypeChange={setAccountType}
+                onNext={handleAccountTypeNext}
+                onBack={() => setCurrentStep('address')}
+                showBackButton={true}
+                vendorId={vendorId}
+                completeProfile={profileData}
+              />
+            )}
+          </>
         )}
 
         {currentStep === 'documents' && (
-          <DocumentsStep
-            accountType={accountType}
-            businessType={businessType}
-            vendorId={vendorId}
-            onDocumentsChange={setDocuments}
-            onBusinessTypeChange={setBusinessType}
-            onSubmit={handleDocumentsSubmit}
-            isSubmitting={isSubmitting}
-            onBack={() => setCurrentStep('account-type')}
-            onClearError={clearError}
-            existingPersonalInfo={completeProfile?.personalInfo}
-            existingBankInfo={completeProfile?.bankInfo}
-            completeProfile={completeProfile}
-          />
+          <>
+            {isStepCompleted('documents') && !editMode['documents'] ? (
+              renderStepSummary('documents')
+            ) : (
+              <DocumentsStep
+                accountType={accountType}
+                businessType={businessType}
+                vendorId={vendorId}
+                onDocumentsChange={setDocuments}
+                onBusinessTypeChange={setBusinessType}
+                onSubmit={handleDocumentsSubmit}
+                isSubmitting={isSubmitting}
+                onBack={() => setCurrentStep('account-type')}
+                onClearError={clearError}
+                existingPersonalInfo={profileData?.personalInfo}
+                existingBankInfo={profileData?.bankInfo}
+                completeProfile={profileData}
+              />
+            )}
+          </>
         )}
 
         {currentStep === 'bank-info' && (
-          <BankInfoStep
-            personalForm={personalInfoForm}
-            bankForm={bankInfoForm}
-            onSubmit={handleFinalSubmit}
-            isSubmitting={isSubmitting}
-            onBack={() => setCurrentStep('documents')}
-            onClearError={clearError}
-            accountType={accountType}
-            existingPersonalInfo={completeProfile?.personalInfo}
-            existingBankInfo={completeProfile?.bankInfo}
-          />
+          <>
+            {isStepCompleted('bank-info') && !editMode['bank-info'] ? (
+              renderStepSummary('bank-info')
+            ) : (
+              <BankInfoStep
+                personalForm={personalInfoForm}
+                bankForm={bankInfoForm}
+                onSubmit={handleFinalSubmit}
+                isSubmitting={isSubmitting}
+                onBack={() => setCurrentStep('documents')}
+                onClearError={clearError}
+                accountType={accountType}
+                existingPersonalInfo={profileData?.personalInfo}
+                existingBankInfo={profileData?.bankInfo}
+              />
+            )}
+          </>
         )}
       </div>
     </div>

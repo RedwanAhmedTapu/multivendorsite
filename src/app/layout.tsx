@@ -6,6 +6,7 @@ import ReduxProvider from "@/context/ReduxProvider";
 import MobileBottomNav from "@/components/movilebottomnav/MobileBottomNav";
 import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
+import { Toaster } from "sonner";
 config.autoAddCss = false;
 
 // Primary font for body text, product info, prices
@@ -53,6 +54,22 @@ export default function RootLayout({
         <ReduxProvider>
           <Navbar />
           {children}
+          <Toaster 
+          position="top-right"
+          toastOptions={{
+            classNames: {
+              toast: 'group toast',
+              title: 'text-sm font-semibold',
+              description: 'text-sm opacity-90',
+              actionButton: 'group-[.toast]:bg-primary group-[.toast]:text-primary-foreground',
+              cancelButton: 'group-[.toast]:bg-muted group-[.toast]:text-muted-foreground',
+              success: 'bg-green-50 border-green-200 text-green-900',
+              error: 'bg-red-50 border-red-200 text-red-900',
+              warning: 'bg-yellow-50 border-yellow-200 text-yellow-900',
+              info: 'bg-blue-50 border-blue-200 text-blue-900',
+            },
+          }}
+        />
           <MobileBottomNav />
         </ReduxProvider>
       </body>

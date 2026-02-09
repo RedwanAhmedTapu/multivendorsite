@@ -120,7 +120,7 @@ export default function CategorySection() {
                       className="w-full h-full rounded-full object-cover"
                     />
                   </div>
-                  <p className="mt-2 text-sm text-gray-700">{cat.name}</p>
+                  <p className="mt-2 text-sm line-clamp-2 min-h-[2.5rem] text-gray-700">{cat.name}</p>
                 </Link>
               ))}
             </div>

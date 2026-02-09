@@ -103,7 +103,6 @@ export interface CategoryAttribute {
 export interface VariantNamePart {
   name: string;
   value: any;
-  displayValue?: string;
   include: boolean;
 }
 

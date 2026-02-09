@@ -1,5 +1,4 @@
 // app/products/page.tsx (Server Component)
-export const dynamic = "force-dynamic";
 import { getCategoriesServer, getProductsServer } from '@/lib/api-utils';
 import ProductsPage from './ProductsPageClient';
 
@@ -13,6 +12,8 @@ export const metadata = {
     type: 'website',
   },
 };
+
+// Remove force-dynamic to allow client-side navigation
 
 export default async function ProductsServerPage() {
   // Fetch data on server

@@ -63,19 +63,20 @@ export const ProductCreationWizard: React.FC<ProductCreationWizardProps> = ({
     // 5. Description - optional, mark as complete only if has actual content
     completionStatus["description"] = formData.description.trim().length > 0;
 
-    // 6. Shipping & Warranty - both fields required
-    completionStatus["shipping-warranty"] = !!(
-      formData.shippingWarranty?.warrantyType &&
-      formData.shippingWarranty?.warrantyDetails
-    );
+    // 6. Shipping & Warranty - optional, mark as complete if either field is filled
+    // If both fields are empty, still consider it complete since it's optional
+    const hasShippingWarrantyData = 
+      formData.shippingWarranty?.warrantyType || 
+      formData.shippingWarranty?.warrantyDetails;
+    completionStatus["shipping-warranty"] = true; // Always complete since it's optional
 
     // 7. Review - all required steps completed
+    // Note: shipping-warranty is not required, so don't include it in required steps check
     const allRequiredComplete = 
       completionStatus["basic-info"] &&
       completionStatus["media"] &&
       completionStatus["attributes"] &&
-      completionStatus["variants"] &&
-      completionStatus["shipping-warranty"];
+      completionStatus["variants"];
     completionStatus["review"] = allRequiredComplete;
 
     updateAllSteps(completionStatus);
@@ -201,11 +202,11 @@ export const ProductCreationWizard: React.FC<ProductCreationWizardProps> = ({
 
                 {step.id === "shipping-warranty" && (
                   <div className="mt-2 text-xs text-gray-600 space-y-1">
-                    <p className={formData.shippingWarranty?.warrantyType ? "text-green-600" : ""}>
-                      • Warranty type {formData.shippingWarranty?.warrantyType ? "✓" : ""}
+                    <p className={formData.shippingWarranty?.warrantyType ? "text-green-600" : "text-gray-500"}>
+                      • Warranty type {formData.shippingWarranty?.warrantyType ? "✓" : "(Optional)"}
                     </p>
-                    <p className={formData.shippingWarranty?.warrantyDetails ? "text-green-600" : ""}>
-                      • Warranty details {formData.shippingWarranty?.warrantyDetails ? "✓" : ""}
+                    <p className={formData.shippingWarranty?.warrantyDetails ? "text-green-600" : "text-gray-500"}>
+                      • Warranty details {formData.shippingWarranty?.warrantyDetails ? "✓" : "(Optional)"}
                     </p>
                   </div>
                 )}

@@ -61,7 +61,7 @@ function AddProductFormContent() {
   const [requiredAttributes, setRequiredAttributes] = useState<Attribute[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-
+  const [resetKey, setResetKey] = useState(0);
   const [attributes, setAttributes] = useState<ProductAttributeInput[]>([]);
   const [variantInputs, setVariantInputs] = useState<ProductVariantInput[]>([]);
   const [variantNameParts, setVariantNameParts] = useState<
@@ -310,8 +310,11 @@ function AddProductFormContent() {
     fullPath: string
   ) => {
     // Find the category object from categories data
-    const category = findCategoryById((categories as Category[]) || [], categoryId);
-    
+    const category = findCategoryById(
+      (categories as Category[]) || [],
+      categoryId
+    );
+
     if (category) {
       const isLeaf = !category.children || category.children.length === 0;
       const categoryAttrs: Attribute[] = category.attributes || [];
@@ -320,7 +323,9 @@ function AddProductFormContent() {
       setIsLeafCategory(isLeaf);
       setCategoryAttributes(categoryAttrs);
 
-      const requiredAttrs = categoryAttrs.filter((attr: Attribute) => attr.isRequired);
+      const requiredAttrs = categoryAttrs.filter(
+        (attr: Attribute) => attr.isRequired
+      );
       setRequiredAttributes(requiredAttrs);
 
       const initialParts: Record<string, VariantNamePart> = {};
@@ -329,7 +334,6 @@ function AddProductFormContent() {
           initialParts[attr.id] = {
             name: attr.name || "",
             value: "",
-            displayValue: "",
             include: false,
           };
         }
@@ -359,7 +363,6 @@ function AddProductFormContent() {
           initialParts[attr.id] = {
             name: attr.name || "",
             value: "",
-            displayValue: "",
             include: false,
           };
         }
@@ -369,13 +372,12 @@ function AddProductFormContent() {
     []
   );
 
-  // Handle attribute value change - store display value
+  // Handle attribute value change
   const handleVariantFieldChange = useCallback(
     (
       fieldId: string,
       fieldName: string,
       value: any,
-      displayValue: string,
       includeInVariant: boolean
     ) => {
       setVariantNameParts((prev) => ({
@@ -383,7 +385,6 @@ function AddProductFormContent() {
         [fieldId]: {
           name: fieldName || "",
           value,
-          displayValue: displayValue || "",
           include: includeInVariant,
         },
       }));
@@ -391,11 +392,11 @@ function AddProductFormContent() {
     []
   );
 
-  // Generate variant name using display values
+  // Generate variant name using values
   const generateVariantName = useCallback((): string => {
     const parts = Object.values(variantNameParts)
-      .filter((part) => part.include && part.displayValue)
-      .map((part) => `${part.name}: ${part.displayValue}`);
+      .filter((part) => part.include && part.value)
+      .map((part) => `${part.name}: ${part.value}`);
 
     return parts.join(" | ") || "";
   }, [variantNameParts]);
@@ -422,10 +423,6 @@ function AddProductFormContent() {
 
     // Variants
     if (variantInputs.length === 0) errors.variantsSection = true;
-
-    // Shipping & Warranty
-    if (!shippingWarranty?.warrantyType) errors.warrantyType = true;
-    if (!shippingWarranty?.warrantyDetails) errors.warrantyDetails = true;
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -567,6 +564,7 @@ function AddProductFormContent() {
     setIsTranslating(false);
     setShowCategorySuggestions(false);
     setSuggestedCategories([]);
+    setResetKey((prev) => prev + 1);
   }, []);
 
   // Form data for wizard - memoized to prevent unnecessary re-renders
@@ -600,317 +598,325 @@ function AddProductFormContent() {
   );
 
   return (
-    <div className="flex gap-6">
-      {/* Main Form */}
-      <div className="flex-1" ref={formRef}>
-        <Card className="w-full mx-auto shadow-none border-none md:p-6">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Add New Product</span>
-              <span className="text-sm font-normal text-gray-600">
-                Complete all required fields marked with *
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Product Name - Required */}
-            <div id="productName" className="relative">
-              <div
-                className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
-                  validationErrors.productName
-                    ? "border-l-4 border-red-500 pl-4"
-                    : ""
-                }`}
-              >
-                <div className="relative">
-                  <label className="block font-medium mb-2">
-                    Product Name <span className="text-red-500">*</span>
-                    {name.length > 0 && (
-                      <span className="ml-2 text-xs font-normal text-gray-500">
-                        ({name.length}/255 characters)
-                      </span>
-                    )}
-                  </label>
+    <div className="relative w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_13rem] gap-4">
+        {/* MAIN CONTENT (scrolls naturally) */}
+        <div ref={formRef}>
+          <Card className="w-full mx-auto shadow-none border-none md:p-6">
+            <CardHeader>
+              <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <span>Add New Product</span>
+                <span className="text-sm font-normal text-gray-600">
+                  Complete all required fields marked with *
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Product Name - Required */}
+              <div id="productName" className="relative">
+                <div
+                  className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
+                    validationErrors.productName
+                      ? "border-l-4 border-red-500 pl-4"
+                      : ""
+                  }`}
+                >
                   <div className="relative">
-                    <Input
-                      ref={nameInputRef}
-                      value={name}
-                      onChange={(e) => handleNameChange(e.target.value)}
-                      placeholder="Enter product name (min 10 characters)"
-                      required
-                      maxLength={255}
-                      className={`pl-10 ${
-                        validationErrors.productName ||
-                        validationErrors.productNameLength
-                          ? "border-red-500"
-                          : ""
-                      }`}
-                    />
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    {name.length > 0 &&
-                      name.length >= 10 &&
-                      !nameValidationError && (
-                        <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
+                    <label className="block font-medium mb-2">
+                      Product Name <span className="text-red-500">*</span>
+                      {name.length > 0 && (
+                        <span className="ml-2 text-xs font-normal text-gray-500">
+                          ({name.length}/255 characters)
+                        </span>
                       )}
-                  </div>
-
-                  {/* Validation messages */}
-                  {validationErrors.productName && (
-                    <p className="text-sm text-red-500 mt-1">
-                      Product name is required
-                    </p>
-                  )}
-                  {nameValidationError && (
-                    <div className="flex items-center gap-1 text-sm text-red-500 mt-1">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{nameValidationError}</span>
-                    </div>
-                  )}
-                  {name.length >= 10 && !nameValidationError && (
-                    <p className="text-sm text-green-600 mt-1 flex items-center gap-1">
-                      <Check className="h-4 w-4" />
-                      Product name length is good
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block font-medium">
-                      Product Name (Bengali)
                     </label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleManualTranslate}
-                      disabled={
-                        isTranslating || !name.trim() || name.length < 10
-                      }
-                      className="text-xs text-blue-600 hover:text-blue-800"
-                    >
-                      {isTranslating ? (
-                        <>
-                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                          Translating...
-                        </>
-                      ) : (
-                        "↻ Auto-translate"
-                      )}
-                    </Button>
-                  </div>
-                  <div className="relative">
-                    <Input
-                      value={nameBn}
-                      onChange={(e) => handleNameBnChange(e.target.value)}
-                      placeholder={
-                        name.length >= 10
-                          ? "Auto-translated from English"
-                          : "Enter English name first"
-                      }
-                      maxLength={255}
-                      className={isTranslating ? "opacity-50" : ""}
-                      disabled={name.length < 10}
-                    />
-                    {isTranslating && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    <div className="relative">
+                      <Input
+                        ref={nameInputRef}
+                        value={name}
+                        onChange={(e) => handleNameChange(e.target.value)}
+                        placeholder="Enter product name (min 10 characters)"
+                        required
+                        maxLength={255}
+                        className={`pl-10 ${
+                          validationErrors.productName ||
+                          validationErrors.productNameLength
+                            ? "border-red-500"
+                            : ""
+                        }`}
+                      />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      {name.length > 0 &&
+                        name.length >= 10 &&
+                        !nameValidationError && (
+                          <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
+                        )}
+                    </div>
+
+                    {/* Validation messages */}
+                    {validationErrors.productName && (
+                      <p className="text-sm text-red-500 mt-1">
+                        Product name is required
+                      </p>
+                    )}
+                    {nameValidationError && (
+                      <div className="flex items-center gap-1 text-sm text-red-500 mt-1">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>{nameValidationError}</span>
                       </div>
                     )}
+                    {name.length >= 10 && !nameValidationError && (
+                      <p className="text-sm text-green-600 mt-1 flex items-center gap-1">
+                        <Check className="h-4 w-4" />
+                        Product name length is good
+                      </p>
+                    )}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {name.length >= 10
-                      ? "Auto-translates from English. You can edit if needed."
-                      : "Enter at least 10 characters in English name to enable translation"}
-                  </p>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block font-medium">
+                        Product Name (Bengali)
+                      </label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleManualTranslate}
+                        disabled={
+                          isTranslating || !name.trim() || name.length < 10
+                        }
+                        className="text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        {isTranslating ? (
+                          <>
+                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                            Translating...
+                          </>
+                        ) : (
+                          "↻ Auto-translate"
+                        )}
+                      </Button>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        value={nameBn}
+                        onChange={(e) => handleNameBnChange(e.target.value)}
+                        placeholder={
+                          name.length >= 10
+                            ? "Auto-translated from English"
+                            : "Enter English name first"
+                        }
+                        maxLength={255}
+                        className={isTranslating ? "opacity-50" : ""}
+                        disabled={name.length < 10}
+                      />
+                      {isTranslating && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {name.length >= 10
+                        ? "Auto-translates from English. You can edit if needed."
+                        : "Enter at least 10 characters in English name to enable translation"}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Category Selection - Required */}
-            <div
-              id="categorySelector"
-              className={
-                validationErrors.categorySelector
-                  ? "border-l-4 border-red-500 pl-4"
-                  : ""
-              }
-            >
-              <label className="block font-medium mb-2">
-                Category <span className="text-red-500">*</span>
-                {categoryId && (
-                  <span className="ml-2 text-xs font-normal text-teal-600">
-                    ✓ Selected
-                  </span>
-                )}
-              </label>
-              <CategoryTreeSelector
-                onSelect={handleCategorySelect}
-                productName={name} // Pass product name
-                suggestedCategories={suggestedCategories}
-                onSuggestionSelect={handleCategorySuggestionSelect}
-              />
-              {validationErrors.categorySelector && (
-                <p className="text-sm text-red-500 mt-1">
-                  Please select a leaf category
-                </p>
-              )}
-            </div>
-
-            {/* Product Images - Required */}
-            <div
-              id="productImages"
-              className={
-                validationErrors.productImages
-                  ? "border-l-4 border-red-500 pl-4"
-                  : ""
-              }
-            >
-              <label className="block font-medium mb-2">
-                Product Images <span className="text-red-500">*</span>
-                {images.length > 0 && (
-                  <span className="text-sm text-gray-500 ml-2">
-                    ({images.length}/10 uploaded)
-                  </span>
-                )}
-              </label>
-              {validationErrors.productImages && (
-                <p className="text-sm text-red-500 mb-2">
-                  At least one image is required
-                </p>
-              )}
-              <ImageUploader
-                images={images}
-                setImages={setImages}
-                maxImages={10}
-              />
-            </div>
-
-            {/* Product Video - Optional */}
-            <div>
-              <label className="block font-medium mb-2">
-                Product Video{" "}
-                <span className="text-sm text-gray-500">(Optional)</span>
-              </label>
-              <VideoUploader
-                videoUrl={videoUrl}
-                setVideoUrl={setVideoUrl}
-                vendorId={vendorId}
-                userRole={userRole}
-              />
-            </div>
-
-            {/* Specifications and Attributes */}
-            {isLeafCategory && (
-              <SpecAttributeManager
-                categoryId={categoryId || ""}
-                attributes={attributes}
-                setAttributes={setAttributes}
-                categoryAttributes={categoryAttributes}
-                requiredAttributes={requiredAttributes}
-                onVariantFieldChange={handleVariantFieldChange}
-                validationErrors={validationErrors}
-              />
-            )}
-
-            {/* Variants */}
-            {isLeafCategory && (
+              {/* Category Selection - Required */}
               <div
-                id="variantsSection"
+                id="categorySelector"
                 className={
-                  validationErrors.variantsSection
+                  validationErrors.categorySelector
                     ? "border-l-4 border-red-500 pl-4"
                     : ""
                 }
               >
-                {validationErrors.variantsSection && (
-                  <p className="text-sm text-red-500 mb-2">
-                    At least one variant is required
+                <label className="block font-medium mb-2">
+                  Category <span className="text-red-500">*</span>
+                  {categoryId && (
+                    <span className="ml-2 text-xs font-normal text-teal-600">
+                      ✓ Selected
+                    </span>
+                  )}
+                </label>
+                <CategoryTreeSelector
+                  onSelect={handleCategorySelect}
+                  productName={name}
+                  suggestedCategories={suggestedCategories}
+                  onSuggestionSelect={handleCategorySuggestionSelect}
+                />
+                {validationErrors.categorySelector && (
+                  <p className="text-sm text-red-500 mt-1">
+                    Please select a leaf category
                   </p>
                 )}
-                <VariantManager
-                  variants={variantInputs}
-                  setVariants={setVariantInputs}
-                  variantNameParts={variantNameParts}
-                  onGenerateVariantName={generateVariantName}
+              </div>
+
+              {/* Product Images - Required */}
+              <div
+                id="productImages"
+                className={
+                  validationErrors.productImages
+                    ? "border-l-4 border-red-500 pl-4"
+                    : ""
+                }
+              >
+                <label className="block font-medium mb-2">
+                  Product Images <span className="text-red-500">*</span>
+                  {images.length > 0 && (
+                    <span className="text-sm text-gray-500 ml-2">
+                      ({images.length}/10 uploaded)
+                    </span>
+                  )}
+                </label>
+                {validationErrors.productImages && (
+                  <p className="text-sm text-red-500 mb-2">
+                    At least one image is required
+                  </p>
+                )}
+                <ImageUploader
+                  images={images}
+                  setImages={setImages}
+                  maxImages={10}
                 />
               </div>
-            )}
 
-            {/* Warning for non-leaf categories */}
-            {!isLeafCategory && categoryId && (
-              <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-                <p className="text-yellow-800 font-medium">
-                  ⚠️ Please select a leaf category to add specifications and
-                  variants.
-                </p>
-                <p className="text-yellow-600 text-sm mt-1">
-                  Leaf categories are the final level categories (not parent
-                  categories).
-                </p>
+              {/* Product Video - Optional */}
+              <div>
+                <label className="block font-medium mb-2">
+                  Product Video{" "}
+                  <span className="text-sm text-gray-500">(Optional)</span>
+                </label>
+                <VideoUploader
+                  videoUrl={videoUrl}
+                  setVideoUrl={setVideoUrl}
+                  vendorId={vendorId}
+                  userRole={userRole}
+                />
               </div>
-            )}
 
-            {/* Description - Optional */}
-            <div>
-              <label className="block font-medium mb-2">Description</label>
-              <ProductDescriptionEditor
-                value={description}
-                onChange={setDescription}
-              />
-            </div>
+              {/* Specifications and Attributes */}
+              {isLeafCategory && (
+                <SpecAttributeManager
+                  categoryId={categoryId || ""}
+                  attributes={attributes}
+                  setAttributes={setAttributes}
+                  categoryAttributes={categoryAttributes}
+                  requiredAttributes={requiredAttributes}
+                  onVariantFieldChange={handleVariantFieldChange}
+                  validationErrors={validationErrors}
+                />
+              )}
 
-            {/* Shipping & Warranty - Required */}
-            <ShippingWarrantyForm
-              value={shippingWarranty}
-              onChange={setShippingWarranty}
-              validationErrors={validationErrors}
-            />
-
-            {/* Action Buttons */}
-            <div className="flex gap-4 pt-6 border-t">
-              <Button
-                onClick={handleSubmit}
-                disabled={
-                  isLoading || !!nameValidationError || name.length < 10
-                }
-                className="flex-1 bg-teal-600 hover:bg-teal-700"
-                size="lg"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Create Product"
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                className="bg-amber-200"
-                onClick={() => {
-                  if (
-                    confirm(
-                      "Are you sure you want to reset the form? All data will be lost."
-                    )
-                  ) {
-                    resetForm();
+              {/* Variants */}
+              {isLeafCategory && (
+                <div
+                  id="variantsSection"
+                  className={
+                    validationErrors.variantsSection
+                      ? "border-l-4 border-red-500 pl-4"
+                      : ""
                   }
-                }}
-                disabled={isLoading}
-                size="lg"
-              >
-                Reset Form
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                >
+                  {validationErrors.variantsSection && (
+                    <p className="text-sm text-red-500 mb-2">
+                      At least one variant is required
+                    </p>
+                  )}
+                  <VariantManager
+                    variants={variantInputs}
+                    setVariants={setVariantInputs}
+                    variantNameParts={variantNameParts}
+                    onGenerateVariantName={generateVariantName}
+                    categoryAttributes={categoryAttributes}
+                  />
+                </div>
+              )}
 
-      {/* Right Sidebar - Only Wizard */}
-      <RightSidebar
-        wizardComponent={<ProductCreationWizard formData={formData} />}
-      />
+              {/* Warning for non-leaf categories */}
+              {!isLeafCategory && categoryId && (
+                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                  <p className="text-yellow-800 font-medium">
+                    ⚠️ Please select a leaf category to add specifications and
+                    variants.
+                  </p>
+                  <p className="text-yellow-600 text-sm mt-1">
+                    Leaf categories are the final level categories (not parent
+                    categories).
+                  </p>
+                </div>
+              )}
+
+              {/* Description - Optional */}
+              <div>
+                <label className="block font-medium mb-2">Description</label>
+                <ProductDescriptionEditor
+                  value={description}
+                  onChange={setDescription}
+                />
+              </div>
+
+              {/* Shipping & Warranty - Required */}
+              <ShippingWarrantyForm
+                key={resetKey}
+                value={shippingWarranty}
+                onChange={setShippingWarranty}
+                validationErrors={validationErrors}
+              />
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t">
+                <Button
+                  onClick={handleSubmit}
+                  disabled={
+                    isLoading || !!nameValidationError || name.length < 10
+                  }
+                  className="flex-1 bg-teal-600 hover:bg-teal-700"
+                  size="lg"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Create Product"
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="bg-amber-200"
+                  onClick={() => {
+                    if (
+                      confirm(
+                        "Are you sure you want to reset the form? All data will be lost."
+                      )
+                    ) {
+                      resetForm();
+                    }
+                  }}
+                  disabled={isLoading}
+                  size="lg"
+                >
+                  Reset Form
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* SIDEBAR (sticky works) */}
+        <div className="hidden lg:block">
+          <aside className="sticky top-0">
+            <RightSidebar
+              wizardComponent={<ProductCreationWizard formData={formData} />}
+            />
+          </aside>
+        </div>
+      </div>
     </div>
   );
 }

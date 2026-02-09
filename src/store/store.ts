@@ -21,6 +21,13 @@ import { employeeApi } from "@/features/employeeApi";
 import { storeEditorApi } from "@/features/storeEditorApi";
 import { faqApi } from "@/features/faqApi";
 import { themeApi } from "@/features/themeApi";
+import { locationApi } from "@/features/locationApi";
+import {courierApi} from "@/features/courierApi";
+import { cartWishApi } from "@/features/cartWishApi";
+import  {warehouseApi} from "@/features/warehouseApi";
+import { accountingApi } from "@/features/accountingApi";
+import userAddressApi from "@/features/userAddressApi";
+import { footerSettingsApi } from "@/features/footerSettingsApi"; 
 
 // --------------------
 // All API imports in one array for easier management
@@ -38,9 +45,16 @@ const apiMiddlewares = [
   shippingProviderApi.middleware,
   offerApi.middleware, 
   employeeApi.middleware,
+  locationApi.middleware,
   storeEditorApi.middleware,
   faqApi.middleware,
   themeApi.middleware,
+  courierApi.middleware,
+  cartWishApi.middleware,
+  warehouseApi.middleware,
+  accountingApi.middleware,
+  userAddressApi.middleware,
+  footerSettingsApi.middleware, 
 ];
 
 const apiReducers = {
@@ -59,8 +73,15 @@ const apiReducers = {
   [offerApi.reducerPath]: offerApi.reducer, 
   [employeeApi.reducerPath]: employeeApi.reducer,
   [storeEditorApi.reducerPath]: storeEditorApi.reducer,
+  [locationApi.reducerPath]:locationApi.reducer,
   [faqApi.reducerPath]: faqApi.reducer,
   [themeApi.reducerPath]: themeApi.reducer,
+  [courierApi.reducerPath]:courierApi.reducer,
+  [cartWishApi.reducerPath]:cartWishApi.reducer,
+  [warehouseApi.reducerPath]:warehouseApi.reducer,
+  [accountingApi.reducerPath]:accountingApi.reducer,  
+  [userAddressApi.reducerPath]: userAddressApi.reducer,
+  [footerSettingsApi.reducerPath]: footerSettingsApi.reducer, 
 };
 
 // --------------------

@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import CategoryTreeSelector from '../categorytreeselector/CategoryTreeSelector';
 import { useGenerateTemplateMutation } from '@/features/productApi';
+import CategoryTreeSelector from '../product/vendor/productform/CategoryTreeSelector';
 
 const BulkProductTemplate: React.FC = () => {
   const [categoryId, setCategoryId] = useState<string | null>(null);

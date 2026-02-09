@@ -1,65 +1,68 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Heart, Eye, ShoppingCart, BadgeCheck } from "lucide-react";
+import { Heart, Eye, BadgeCheck } from "lucide-react";
 import { useGetProductsQuery } from "@/features/productApi";
 import Link from "next/link";
-import type { Product as ProductType } from "@/types/product"; // Import with alias
+import type { Product as ProductType } from "@/types/product";
 import HomepageProductSectionSkeleton from "../skeletons/HomepageProductSectionSkeleton";
 import { Container } from "../Container";
+import {
+  useAddToWishlistMutation,
+  useRemoveFromWishlistMutation,
+  useCheckInWishlistQuery,
+  useGetWishlistQuery,
+  useLazyCheckInWishlistQuery,
+} from "@/features/cartWishApi";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 // Taka Icon Component using FontAwesome
 const TakaIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <i className={`fa-solid fa-bangladeshi-taka-sign ${className}`} />
 );
 
-// Updated image type
-interface ProductImage {
-  url: string;
-  altText?: string;
-}
-
-interface Vendor {
-  id: string;
-  storeName: string;
-  avatar: string;
-  verificationStatus: "PENDING" | "VERIFIED" | "REJECTED";
-}
-
-// Use the imported ProductType instead of redefining
 interface ProductCardProps {
   product: ProductType;
 }
 
 interface SectionProps {
   title: string;
-  products: ProductType[]; // Use ProductType here
+  products: ProductType[];
 }
 
 const ProductCard = ({ product }: ProductCardProps) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
-  
+  const [isWishlistLoading, setIsWishlistLoading] = React.useState(false);
+  const [localWishlistState, setLocalWishlistState] = React.useState(false);
+
+  // Get variant information
   const variant = product.variants?.[0];
   const price = variant?.price || 0;
   const specialPrice = variant?.specialPrice || null;
   const discount = variant?.discount || null;
-  
+  const variantId = variant?.id || "";
+  const router = useRouter();
+
   // Calculate average rating
   const averageRating = product.reviews?.length
-    ? product.reviews.reduce((acc, review) => acc + review.rating, 0) / product.reviews.length
+    ? product.reviews.reduce((acc, review) => acc + review.rating, 0) /
+      product.reviews.length
     : 0;
   const reviewCount = product.reviews?.length || 0;
 
   // Check for free shipping
   const hasFreeShipping = product.offerProducts?.length
-    ? product.offerProducts.some(op => op.offer.type === "FREE_SHIPPING")
+    ? product.offerProducts.some((op) => op.offer.type === "FREE_SHIPPING")
     : false;
 
-  // Check vendor verification - handle undefined case
+  // Check vendor verification
   const isVerified = product.vendor?.verificationStatus === "VERIFIED";
   const storeName = product.vendor?.storeName || "Unknown Store";
 
@@ -67,14 +70,119 @@ const ProductCard = ({ product }: ProductCardProps) => {
   const image = product.images?.[0];
   const altText = image?.altText || product.name;
 
+  // Wishlist API hooks
+  const [addToWishlist] = useAddToWishlistMutation();
+  const [removeFromWishlist] = useRemoveFromWishlistMutation();
+
+  // Use lazy query for wishlist check - this won't auto-fetch on mount
+  const [
+    triggerCheckWishlist,
+    { data: wishlistCheck, isFetching: isCheckingWishlist },
+  ] = useLazyCheckInWishlistQuery();
+
+  // Get wishlist data (optional, for additional info)
+  const { refetch: refetchWishlist } = useGetWishlistQuery();
+
+  // Check if product is in wishlist
+  const isInWishlist = wishlistCheck?.data?.inWishlist || false;
+  const wishlistItemId = wishlistCheck?.data?.itemId;
+
+  // Check wishlist status on mount and when product changes
+  React.useEffect(() => {
+    if (product.id) {
+      triggerCheckWishlist({
+        productId: product.id,
+        variantId: variantId || undefined,
+      });
+    }
+  }, [product.id, variantId, triggerCheckWishlist]);
+
+  // Update local state when wishlist check changes
+  React.useEffect(() => {
+    if (wishlistCheck?.data) {
+      setLocalWishlistState(wishlistCheck.data.inWishlist);
+    }
+  }, [wishlistCheck]);
+
+  const handleWishlistToggle = async () => {
+    if (isWishlistLoading || isCheckingWishlist) return;
+
+    setIsWishlistLoading(true);
+
+    try {
+      if (isInWishlist && wishlistItemId) {
+        // Remove from wishlist
+        await removeFromWishlist(wishlistItemId).unwrap();
+        toast.success("Removed from wishlist");
+        setLocalWishlistState(false);
+
+        // Update the wishlist check
+        triggerCheckWishlist({
+          productId: product.id,
+          variantId: variantId || undefined,
+        });
+      } else {
+        // Add to wishlist
+        const wishlistData = {
+          productId: product.id,
+          variantId: variantId || undefined,
+          priority: 1,
+          notes: "",
+          notifyOnDiscount: true,
+          notifyOnRestock: true,
+        };
+
+        await addToWishlist(wishlistData).unwrap();
+        toast.success("Added to wishlist");
+        setLocalWishlistState(true);
+
+        // Update the wishlist check
+        triggerCheckWishlist({
+          productId: product.id,
+          variantId: variantId || undefined,
+        });
+      }
+
+      // Refetch full wishlist if needed
+      refetchWishlist();
+    } catch (error: any) {
+      console.error("Wishlist toggle error:", error);
+      const errorMessage =
+        error?.data?.message || error?.message || "Something went wrong";
+      toast.error(errorMessage);
+    } finally {
+      setIsWishlistLoading(false);
+    }
+  };
+
+  // Determine if heart should be filled
+  const shouldFillHeart = localWishlistState || isInWishlist;
+  const isLoading = isWishlistLoading || isCheckingWishlist;
+
+  const handleProductClick = useCallback(() => {
+    router.push(`/products/${product.id}`);
+  }, [router, product.id]);
+
   return (
-    <Card className="group relative border border-gray-200 rounded-lg p-0 shadow-sm hover:shadow-lg transition-all duration-300 h-full flex flex-col bg-white overflow-hidden">
+    <Card className="group relative border border-gray-200 rounded-lg p-0 shadow-sm hover:shadow-lg transition-all duration-300 h-full flex flex-col bg-white overflow-hidden" onClick={handleProductClick}>
       {/* Wishlist & View Icons */}
-      <div className="absolute top-3 right-3 z-20 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        <button className="bg-white rounded-full p-2 shadow-lg hover:bg-pink-50 hover:text-pink-600 transition-all duration-200 transform hover:scale-110">
-          <Heart size={18} />
+      <div className="absolute top-3 right-3 z-20 flex flex-col gap-2">
+        <button
+          onClick={handleWishlistToggle}
+          disabled={isLoading}
+          className={`rounded-full p-2 shadow-lg transition-all duration-200 transform hover:scale-110 ${
+            shouldFillHeart
+              ? "text-pink-600 bg-pink-50 hover:bg-pink-100"
+              : "bg-white hover:bg-pink-50 hover:text-pink-600"
+          } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+          title={shouldFillHeart ? "Remove from wishlist" : "Add to wishlist"}
+        >
+          <Heart size={18} className={shouldFillHeart ? "fill-pink-600" : ""} />
         </button>
-        <button className="bg-white rounded-full p-2 shadow-lg hover:bg-teal-50 hover:text-teal-600 transition-all duration-200 transform hover:scale-110">
+        <button
+          className="bg-white rounded-full p-2 shadow-lg hover:bg-teal-50 hover:text-teal-600 transition-all duration-200 transform hover:scale-110"
+          title="Quick view"
+        >
           <Eye size={18} />
         </button>
       </div>
@@ -96,16 +204,32 @@ const ProductCard = ({ product }: ProductCardProps) => {
             </div>
           )}
         </div>
-
+        {/*  <Image
+              src="/tag/Gemini_Generated_Image_f56micf56micf56m.png"
+              alt="Offer Badge"
+              width={100}
+              height={80}
+              className="object-contain"  
+              /> */}
         {/* Top Left Badge - Free Shipping */}
-        <div className="absolute top-3 left-3 z-10">
-          {hasFreeShipping && (
-            <Badge className="bg-[#00A9E0] hover:bg-[#0095C9] text-white px-3 py-1 text-xs font-semibold flex items-center gap-1 shadow-md">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="1" y="3" width="15" height="13"/>
-                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
-                <circle cx="5.5" cy="18.5" r="2.5"/>
-                <circle cx="18.5" cy="18.5" r="2.5"/>
+        <div className="absolute bottom-0 left-3 z-10">
+          {!hasFreeShipping && (
+            <Badge className="bg-[#024f42] hover:bg-[#036939] text-white px-3 py-1 text-xs font-semibold flex items-center gap-1 shadow-md">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="1" y="3" width="15" height="13" />
+                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                <circle cx="5.5" cy="18.5" r="2.5" />
+                <circle cx="18.5" cy="18.5" r="2.5" />
               </svg>
               FREE DELIVERY
             </Badge>
@@ -116,16 +240,15 @@ const ProductCard = ({ product }: ProductCardProps) => {
       {/* Content */}
       <CardContent className="flex flex-col px-4 py-1 flex-grow">
         {/* Product Name */}
-        <h3 
+        <h3
           className={`text-sm font-medium text-gray-800 mb-2 leading-tight cursor-pointer hover:text-teal-700 transition-colors ${
-            isExpanded ? '' : 'overflow-hidden text-ellipsis'
+            isExpanded ? "" : "overflow-hidden text-ellipsis"
           }`}
           style={{
-            display: isExpanded ? 'block' : '-webkit-box',
-            WebkitLineClamp: isExpanded ? 'unset' : 2,
-            WebkitBoxOrient: 'vertical'
+            display: isExpanded ? "block" : "-webkit-box",
+            WebkitLineClamp: isExpanded ? "unset" : 2,
+            WebkitBoxOrient: "vertical",
           }}
-          onClick={() => setIsExpanded(!isExpanded)}
           title={product.name}
         >
           {product.name}
@@ -135,7 +258,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
         <div className="mb-2">
           {specialPrice ? (
             <div className="flex flex-col">
-              <div className="flex items-center gap-1.5 mb-1">
+              <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1">
                   <TakaIcon className="text-teal-600 text-lg" />
                   <span className="text-xl font-bold text-teal-600">
@@ -148,25 +271,15 @@ const ProductCard = ({ product }: ProductCardProps) => {
                   </Badge>
                 )}
               </div>
+              <div className="flex  items-center justify-between">
               <div className="flex items-center gap-1">
                 <TakaIcon className="text-gray-400 text-base" />
                 <span className="text-sm text-gray-400 line-through">
                   {price.toLocaleString()}
                 </span>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1">
-              <TakaIcon className="text-gray-800 text-lg" />
-              <span className="text-xl font-bold text-gray-800">
-                {price.toLocaleString()}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Rating Section */}
-        <div className="flex items-center gap-2 mb-3">
+                </div>
+                 {/* Rating Section */}
+        <div className="flex items-center gap-2 ">
           <div className="flex text-orange-400">
             {Array.from({ length: 5 }).map((_, i) => (
               <span key={i} className="text-sm">
@@ -175,9 +288,25 @@ const ProductCard = ({ product }: ProductCardProps) => {
             ))}
           </div>
           <span className="text-sm text-gray-600 font-medium">
-            {averageRating > 0 ? averageRating.toFixed(1) : "0.0"} ({reviewCount})
+            {averageRating > 0 ? averageRating.toFixed(1) : ""} 
+            {/* (
+            {reviewCount}) */}
           </span>
         </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <TakaIcon className="text-gray-800 text-lg" />
+              <span className="text-xl font-bold text-gray-800">
+                {price.toLocaleString()}
+              </span>
+              
+            </div>
+          )}
+        </div>
+
+       
 
         {/* Store Name with Verification Badge */}
         <div className="flex items-center gap-2 mb-2">
@@ -202,12 +331,17 @@ const ProductSection = ({ title, products }: SectionProps) => {
   return (
     <Container className="py-4">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xs sm:text-sm md:text-lg lg:text-xl font-bold text-gray-800">{title}</h2>
-        <Link href="/products" className="text-teal-600 hover:text-teal-800 text-sm font-medium transition-colors">
-          See All 
+        <h2 className="text-xs sm:text-sm md:text-lg lg:text-xl font-bold text-gray-800">
+          {title}
+        </h2>
+        <Link
+          href="/products"
+          className="text-teal-600 hover:text-teal-800 text-sm font-medium transition-colors"
+        >
+          See All
         </Link>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-6 gap-1 ">
+      <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-6 gap-1">
         {products.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
@@ -217,36 +351,106 @@ const ProductSection = ({ title, products }: SectionProps) => {
 };
 
 const ProductGrid = () => {
-  const { data: products = [], isLoading, error } = useGetProductsQuery();
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // Show skeleton while loading
-  if (isLoading) {
+  const {
+    data: productsResponse,
+    isLoading,
+    error,
+    isFetching,
+  } = useGetProductsQuery(
+    { page },
+    {
+      refetchOnMountOrArgChange: true,
+    },
+  );
+
+  // Extract products and pagination info
+  const products = productsResponse?.data || [];
+  const pagination = productsResponse?.pagination;
+
+  // Load more products
+  const loadMore = useCallback(async () => {
+    if (!hasMore || isLoadingMore || isFetching) return;
+
+    setIsLoadingMore(true);
+    const nextPage = page + 1;
+    setPage(nextPage);
+    setIsLoadingMore(false);
+  }, [hasMore, isLoadingMore, isFetching, page]);
+
+  // Check if there are more products
+  useEffect(() => {
+    if (pagination) {
+      setHasMore(pagination.hasNextPage);
+    }
+  }, [pagination]);
+
+  // Handle scroll for infinite scroll (optional for homepage)
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + window.scrollY >=
+          document.body.offsetHeight - 500 &&
+        !isFetching &&
+        hasMore &&
+        !isLoadingMore
+      ) {
+        loadMore();
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isFetching, hasMore, isLoadingMore, loadMore]);
+
+  // Show skeleton while loading initial products
+  if (isLoading && page === 1) {
     return (
       <>
-        {/* <HomepageProductSectionSkeleton title={true} showSeeAll={true} gridCols={5} /> */}
-        <HomepageProductSectionSkeleton title={true} showSeeAll={true} gridCols={6} />
-        {/* <HomepageProductSectionSkeleton title={true} showSeeAll={true} gridCols={5} />
-        <HomepageProductSectionSkeleton title={true} showSeeAll={true} gridCols={5} /> */}
+        <HomepageProductSectionSkeleton
+          title={true}
+          showSeeAll={true}
+          gridCols={6}
+        />
       </>
     );
   }
-  if (error) return <p className="text-center py-10 text-red-500">Failed to load products.</p>;
 
-  // Example: splitting products into sections
-  const flashDeals = products.slice(0, 5);
-  const clearanceSale = products;
-  const newArrivals = products.slice(10, 15);
-  const youMightLike = products.slice(15, 20);
+  if (error)
+    return (
+      <p className="text-center py-10 text-red-500">Failed to load products.</p>
+    );
 
   return (
     <>
-      {/* <ProductSection title="Flash Deals" products={flashDeals} /> */}
       <ProductSection
         title="Yearly Stock Clearance Sale Offer - Up to 70% Discount"
-        products={clearanceSale}
+        products={products}
       />
-      {/* <ProductSection title="New Arrivals" products={newArrivals} />
-      <ProductSection title="You Might Also Like" products={youMightLike} /> */}
+
+      {/* Load More Button (Alternative to infinite scroll) */}
+      {hasMore && (
+        <div className="flex justify-center py-8">
+          <Button
+            onClick={loadMore}
+            disabled={isLoadingMore || isFetching}
+            variant="outline"
+            className="px-8"
+          >
+            {isLoadingMore ? "Loading..." : "Load More Products"}
+          </Button>
+        </div>
+      )}
+
+      {/* Loading indicator for infinite scroll */}
+      {(isLoadingMore || (isFetching && page > 1)) && (
+        <div className="flex justify-center py-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+        </div>
+      )}
     </>
   );
 };

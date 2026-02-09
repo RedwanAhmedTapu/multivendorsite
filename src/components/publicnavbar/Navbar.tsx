@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, ChangeEvent, useEffect } from "react";
-import { Menu, Search, Heart, ShoppingBag, ChevronDown, X, Package, HelpCircle, Globe, User } from "lucide-react";
+import { Menu, Search, Heart, ShoppingBag, ChevronDown, X, Package, HelpCircle, Globe, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { JSX } from "react";
@@ -10,31 +10,55 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useGetCategoriesQuery } from "@/features/apiSlice";
 import { Container } from "../Container";
 import { useGetActiveThemeQuery } from "@/features/themeApi";
+import { useSelector, useDispatch } from "react-redux";
+import { RootState } from "@/store/store";
+import { clearAuth } from "@/features/authSlice";
+import { LoginModal } from "../loginmodal/loginModal";
+import NestedCategoryMenu from "./NestedCategoryMenu";
 
 interface Category {
   id: string;
   name: string;
   slug: string;
   parentId?: string | null;
+  children?: Category[];
+  image?: string | null;
 }
 
 export default function Navbar(): JSX.Element {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const dispatch = useDispatch();
 
   const [search, setSearch] = useState<string>("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isNavbarFixed, setIsNavbarFixed] = useState<boolean>(false);
   const [popoverWidth, setPopoverWidth] = useState<number>(0);
   const [isPopoverOpen, setIsPopoverOpen] = useState<boolean>(false);
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState<boolean>(false);
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+  const [loginRedirectPath, setLoginRedirectPath] = useState<string>("");
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const categoryButtonRef = useRef<HTMLButtonElement>(null);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
+
+  // Get user from Redux store
+  const { user } = useSelector((state: RootState) => state.auth);
+  const isAuthenticated = !!user;
 
   // ✅ Fetch categories
   const { data: categoriesData } = useGetCategoriesQuery();
@@ -45,6 +69,7 @@ export default function Navbar(): JSX.Element {
   // Determine theme based on layout type
   const theme = activeLayoutType === 'layout_1' ? 'modern' : 'default';
   const rootCategories: Category[] = categoriesData?.filter((cat: Category) => !cat.parentId) || [];
+  const allCategories: Category[] = categoriesData || [];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -61,6 +86,27 @@ export default function Navbar(): JSX.Element {
     }
   }, []);
 
+  // Close category menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isCategoryMenuOpen && 
+          categoryButtonRef.current && 
+          !categoryButtonRef.current.contains(event.target as Node) &&
+          categoryMenuRef.current &&
+          !categoryMenuRef.current.contains(event.target as Node)) {
+        setIsCategoryMenuOpen(false);
+      }
+    };
+
+    if (isCategoryMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isCategoryMenuOpen]);
+
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>): void => {
     setSearch(e.target.value);
   };
@@ -69,21 +115,63 @@ export default function Navbar(): JSX.Element {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
+  const handleLogout = () => {
+    dispatch(clearAuth());
+    router.push("/");
+  };
+
+  const handleCartClick = () => {
+    if (isAuthenticated) {
+      router.push("/cart");
+    } else {
+      setLoginRedirectPath("/cart");
+      setShowLoginModal(true);
+    }
+  };
+
+  const handleWishlistClick = () => {
+    if (isAuthenticated) {
+      router.push("/wishlist");
+    } else {
+      setLoginRedirectPath("/wishlist");
+      setShowLoginModal(true);
+    }
+  };
+
+  const handleUserDashboardClick = () => {
+    if (user?.role === "CUSTOMER") {
+      router.push(`/user-dashboard?userid=${user.id}`);
+    } else if (user?.role === "VENDOR") {
+      router.push("/vendor-dashboard");
+    } else if (user?.role === "ADMIN") {
+      router.push("/admin-dashboard");
+    }
+  };
+
+  const handleLoginSuccess = () => {
+    setShowLoginModal(false);
+    if (loginRedirectPath) {
+      router.push(loginRedirectPath);
+      setLoginRedirectPath("");
+    }
+  };
+
   // ✅ hide navbar if admin/vendor
   if (
     pathname.includes("admin-dashboard") ||
     pathname.includes("vendor-dashboard") ||
+    pathname.includes("user-dashboard") ||
     pathname.includes("register") ||
     pathname.includes("reset-password") ||
     pathname.includes("login") ||
+    pathname.includes("accounting") ||
     pathname.includes("vendor-store-decoration")
   ) {
     return <></>;
   }
 
   const handleCategoryClick = (slug: string) => {
-    setIsPopoverOpen(false);
-    
+    // Navigate first
     if (pathname === '/products') {
       const params = new URLSearchParams(searchParams.toString());
       params.set('category', slug);
@@ -91,6 +179,10 @@ export default function Navbar(): JSX.Element {
     } else {
       router.push(`/products?category=${slug}`);
     }
+    
+    // Then close menus
+    setIsPopoverOpen(false);
+    setIsCategoryMenuOpen(false);
   };
 
   const handleSearchSubmit = () => {
@@ -111,11 +203,24 @@ export default function Navbar(): JSX.Element {
     }
   };
 
-  
+  // Get display name for user
+  const getUserDisplayName = () => {
+    if (!user) return "";
+    return user.name || user.email || user.phone || "User";
+  };
 
   if (theme === "default") {
     return (
       <>
+        {/* Login Modal */}
+        <LoginModal
+          isOpen={showLoginModal}
+          onClose={() => setShowLoginModal(false)}
+          onLoginSuccess={handleLoginSuccess}
+          redirectPath={loginRedirectPath}
+          message={loginRedirectPath ? "Please sign in to continue" : undefined}
+        />
+
         {/* Placeholder to prevent content jump when navbar becomes fixed */}
         {isNavbarFixed && <div className="h-[80px]"></div>}
         
@@ -204,9 +309,9 @@ export default function Navbar(): JSX.Element {
             </div>
 
             {/* Search Bar */}
-            <div ref={searchContainerRef} className="flex-1 max-w-2xl lg:max-w-3xl mx-0 lg:mx-4">
+            <div ref={searchContainerRef} className="flex-1 max-w-2xl lg:max-w-3xl mx-0 lg:mx-4 relative">
               <div className="flex items-center border border-gray-300 rounded-lg bg-white overflow-hidden">
-                {/* Category Dropdown */}
+                {/* Category Dropdown - Mobile Simple Dropdown */}
                 <div className="relative flex md:hidden">
                   <button
                     onClick={() => setIsPopoverOpen(!isPopoverOpen)}
@@ -241,6 +346,21 @@ export default function Navbar(): JSX.Element {
                   )}
                 </div>
 
+                {/* Category Dropdown - Desktop Nested Menu */}
+                <div className="relative hidden md:block">
+                  <button
+                    ref={categoryButtonRef}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsCategoryMenuOpen(!isCategoryMenuOpen);
+                    }}
+                    className="flex items-center gap-2 px-4 h-12 bg-gray-50 hover:bg-gray-100 border-r border-gray-300 text-gray-700 text-sm whitespace-nowrap"
+                  >
+                    <span>All Categories</span>
+                    <ChevronDown size={16} />
+                  </button>
+                </div>
+
                 {/* Search Input */}
                 <input
                   type="text"
@@ -259,17 +379,66 @@ export default function Navbar(): JSX.Element {
                   <Search size={18} className="md:size-[20px]" />
                 </button>
               </div>
+
+              {/* Desktop Nested Category Menu - Positioned outside search bar */}
+              {isCategoryMenuOpen && (
+                <div 
+                  ref={categoryMenuRef}
+                  className="absolute top-full left-0 mt-1 z-[100]"
+                >
+                  <NestedCategoryMenu 
+                    categories={allCategories}
+                    onCategorySelect={handleCategoryClick}
+                    onClose={() => setIsCategoryMenuOpen(false)}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Right Icons */}
             <div className="flex items-center gap-2 md:gap-4">
-              <button className="hidden sm:flex flex-col items-center text-gray-700 hover:text-emerald-600 p-1">
-                <User size={22} className="md:size-[24px]" />
-              </button>
-              <button className="hidden sm:flex flex-col items-center text-gray-700 hover:text-emerald-600 p-1">
+              {/* User Account or Login */}
+              {isAuthenticated ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="hidden sm:flex items-center gap-2 text-gray-700 hover:text-emerald-600 p-1">
+                      <User size={22} className="md:size-[24px]" />
+                      <span className="hidden lg:block text-sm font-medium max-w-[120px] truncate">
+                        {getUserDisplayName()}
+                      </span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem onClick={handleUserDashboardClick} className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Dashboard</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Logout</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <button 
+                  onClick={() => setShowLoginModal(true)}
+                  className="hidden sm:flex flex-col items-center text-gray-700 hover:text-emerald-600 p-1"
+                >
+                  <User size={22} className="md:size-[24px]" />
+                </button>
+              )}
+
+              <button 
+                onClick={handleWishlistClick}
+                className="hidden sm:flex flex-col items-center text-gray-700 hover:text-emerald-600 p-1"
+              >
                 <Heart size={22} className="md:size-[24px]" />
               </button>
-              <button className="hidden sm:flex items-center gap-1 md:gap-2 bg-red-400 hover:bg-red-500 text-white px-3 md:px-4 h-10 md:h-12 rounded-lg whitespace-nowrap">
+              <button 
+                onClick={handleCartClick}
+                className="hidden sm:flex items-center gap-1 md:gap-2 bg-red-400 hover:bg-red-500 text-white px-3 md:px-4 h-10 md:h-12 rounded-lg whitespace-nowrap"
+              >
                 <ShoppingBag size={18} className="md:size-[20px]" />
                 <span className="font-medium text-xs md:text-sm">Cart</span>
               </button>
@@ -280,9 +449,18 @@ export default function Navbar(): JSX.Element {
     );
   }
 
-   if (theme === "modern") {
+  if (theme === "modern") {
     return (
       <>
+        {/* Login Modal */}
+        <LoginModal
+          isOpen={showLoginModal}
+          onClose={() => setShowLoginModal(false)}
+          onLoginSuccess={handleLoginSuccess}
+          redirectPath={loginRedirectPath}
+          message={loginRedirectPath ? "Please sign in to continue" : undefined}
+        />
+
         {isNavbarFixed && <div className="h-28 md:h-36"></div>}
         <header
           className={`w-full bg-[#0b5052] text-white ${
@@ -334,53 +512,20 @@ export default function Navbar(): JSX.Element {
                 className="hidden md:flex flex-1 max-w-3xl mx-2 lg:mx-4 relative"
               >
                 <div className="flex w-full items-center border border-gray-300 rounded-md bg-white overflow-hidden">
-                  {/* All Categories Button */}
-                  <Popover
-                    open={isPopoverOpen}
-                    onOpenChange={setIsPopoverOpen}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="flex items-center justify-between px-2 bg-white text-gray-700 h-9 lg:h-10 min-w-[40px] hover:bg-gray-50 text-xs border-0 rounded-none border-r border-gray-300"
-                      >
-                        <span>All</span>
-                        <ChevronDown className="h-3 w-3 ml-1 text-gray-600" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="w-full p-4"
-                      style={{ width: popoverWidth }}
-                      align="start"
+                  {/* All Categories Button - Desktop Nested Menu */}
+                  <div className="relative">
+                    <button
+                      ref={categoryButtonRef}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsCategoryMenuOpen(!isCategoryMenuOpen);
+                      }}
+                      className="flex items-center justify-between px-3 bg-white text-gray-700 h-9 lg:h-10 min-w-[100px] hover:bg-gray-50 text-xs border-0 rounded-none border-r border-gray-300"
                     >
-                      <div className="flex justify-between items-center mb-3">
-                        <h3 className="font-semibold text-base">
-                          Select Categories
-                        </h3>
-                        <X
-                          className="h-4 w-4 cursor-pointer"
-                          onClick={() => setIsPopoverOpen(false)}
-                        />
-                      </div>
-                      <div className="grid grid-cols-3 gap-x-6 gap-y-2 text-xs text-gray-700">
-                        {rootCategories.length > 0 ? (
-                          rootCategories.map((cat: Category) => (
-                            <button
-                              key={cat.id}
-                              onClick={() => handleCategoryClick(cat.slug)}
-                              className="text-left hover:underline cursor-pointer"
-                            >
-                              {cat.name}
-                            </button>
-                          ))
-                        ) : (
-                          <p className="text-gray-500 col-span-3">
-                            No categories
-                          </p>
-                        )}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                      <span>All Categories</span>
+                      <ChevronDown className="h-3 w-3 ml-2 text-gray-600" />
+                    </button>
+                  </div>
 
                   {/* Search Input */}
                   <Input
@@ -399,38 +544,81 @@ export default function Navbar(): JSX.Element {
                     <Search size={16} />
                   </Button>
                 </div>
+
+                {/* Desktop Nested Category Menu - Positioned outside search bar */}
+                {isCategoryMenuOpen && (
+                  <div 
+                    ref={categoryMenuRef}
+                    className="absolute top-full left-0 mt-1 z-[100]"
+                  >
+                    <NestedCategoryMenu 
+                      categories={allCategories}
+                      onCategorySelect={handleCategoryClick}
+                      onClose={() => setIsCategoryMenuOpen(false)}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Right Section */}
               <div className="flex items-center gap-1 md:gap-2 lg:gap-3">
-                <Link href="/vendor-register">
-                  <Button
-                    variant="link"
-                    className="text-white hidden sm:block text-xs"
-                  >
-                    Become a Seller
-                  </Button>
-                </Link>
-                <Link href="/register">
-                  <Button
-                    variant="link"
-                    className="text-white hidden sm:block text-xs"
-                  >
-                    Sign Up
-                  </Button>
-                </Link>
-                <Link href="/login">
-                  <Button
-                    variant="link"
-                    className="text-white hidden sm:block text-xs"
-                  >
-                    Sign in
-                  </Button>
-                </Link>
+                {isAuthenticated ? (
+                  <>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="link"
+                          className="text-white hidden sm:flex items-center gap-1 text-xs px-2"
+                        >
+                          <User size={14} />
+                          <span className="max-w-[100px] truncate">{getUserDisplayName()}</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem onClick={handleUserDashboardClick} className="cursor-pointer">
+                          <User className="mr-2 h-4 w-4" />
+                          <span>Dashboard</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">
+                          <LogOut className="mr-2 h-4 w-4" />
+                          <span>Logout</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/vendor-register">
+                      <Button
+                        variant="link"
+                        className="text-white hidden sm:block text-xs"
+                      >
+                        Become a Seller
+                      </Button>
+                    </Link>
+                    <Link href="/register">
+                      <Button
+                        variant="link"
+                        className="text-white hidden sm:block text-xs"
+                      >
+                        Sign Up
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="link"
+                      onClick={() => setShowLoginModal(true)}
+                      className="text-white hidden sm:block text-xs"
+                    >
+                      Sign in
+                    </Button>
+                  </>
+                )}
 
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={handleWishlistClick}
                   className="text-white p-1 h-7 w-7"
                 >
                   <Heart size={16} />
@@ -438,6 +626,7 @@ export default function Navbar(): JSX.Element {
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={handleCartClick}
                   className="text-white p-1 h-7 w-7"
                 >
                   <ShoppingBag size={16} />

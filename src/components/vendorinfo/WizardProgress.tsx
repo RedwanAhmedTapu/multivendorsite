@@ -7,6 +7,7 @@ interface WizardProgressProps {
   progress: number;
   currentStep: WizardStep;
   getStepStatus: (stepKey: WizardStep) => 'completed' | 'current' | 'pending';
+  onStepClick?: (step: WizardStep) => void; // New prop for navigation
 }
 
 const steps: { 
@@ -50,10 +51,18 @@ const steps: {
 const WizardProgress: React.FC<WizardProgressProps> = ({ 
   progress, 
   currentStep, 
-  getStepStatus 
+  getStepStatus,
+  onStepClick 
 }) => {
+  const handleStepClick = (step: WizardStep, status: string) => {
+    // Allow clicking on current step or completed steps
+    if (onStepClick && (status === 'completed' || status === 'current')) {
+      onStepClick(step);
+    }
+  };
+
   return (
-    <div className="mb-8  bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 border-b border-teal-100/50 shadow-sm transition-all duration-300">
+    <div className="mb-8 bg-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 border-b border-teal-100/50 shadow-sm transition-all duration-300">
       <div className="max-w-6xl mx-auto px-4 py-4">
         {/* Compact Header for Sticky Mode */}
         <div className="flex items-center justify-between mb-4">
@@ -100,6 +109,7 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
             {steps.map((step, index) => {
               const status = getStepStatus(step.key);
               const StepIcon = step.icon;
+              const isClickable = status === 'completed' || status === 'current';
               
               return (
                 <div 
@@ -107,17 +117,23 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
                   className="flex flex-col items-center flex-1 relative z-10"
                 >
                   {/* Step Circle - Compact */}
-                  <div className={`
-                    relative flex items-center justify-center w-10 h-10 rounded-lg
-                    transition-all duration-300 group cursor-pointer
-                    ${status === 'completed' 
-                      ? 'bg-gradient-to-br from-green-500 to-green-600 shadow-sm shadow-green-500/20 border border-green-400' 
-                      : status === 'current'
-                      ? 'bg-gradient-to-br from-teal-500 to-teal-600 shadow-md shadow-teal-500/30 border border-teal-400'
-                      : 'bg-white border border-gray-200'
-                    }
-                    mb-2
-                  `}>
+                  <button
+                    type="button"
+                    onClick={() => handleStepClick(step.key, status)}
+                    disabled={!isClickable}
+                    className={`
+                      relative flex items-center justify-center w-10 h-10 rounded-lg
+                      transition-all duration-300 group
+                      ${status === 'completed' 
+                        ? 'bg-gradient-to-br from-green-500 to-green-600 shadow-sm shadow-green-500/20 border border-green-400 cursor-pointer hover:shadow-md hover:scale-105' 
+                        : status === 'current'
+                        ? 'bg-gradient-to-br from-teal-500 to-teal-600 shadow-md shadow-teal-500/30 border border-teal-400 cursor-pointer hover:shadow-lg hover:scale-105'
+                        : 'bg-white border border-gray-200 cursor-not-allowed opacity-60'
+                      }
+                      ${isClickable ? 'active:scale-95' : ''}
+                      mb-2
+                    `}
+                  >
                     {/* Icon or Check */}
                     {status === 'completed' ? (
                       <Check className="w-4 h-4 text-white" />
@@ -142,14 +158,17 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
                     </div>
                     
                     {/* Tooltip on Hover */}
-                    <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 hidden group-hover:block z-50">
+                    <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 hidden group-hover:block z-50 pointer-events-none">
                       <div className="bg-gray-900 text-white text-xs rounded-lg py-1.5 px-3 whitespace-nowrap shadow-lg">
                         <div className="font-semibold">{step.title}</div>
                         <div className="text-gray-300">{step.description}</div>
+                        {isClickable && (
+                          <div className="text-teal-300 text-[10px] mt-0.5">Click to navigate</div>
+                        )}
                       </div>
                       <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1 w-2 h-2 bg-gray-900 rotate-45"></div>
                     </div>
-                  </div>
+                  </button>
                   
                   {/* Step Info - Compact */}
                   <div className="text-center max-w-[80px]">

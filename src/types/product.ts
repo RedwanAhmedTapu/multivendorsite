@@ -65,11 +65,12 @@ export interface ProductAttribute {
 export interface Product {
   id: string;
   name: string;
+  nameBn?:string,
   description?: string | null;
   slug: string;
   vendorId: string;
   categoryId: string;
-  approvalStatus: 'PENDING' | 'ACTIVE' | 'REJECTED';
+  approvalStatus: 'PENDING' | 'ACTIVE' | 'REJECTED'|"DRAFT" | "INACTIVE";
   approvedById?: string | null;
   
   // Relations
@@ -122,6 +123,7 @@ export interface ProductVariant {
   name?: string | null;
   sku: string;
   price: number;
+  availability: boolean;
   specialPrice?: number | null;
   discount?: number | null;
   stock: number;
@@ -193,11 +195,12 @@ export interface ProductVariantInput {
   name?: string | null;
   sku: string;
   price: number;
+  availability?:boolean
   specialPrice?: number | null;
   discount?: number;
   stock?: number;
   weight?: number | null;
-  attributes?: { attributeValueId: string }[];
+  attributes?: { attributeValueId: string,value?:string }[];
   images?: (string | ProductImageInput)[]; // URLs or full image objects
 }
 
@@ -254,7 +257,7 @@ export interface UpdateProductData {
   shippingWarranty?: ProductShippingWarrantyInput;
   
   // Approval status
-  status?: "PENDING" | "ACTIVE" | "REJECTED";
+  approvalStatus?: "PENDING" | "ACTIVE" | "REJECTED"|"DRAFT" | "INACTIVE";
   approvedById?: string;
   
   // For audit logging
@@ -271,7 +274,7 @@ export interface BulkProductData {
   sku: string;
   price: number;
   stock: number;
-  approvalStatus?: 'PENDING' | 'ACTIVE' | 'REJECTED';
+  approvalStatus?: 'PENDING' | 'ACTIVE' | 'REJECTED'|"DRAFT" | "INACTIVE";
   variantGroupNo?: number;
   videoUrl?: string;
   images: string[];
@@ -309,7 +312,7 @@ export interface ProductFilter {
   specifications?: Record<string, string | string[] | number>; // attributeId -> value(s)
   
   // Approval status
-  approvalStatus?: "PENDING" | "ACTIVE" | "REJECTED";
+  approvalStatus?: "PENDING" | "ACTIVE" | "REJECTED"|"DRAFT" | "INACTIVE";
 }
 
 // =====================
@@ -319,7 +322,7 @@ export interface ProductListItem {
   id: string;
   name: string;
   slug: string;
-  approvalStatus: 'PENDING' | 'ACTIVE' | 'REJECTED';
+  approvalStatus: 'PENDING' | 'ACTIVE' | 'REJECTED'|"DRAFT" | "INACTIVE";
   vendor: {
     id: string;
     storeName: string;

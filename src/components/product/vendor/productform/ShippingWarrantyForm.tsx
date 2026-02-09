@@ -1,7 +1,13 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { AlertCircle } from "lucide-react";
@@ -13,27 +19,40 @@ interface Props {
   validationErrors: Record<string, boolean>;
 }
 
-export default function ShippingWarrantyForm({ value, onChange, validationErrors }: Props) {
+const initialFormState: ProductShippingWarrantyInput = {
+  packageWeightValue: 0,
+  packageWeightUnit: "kg",
+  packageLength: 0,
+  packageWidth: 0,
+  packageHeight: 0,
+  dangerousGoods: "none",
+  warrantyType: "",
+  warrantyPeriodValue: 6,
+  warrantyPeriodUnit: "months",
+  warrantyDetails: "",
+};
+
+export default function ShippingWarrantyForm({
+  value,
+  onChange,
+  validationErrors,
+}: Props) {
+  // Initialize with either the provided value or the initial state
   const [form, setForm] = useState<ProductShippingWarrantyInput>(
-    value || {
-      packageWeightValue: 0,
-      packageWeightUnit: "kg",
-      packageLength: 0,
-      packageWidth: 0,
-      packageHeight: 0,
-      dangerousGoods: "none",
-      warrantyType: "",
-      warrantyPeriodValue: 6,
-      warrantyPeriodUnit: "months",
-      warrantyDetails: "",
-    }
+    value || initialFormState
   );
 
+  // Update form when value changes from parent (including reset)
   useEffect(() => {
-    if (value) {
+    if (value === null) {
+      // If parent sets value to null, reset to initial state
+      setForm(initialFormState);
+      onChange(initialFormState); // Notify parent of the reset
+    } else if (value) {
+      // Otherwise, update with the new value
       setForm(value);
     }
-  }, [value]);
+  }, [value, onChange]);
 
   const updateField = (field: keyof ProductShippingWarrantyInput, val: any) => {
     const updated = { ...form, [field]: val };
@@ -48,26 +67,43 @@ export default function ShippingWarrantyForm({ value, onChange, validationErrors
   return (
     <Card className="w-full mt-6 shadow-none border-none">
       <CardHeader>
-        <CardTitle>Shipping & Warranty <span className="text-red-500">*</span></CardTitle>
+        <CardTitle>
+          Shipping & Warranty <span className="text-red-500">*</span>
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-
         {/* Package Weight */}
-        <div id="packageWeight" className={isFieldError("packageWeight") ? 'border-l-4 border-red-500 pl-4' : ''}>
-          <label className="block font-medium mb-2">Package Weight <span className="text-red-500">*</span></label>
+        <div
+          id="packageWeight"
+          className={
+            isFieldError("packageWeight")
+              ? "border-l-4 border-red-500 pl-4"
+              : ""
+          }
+        >
+          <label className="block font-medium mb-2">
+            Package Weight <span className="text-red-500">*</span>
+          </label>
           <div className="w-1/3 flex space-x-2">
             <Input
               type="number"
               min={0.001}
               max={300000}
-              value={form.packageWeightValue}
-              onChange={(e) => updateField("packageWeightValue", Number(e.target.value))}
+              value={form.packageWeightValue || ""}
+              onChange={(e) =>
+                updateField("packageWeightValue", Number(e.target.value))
+              }
               placeholder="Enter weight"
               className={isFieldError("packageWeight") ? "border-red-500" : ""}
             />
             <Select
               value={form.packageWeightUnit}
-              onValueChange={(val) => updateField("packageWeightUnit", val as ProductShippingWarrantyInput["packageWeightUnit"])}
+              onValueChange={(val) =>
+                updateField(
+                  "packageWeightUnit",
+                  val as ProductShippingWarrantyInput["packageWeightUnit"]
+                )
+              }
             >
               <SelectTrigger className="w-24">
                 <SelectValue placeholder="Unit" />
@@ -89,35 +125,47 @@ export default function ShippingWarrantyForm({ value, onChange, validationErrors
         {/* Package Dimensions */}
         <div className="flex space-x-2">
           <div className="flex-1">
-            <label className="block font-medium mb-2">Length (cm) <span className="text-red-500">*</span></label>
+            <label className="block font-medium mb-2">
+              Length (cm) <span className="text-red-500">*</span>
+            </label>
             <Input
               type="number"
               min={0.01}
               max={300}
-              value={form.packageLength}
-              onChange={(e) => updateField("packageLength", Number(e.target.value))}
+              value={form.packageLength || ""}
+              onChange={(e) =>
+                updateField("packageLength", Number(e.target.value))
+              }
               placeholder="0.01 ~ 300"
             />
           </div>
           <div className="flex-1">
-            <label className="block font-medium mb-2">Width (cm) <span className="text-red-500">*</span></label>
+            <label className="block font-medium mb-2">
+              Width (cm) <span className="text-red-500">*</span>
+            </label>
             <Input
               type="number"
               min={0.01}
               max={300}
-              value={form.packageWidth}
-              onChange={(e) => updateField("packageWidth", Number(e.target.value))}
+              value={form.packageWidth || ""}
+              onChange={(e) =>
+                updateField("packageWidth", Number(e.target.value))
+              }
               placeholder="0.01 ~ 300"
             />
           </div>
           <div className="flex-1">
-            <label className="block font-medium mb-2">Height (cm) <span className="text-red-500">*</span></label>
+            <label className="block font-medium mb-2">
+              Height (cm) <span className="text-red-500">*</span>
+            </label>
             <Input
               type="number"
               min={0.01}
               max={300}
-              value={form.packageHeight}
-              onChange={(e) => updateField("packageHeight", Number(e.target.value))}
+              value={form.packageHeight || ""}
+              onChange={(e) =>
+                updateField("packageHeight", Number(e.target.value))
+              }
               placeholder="0.01 ~ 300"
             />
           </div>
@@ -143,19 +191,50 @@ export default function ShippingWarrantyForm({ value, onChange, validationErrors
         </div>
 
         {/* Warranty Type */}
-        <div id="warrantyType" className={isFieldError("warrantyType") ? 'border-l-4 border-red-500 pl-4' : ''}>
-          <label className="block font-medium mb-2">Warranty Type <span className="text-red-500">*</span></label>
+        <div
+          id="warrantyType"
+          className={
+            isFieldError("warrantyType") ? "border-l-4 border-red-500 pl-4" : ""
+          }
+        >
+          <label className="block font-medium mb-2">
+            Warranty Type 
+          </label>
           <Select
             value={form.warrantyType}
             onValueChange={(val) => updateField("warrantyType", val)}
           >
-            <SelectTrigger className={isFieldError("warrantyType") ? "border-red-500" : ""}>
+            <SelectTrigger
+              className={isFieldError("warrantyType") ? "border-red-500" : ""}
+            >
               <SelectValue placeholder="Select warranty type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="manufacturer">Manufacturer</SelectItem>
-              <SelectItem value="seller">Seller</SelectItem>
-              <SelectItem value="none">None</SelectItem>
+              <SelectItem value="FINIXMART_WARRANTY">
+                Finixmart Warranty
+              </SelectItem>
+              <SelectItem value="LOCAL_WARRANTY">Local Warranty</SelectItem>
+              <SelectItem value="AGENT_WARRANTY">Agent Warranty</SelectItem>
+              <SelectItem value="BRAND_WARRANTY">Brand Warranty</SelectItem>
+              <SelectItem value="SELLER_WARRANTY">Seller Warranty</SelectItem>
+              <SelectItem value="LOCAL_SELLER_WARRANTY">
+                Local Seller Warranty
+              </SelectItem>
+              <SelectItem value="INTERNATIONAL_WARRANTY">
+                International Warranty
+              </SelectItem>
+              <SelectItem value="INTERNATIONAL_MANUFACTURER_WARRANTY">
+                International Manufacturer Warranty
+              </SelectItem>
+              <SelectItem value="INTERNATIONAL_SELLER_WARRANTY">
+                International Seller Warranty
+              </SelectItem>
+              <SelectItem value="NON_LOCAL_WARRANTY">
+                Non Local Warranty
+              </SelectItem>
+              <SelectItem value="NO_WARRANTY">No Warranty</SelectItem>
+              <SelectItem value="NOT_APPLICABLE">Not Applicable</SelectItem>
+              <SelectItem value="ORIGINAL_PRODUCT">Original Product</SelectItem>
             </SelectContent>
           </Select>
           {isFieldError("warrantyType") && (
@@ -168,18 +247,27 @@ export default function ShippingWarrantyForm({ value, onChange, validationErrors
 
         {/* Warranty Period */}
         <div>
-          <label className="block font-medium mb-2">Warranty Period <span className="text-red-500">*</span></label>
+          <label className="block font-medium mb-2">
+            Warranty Period 
+          </label>
           <div className="md:w-1/3 flex space-x-2">
             <Input
               type="number"
               min={0}
-              value={form.warrantyPeriodValue}
-              onChange={(e) => updateField("warrantyPeriodValue", Number(e.target.value))}
+              value={form.warrantyPeriodValue || ""}
+              onChange={(e) =>
+                updateField("warrantyPeriodValue", Number(e.target.value))
+              }
               placeholder="e.g., 6"
             />
             <Select
               value={form.warrantyPeriodUnit}
-              onValueChange={(val) => updateField("warrantyPeriodUnit", val as ProductShippingWarrantyInput["warrantyPeriodUnit"])}
+              onValueChange={(val) =>
+                updateField(
+                  "warrantyPeriodUnit",
+                  val as ProductShippingWarrantyInput["warrantyPeriodUnit"]
+                )
+              }
             >
               <SelectTrigger className="w-32">
                 <SelectValue placeholder="Unit" />
@@ -194,13 +282,24 @@ export default function ShippingWarrantyForm({ value, onChange, validationErrors
         </div>
 
         {/* Warranty Details */}
-        <div id="warrantyDetails" className={isFieldError("warrantyDetails") ? 'border-l-4 border-red-500 pl-4' : ''}>
-          <label className="block font-medium mb-2">Warranty Details <span className="text-red-500">*</span></label>
+        <div
+          id="warrantyDetails"
+          className={
+            isFieldError("warrantyDetails")
+              ? "border-l-4 border-red-500 pl-4"
+              : ""
+          }
+        >
+          <label className="block font-medium mb-2">
+            Warranty Details 
+          </label>
           <Input
             value={form.warrantyDetails || ""}
             onChange={(e) => updateField("warrantyDetails", e.target.value)}
             placeholder="Provide warranty terms and conditions"
-            className={`md:w-2/3 md:h-16 ${isFieldError("warrantyDetails") ? "border-red-500" : ""}`}
+            className={`md:w-2/3 md:h-16 ${
+              isFieldError("warrantyDetails") ? "border-red-500" : ""
+            }`}
           />
           {isFieldError("warrantyDetails") && (
             <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
@@ -209,7 +308,6 @@ export default function ShippingWarrantyForm({ value, onChange, validationErrors
             </p>
           )}
         </div>
-
       </CardContent>
     </Card>
   );

@@ -190,11 +190,12 @@ function AdminLayout({ main }: { main: ReactNode }) {
       title: "Shipping & Delivery",
       items: [
         {
-          title: "Shipping",
+          title: "Courier & Shipping",
           href: "#",
           icon: MapPin,
           subItems: [
-            { title: "shippingprovider", href: "/admin-dashboard/shippingapi", icon: Settings },
+            { title: "couriercredentials", href: "/admin-dashboard/courier/credentials", icon: Settings },
+            { title: "courierprovider", href: "/admin-dashboard/courier", icon: Settings },
           ],
         },
       ],
@@ -235,6 +236,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
         { title: "SEO & Marketing", href: "/admin/settings/seo-marketing", icon: BarChart2 },
         { title: "Third-Party Integrations", href: "/admin/settings/integrations", icon: Settings },
         { title: "Terms & Conditions", href: "/admin-dashboard/settings/terms", icon: FileText },
+        { title: "Footer Settings", href: "/admin-dashboard/settings/footer", icon: FileText },
       ],
     },
     {
@@ -250,11 +252,6 @@ function AdminLayout({ main }: { main: ReactNode }) {
   // This now works 100%
   const searchMenuItems = flattenMenuItems(sections);
 
-  const footer = {
-    user: { name: "Admin User", email: "admin@acme.com" },
-    logoutAction: () => console.log("Logout!"),
-  };
-
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
   return (
@@ -263,7 +260,6 @@ function AdminLayout({ main }: { main: ReactNode }) {
         <AdminSidebar
           logo={logo}
           sections={sections}
-          footer={footer}
           mobileOpen={mobileSidebarOpen}
           onClose={() => setMobileSidebarOpen(false)}
           isCollapsed={!sidebarOpen}
@@ -288,7 +284,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
           onMenuClick={toggleSidebar}
           isSidebarOpen={sidebarOpen}
           showMenuButton={false}
-          menuItems={searchMenuItems} // Now fully populated with icon + keywords
+          menuItems={searchMenuItems}
         />
 
         <main className="flex-1 overflow-y-auto bg-grey-50 ">

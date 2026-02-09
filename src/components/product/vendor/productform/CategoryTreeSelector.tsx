@@ -12,14 +12,16 @@ interface Props {
     name: string;
     fullPath: string;
   }>;
-  onSuggestionSelect?: (id: string, fullPath: string) => void; // Add suggestion handler
+  onSuggestionSelect?: (id: string, fullPath: string) => void; 
+   initialCategoryId?: string | null;
 }
 
 const CategoryTreeSelector: React.FC<Props> = ({ 
   onSelect, 
   productName = "", 
   suggestedCategories = [],
-  onSuggestionSelect 
+  onSuggestionSelect ,
+  initialCategoryId=""
 }) => {
   const { data: categories, isLoading } = useGetCategoriesQuery();
   const [selectedPath, setSelectedPath] = useState<string[]>([]);
@@ -34,7 +36,37 @@ const CategoryTreeSelector: React.FC<Props> = ({
   const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+useEffect(() => {
+  if (initialCategoryId && categories && !selectedId) {
+    // Find category by ID and set initial selection
+    const findCategory = (cats: Category[], targetId: string): { category: Category | null, path: string[] } => {
+      for (const cat of cats) {
+        if (cat.id === targetId) {
+          return { category: cat, path: [cat.name] };
+        }
+        if (cat.children) {
+          const found = findCategory(cat.children, targetId);
+          if (found.category) {
+            return { category: found.category, path: [cat.name, ...found.path] };
+          }
+        }
+      }
+      return { category: null, path: [] };
+    };
 
+    const { category, path } = findCategory(categories, initialCategoryId);
+    if (category) {
+      const hasChildren = category.children && category.children.length > 0;
+      setSelectedId(category.id);
+      setSelectedPath(path);
+      setSearchQuery(buildPathString(path));
+      
+      if (!hasChildren) {
+        onSelect(category.id, buildPathString(path), true, category.attributes || []);
+      }
+    }
+  }
+}, [initialCategoryId, categories, selectedId, onSelect]);
   // Show smart suggestions when product name has at least 10 characters
   useEffect(() => {
     if (productName.trim().length >= 10 && suggestedCategories.length > 0) {

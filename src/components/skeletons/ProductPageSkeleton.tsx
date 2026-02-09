@@ -2,6 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Container } from "../Container";
 
 export const ProductPageSkeleton = () => {
   return (
@@ -224,7 +225,7 @@ export const ProductGridSkeleton = ({ view = "grid", count = 8 }: { view?: "grid
 
 // Enhanced version with conditional grid columns
 export const ProductsPageSkeleton = ({ 
-  isBaseProductsPage = false,
+  isBaseProductsPage = true,
   viewMode = "grid"
 }: { 
   isBaseProductsPage?: boolean;
@@ -244,7 +245,7 @@ export const ProductsPageSkeleton = ({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto p-1 sm:px-4 py-2 max-w-7xl">
+     <Container className="p-1 sm:px-4 py-2">
         {/* Header Section */}
         <div className="mb-6">
           {/* Categories Skeleton */}
@@ -327,8 +328,9 @@ export const ProductsPageSkeleton = ({
             </div>
           </div>
         </div>
+        </Container>
       </div>
-    </div>
+      
   );
 };
 

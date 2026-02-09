@@ -1,11 +1,11 @@
 // components/vendor/layout/VendorLayout.tsx
 "use client";
 
-import { useState, ReactNode, useMemo } from "react";
+import { useState, ReactNode, useMemo, useRef, useEffect } from "react";
 import { VendorSidebar } from "./sidebar/VendorSidebar";
 import PrivateRoute from "@/components/privateroute/PrivateRoute";
 import { VendorNavbar } from "./navbar/VendorNavbar";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { BookTemplateIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { flattenMenuItems } from "@/utils/flattenMenuItems";
 
 type VendorLayoutProps = {
@@ -31,6 +31,9 @@ type SidebarSection = {
 function VendorLayout({ main }: VendorLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isNavbarVisible, setIsNavbarVisible] = useState(true);
+  const mainContentRef = useRef<HTMLDivElement>(null);
+  const lastScrollY = useRef(0);
 
   const logo = {
     icon: Store,
@@ -56,10 +59,11 @@ function VendorLayout({ main }: VendorLayoutProps) {
           color: "text-blue-500",
           subItems: [
             { title: "Add Product", href: "/vendor-dashboard/products/add", icon: Plus },
-            { title: "Manage Products", href: "/vendor-dashboard/products", icon: List },
+            { title: "Manage Products", href: "/vendor-dashboard/products/product-manage", icon: List },
+            { title: "Bulk Template", href: "/vendor-dashboard/products/bulk-template", icon: BookTemplateIcon },
             { title: "Bulk Upload", href: "/vendor-dashboard/products/bulk-upload", icon: Upload },
-            { title: "Product Scheduling", href: "/vendor-dashboard/products/schedule", icon: Clock },
-            { title: "Stock Alerts", href: "/vendor-dashboard/products/stock-alerts", icon: AlertCircle, badge: "3" },
+            // { title: "Product Scheduling", href: "/vendor-dashboard/products/schedule", icon: Clock },
+            // { title: "Stock Alerts", href: "/vendor-dashboard/products/stock-alerts", icon: AlertCircle, badge: "3" },
           ],
         },
       ],
@@ -253,18 +257,57 @@ function VendorLayout({ main }: VendorLayoutProps) {
   // Flatten menu items for search
   const searchMenuItems = useMemo(() => flattenMenuItems(sections), [sections]);
 
-  const footer = {
-    user: {
-      name: "Vendor User",
-      email: "vendor@finixmart.com",
-      avatar: "/avatars/vendor.jpg",
-    },
-    logoutAction: () => {
-      console.log("Vendor Logout!");
-    },
-  };
+  
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
+
+  // Handle scroll on the main content container
+  useEffect(() => {
+    const mainContent = mainContentRef.current;
+    if (!mainContent) return;
+
+    const scrollThreshold = 10;
+
+    const handleScroll = () => {
+      const currentScrollY = mainContent.scrollTop;
+
+      // Always show navbar when at the top
+      if (currentScrollY < 10) {
+        setIsNavbarVisible(true);
+        lastScrollY.current = currentScrollY;
+        return;
+      }
+
+      // Check if scroll difference meets threshold
+      if (Math.abs(currentScrollY - lastScrollY.current) < scrollThreshold) {
+        return;
+      }
+
+      // Hide when scrolling down, show when scrolling up
+      if (currentScrollY > lastScrollY.current) {
+        setIsNavbarVisible(false);
+      } else {
+        setIsNavbarVisible(true);
+      }
+
+      lastScrollY.current = currentScrollY;
+    };
+
+    // Throttle scroll events for better performance
+    let ticking = false;
+    const scrollListener = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    mainContent.addEventListener("scroll", scrollListener, { passive: true });
+    return () => mainContent.removeEventListener("scroll", scrollListener);
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
@@ -272,7 +315,6 @@ function VendorLayout({ main }: VendorLayoutProps) {
         <VendorSidebar
           logo={logo}
           sections={sections}
-          footer={footer}
           mobileOpen={mobileSidebarOpen}
           onClose={() => setMobileSidebarOpen(false)}
           isCollapsed={!sidebarOpen}
@@ -297,10 +339,17 @@ function VendorLayout({ main }: VendorLayoutProps) {
           onMenuClick={toggleSidebar}
           isSidebarOpen={sidebarOpen}
           menuItems={searchMenuItems}
+          isVisible={isNavbarVisible}
         />
 
-        <main className="flex-1 overflow-y-auto bg-grey-50">
-          <div className="p-2 sm:p-4">{main}</div>
+        <main 
+          ref={mainContentRef}
+          className="flex-1 overflow-y-auto bg-grey-50"
+        >
+          {/* Add padding top to account for fixed navbar */}
+          <div className="pt-16">
+            <div className="p-2 sm:p-4">{main}</div>
+          </div>
         </main>
       </div>
     </div>

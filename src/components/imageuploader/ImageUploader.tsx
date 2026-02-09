@@ -20,6 +20,7 @@ type ImageUploaderProps = {
   onUploadProgress?: (progress: number) => void;
   productId?: string;
   variantId?: string;
+  existingImages?: string[];
 };
 
 export default function ImageUploader({ 
@@ -29,11 +30,11 @@ export default function ImageUploader({
   onUploadProgress,
   productId,
   variantId,
+  existingImages = []
 }: ImageUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-
   const { user } = useSelector((state: RootState) => state.auth);
   const vendorId = user?.vendorId;
 

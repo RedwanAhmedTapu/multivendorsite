@@ -13,18 +13,24 @@ export interface Category {
   createdAt: string;
   updatedAt: string;
 }
-
+export interface VariantNamePart {
+  name: string;
+  value: any;
+  displayValue?: string;
+  include: boolean;
+}
 export interface Attribute {
+  isRequired?: unknown;
   id: string;
   name: string;
   slug: string;
   type: 'TEXT' | 'NUMBER' | 'BOOLEAN' | 'SELECT' | 'MULTISELECT';
-  unit?: string; 
+
+  unit?: string;
+  values?: AttributeValue[];
+  categories?: CategoryAttribute[];
   createdAt: string;
   updatedAt: string;
-  values?: AttributeValue[];
-  isRequired?: unknown;
-
 }
 export interface AttributeValue {
   id: string;

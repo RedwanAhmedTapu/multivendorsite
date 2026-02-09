@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useGetCategoryFiltersQuery } from "@/features/apiSlice";
+import { useGetCategoryFiltersBySlugQuery } from "@/features/apiSlice";
 import { useSearchParams } from "next/navigation";
 
 // ============================================
@@ -26,7 +26,7 @@ export interface ProductFilters {
 interface FilterSidebarProps {
   isMobileOpen: boolean;
   onMobileClose: () => void;
-  categoryId?: string;
+  categorySlug?: string;
   selectedVendor?: string;
   onFiltersChange: (filters: ProductFilters) => void;
   currentFilters?: ProductFilters;
@@ -83,17 +83,18 @@ interface CategoryFilterResponse {
 export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   isMobileOpen,
   onMobileClose,
-  categoryId,
+  categorySlug,
   selectedVendor,
   onFiltersChange,
   currentFilters: externalFilters,
 }) => {
   const searchParams = useSearchParams();
   
-  // Check if products page has any parameters in URL
-  const hasUrlParams = useMemo(() => {
-    return searchParams.toString().length > 0;
-  }, [searchParams]);
+  // REMOVED: The check for URL parameters that was hiding the sidebar
+  // This is what was causing your issue:
+  // const hasUrlParams = useMemo(() => {
+  //   return searchParams.toString().length > 0;
+  // }, [searchParams]);
 
   // Fetch filter data from API
   const { 
@@ -101,8 +102,8 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     isLoading: filterLoading,
     isSuccess: filterSuccess,
     error: filterError 
-  } = useGetCategoryFiltersQuery(categoryId || '', {
-    skip: !categoryId,
+  } = useGetCategoryFiltersBySlugQuery(categorySlug || '', {
+    skip: !categorySlug,
   });
   
   // Extract filter data from response
@@ -110,7 +111,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   
   // Initialize filters with proper defaults
   const [internalFilters, setInternalFilters] = useState<ProductFilters>({
-    categories: categoryId ? [categoryId] : [],
+    categories: categorySlug ? [categorySlug] : [],
     priceRange: [0, 100000], // Default range
     attributes: {},
     brands: [],
@@ -264,7 +265,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       : [0, 100000];
 
     const clearedFilters = {
-      categories: categoryId ? [categoryId] : [],
+      categories: categorySlug ? [categorySlug] : [],
       priceRange: defaultPriceRange as [number, number],
       attributes: {},
       brands: [],
@@ -276,7 +277,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     updateFilters(clearedFilters);
     setMinPriceInput(defaultPriceRange[0].toString());
     setMaxPriceInput(defaultPriceRange[1].toString());
-  }, [filterData, categoryId, selectedVendor, updateFilters]);
+  }, [filterData, categorySlug, selectedVendor, updateFilters]);
 
   const getActiveFilterCount = useCallback(() => {
     let count = 0;
@@ -637,7 +638,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     const defaultMax = filterData?.filters?.priceRange?.max || 100000;
 
     // Loading state
-    if (filterLoading && categoryId) {
+    if (filterLoading && categorySlug) {
       return (
         <div className="w-full md:w-64 p-4 h-full md:h-fit overflow-y-auto bg-transparent">
           <div className="animate-pulse space-y-4">
@@ -665,7 +666,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     }
 
     // No data yet but still show common filters
-    if (!filterData && categoryId) {
+    if (!filterData && categorySlug) {
       return (
         <div className="w-full md:w-64 p-4 h-full md:h-fit bg-transparent overflow-y-auto">
           <div className="text-center py-3">
@@ -806,32 +807,26 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
           {/* Always show common filters */}
           {renderCommonFilters()}
 
-          {/* Show message when no category filters available */}
-          {categoryId && !hasCategoryFilters && filterData && (
-            <div className="p-3 bg-gray-50 rounded border border-gray-200">
-              <p className="text-sm text-gray-600 text-center">No additional filters</p>
-              <p className="text-xs text-gray-400 mt-1 text-center">Use common filters above</p>
-            </div>
-          )}
+          
         </div>
       </div>
     );
   }, [
-    filterLoading, categoryId, filterError, filterData, 
+    filterLoading, categorySlug, filterError, filterData, 
     filters, getActiveFilterCount, removeFilter, filterableAttributes,
     showAllItems, expandedSections, onMobileClose, clearAllFilters, 
     FilterSection, hasCategoryFilters, renderCommonFilters, 
     renderDynamicAttributes, getDisplayValueWithUnit
   ]);
 
-  // Hide the filter sidebar if no URL parameters are present
-  if (!hasUrlParams) {
-    return null;
-  }
+  // REMOVED: The condition that was hiding the sidebar
+  // if (!hasUrlParams) {
+  //   return null;
+  // }
 
   return (
     <>
-      {/* Desktop sidebar */}
+      {/* Desktop sidebar - ALWAYS VISIBLE on desktop */}
       <aside className="hidden md:block filter-sidebar sticky top-4">
         <FilterContent />
       </aside>

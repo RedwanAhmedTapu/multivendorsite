@@ -1,40 +1,30 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-// -----------------
-// Types
-// -----------------
 export interface User {
   id: number;
-  avatar?:string;
+  avatar?: string;
   name?: string;
   email?: string;
   phone?: string;
   vendorId?: string;
+  vendor?: { storeName: string; vendorType: string };
   role: string;
 }
 
 interface AuthState {
   user: User | null;
   accessToken: string | null;
-  
 }
 
-// -----------------
-// Initial state
-// -----------------
 const initialState: AuthState = {
   user: null,
   accessToken: null,
 };
 
-// -----------------
-// Slice
-// -----------------
 const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    // Store both user & accessToken
     setCredentials: (
       state,
       action: PayloadAction<{ user: User; accessToken: string }>
@@ -43,21 +33,26 @@ const authSlice = createSlice({
       state.accessToken = action.payload.accessToken;
     },
 
-    // Update only accessToken (used after refresh)
     setAccessToken: (state, action: PayloadAction<string>) => {
       state.accessToken = action.payload;
     },
 
-    // Clear everything (logout)
+    setUser: (state, action: PayloadAction<User>) => {
+      state.user = action.payload;
+    },
+
     clearAuth: (state) => {
       state.user = null;
       state.accessToken = null;
+      
+      // Clear localStorage if needed
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('user');
+      }
     },
   },
 });
 
-// -----------------
-// Exports
-// -----------------
-export const { setCredentials, setAccessToken, clearAuth } = authSlice.actions;
+export const { setCredentials, setAccessToken, setUser, clearAuth } = authSlice.actions;
 export default authSlice.reducer;

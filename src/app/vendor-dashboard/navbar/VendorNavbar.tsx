@@ -2,10 +2,21 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Menu, Bell, Settings, Search, User, Store, ChevronRight } from "lucide-react";
+import {
+  Menu,
+  Bell,
+  Settings,
+  Search,
+  ChevronRight,
+  LogOut,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
+import { useSelector, useDispatch } from "react-redux";
+import { RootState } from "@/store/store";
+import { useLogoutMutation } from "@/features/authApi";
+import { clearAuth } from "@/features/authSlice";
 
 type Icon = React.ComponentType<React.SVGProps<SVGSVGElement>>;
 
@@ -21,6 +32,7 @@ type VendorNavbarProps = {
   onMenuClick: () => void;
   isSidebarOpen: boolean;
   menuItems?: FlatMenuItem[];
+  isVisible?: boolean; // Accept visibility from parent
 };
 
 export function VendorNavbar({
@@ -28,25 +40,37 @@ export function VendorNavbar({
   onMenuClick,
   isSidebarOpen,
   menuItems = [],
+  isVisible = true, // Default to visible
 }: VendorNavbarProps) {
   const router = useRouter();
+  const dispatch = useDispatch();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
+  // Get auth state from Redux
+  const { user } = useSelector((state: RootState) => state.auth);
+
+  // Logout mutation
+  const [logoutMutation, { isLoading: isLoggingOut }] = useLogoutMutation();
+
   // Filter menu items based on search query
-  const filteredItems = menuItems.filter((item) =>
-    item.keywords.some((keyword) =>
-      keyword.toLowerCase().includes(searchQuery.toLowerCase())
-    ) || item.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredItems = menuItems.filter(
+    (item) =>
+      item.keywords.some((keyword) =>
+        keyword.toLowerCase().includes(searchQuery.toLowerCase())
+      ) || item.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Close search results when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+      if (
+        searchRef.current &&
+        !searchRef.current.contains(event.target as Node)
+      ) {
         setShowSearchResults(false);
         setSelectedIndex(-1);
       }
@@ -63,12 +87,12 @@ export function VendorNavbar({
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIndex((prev) => 
+        setSelectedIndex((prev) =>
           prev < filteredItems.length - 1 ? prev + 1 : 0
         );
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSelectedIndex((prev) => 
+        setSelectedIndex((prev) =>
           prev > 0 ? prev - 1 : filteredItems.length - 1
         );
       } else if (e.key === "Enter" && selectedIndex >= 0) {
@@ -87,7 +111,9 @@ export function VendorNavbar({
   // Scroll selected item into view
   useEffect(() => {
     if (selectedIndex >= 0 && resultsRef.current) {
-      const selectedElement = resultsRef.current.children[selectedIndex] as HTMLElement;
+      const selectedElement = resultsRef.current.children[
+        selectedIndex
+      ] as HTMLElement;
       if (selectedElement) {
         selectedElement.scrollIntoView({ block: "nearest" });
       }
@@ -109,6 +135,19 @@ export function VendorNavbar({
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logoutMutation().unwrap();
+      dispatch(clearAuth());
+      router.push("/vendor/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      // Still logout locally even if API fails
+      dispatch(clearAuth());
+      router.push("/vendor/login");
+    }
+  };
+
   const highlightText = (text: string, query: string) => {
     if (!query) return text;
     const regex = new RegExp(`(${query})`, "gi");
@@ -124,10 +163,51 @@ export function VendorNavbar({
     );
   };
 
+  // Get user initials for avatar
+  const getUserInitials = (name?: string) => {
+    if (!name) return "V";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
+    <header
+      className={`
+        fixed top-0 left-0 right-0 z-40 
+        bg-white border-b border-gray-200 shadow-sm
+        transition-transform duration-300 ease-in-out
+        ${isVisible ? "translate-y-0" : "-translate-y-full"}
+      `}
+    >
       <div className="h-16 px-4 sm:px-6 flex items-center justify-between">
-       
+        {/* Left - Mobile Menu & Store Info */}
+        <div className="flex items-center gap-4">
+          {/* Mobile Menu Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMobileMenuClick}
+            className="lg:hidden text-gray-600 hover:text-teal-600 hover:bg-gray-100"
+            aria-label="Toggle mobile menu"
+          >
+            <Menu className="w-5 h-5" />
+          </Button>
+
+          {/* Desktop Sidebar Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMenuClick}
+            className="hidden lg:flex text-gray-600 hover:text-teal-600 hover:bg-gray-100"
+            aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          >
+            <Menu className="w-5 h-5" />
+          </Button>
+        </div>
 
         {/* Center - Search */}
         <div className="flex-1 max-w-2xl mx-4 relative" ref={searchRef}>
@@ -148,6 +228,7 @@ export function VendorNavbar({
                   setShowSearchResults(false);
                 }}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label="Clear search"
               >
                 ×
               </button>
@@ -156,7 +237,7 @@ export function VendorNavbar({
 
           {/* Search Results Dropdown */}
           {showSearchResults && (
-            <div 
+            <div
               ref={resultsRef}
               className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto"
             >
@@ -164,7 +245,8 @@ export function VendorNavbar({
                 <>
                   <div className="px-4 py-2 border-b border-gray-100 bg-gray-50">
                     <p className="text-xs font-medium text-gray-500">
-                      {filteredItems.length} result{filteredItems.length !== 1 ? "s" : ""} found
+                      {filteredItems.length} result
+                      {filteredItems.length !== 1 ? "s" : ""} found
                     </p>
                   </div>
                   {filteredItems.map((item, index) => (
@@ -175,22 +257,38 @@ export function VendorNavbar({
                         w-full flex items-center justify-between px-4 py-3
                         hover:bg-teal-50 border-b border-gray-100 last:border-b-0
                         transition-colors duration-150
-                        ${selectedIndex === index ? "bg-teal-50 border-teal-100" : ""}
+                        ${
+                          selectedIndex === index
+                            ? "bg-teal-50 border-teal-100"
+                            : ""
+                        }
                       `}
                       onMouseEnter={() => setSelectedIndex(index)}
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className={`p-2 rounded-md ${
-                          selectedIndex === index ? "bg-teal-100" : "bg-gray-100"
-                        }`}>
-                          <item.icon className={`w-4 h-4 ${
-                            selectedIndex === index ? "text-teal-600" : "text-gray-600"
-                          }`} />
+                        <div
+                          className={`p-2 rounded-md ${
+                            selectedIndex === index
+                              ? "bg-teal-100"
+                              : "bg-gray-100"
+                          }`}
+                        >
+                          <item.icon
+                            className={`w-4 h-4 ${
+                              selectedIndex === index
+                                ? "text-teal-600"
+                                : "text-gray-600"
+                            }`}
+                          />
                         </div>
                         <div className="flex-1 min-w-0 text-left">
-                          <p className={`text-sm font-medium truncate ${
-                            selectedIndex === index ? "text-teal-700" : "text-gray-900"
-                          }`}>
+                          <p
+                            className={`text-sm font-medium truncate ${
+                              selectedIndex === index
+                                ? "text-teal-700"
+                                : "text-gray-900"
+                            }`}
+                          >
                             {highlightText(item.title, searchQuery)}
                           </p>
                           <p className="text-xs text-gray-500 truncate">
@@ -198,9 +296,13 @@ export function VendorNavbar({
                           </p>
                         </div>
                       </div>
-                      <ChevronRight className={`w-4 h-4 ${
-                        selectedIndex === index ? "text-teal-500" : "text-gray-400"
-                      }`} />
+                      <ChevronRight
+                        className={`w-4 h-4 ${
+                          selectedIndex === index
+                            ? "text-teal-500"
+                            : "text-gray-400"
+                        }`}
+                      />
                     </button>
                   ))}
                   <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
@@ -212,8 +314,12 @@ export function VendorNavbar({
               ) : (
                 <div className="px-4 py-8 text-center">
                   <Search className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No results found for "{searchQuery}"</p>
-                  <p className="text-xs text-gray-400 mt-1">Try different keywords</p>
+                  <p className="text-sm text-gray-500">
+                    No results found for "{searchQuery}"
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Try different keywords
+                  </p>
                 </div>
               )}
             </div>
@@ -226,6 +332,7 @@ export function VendorNavbar({
             variant="ghost"
             size="icon"
             className="text-gray-600 hover:text-teal-600 hover:bg-gray-100 relative"
+            title="Notifications"
           >
             <Bell className="w-5 h-5" />
             <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -235,19 +342,80 @@ export function VendorNavbar({
             variant="ghost"
             size="icon"
             className="text-gray-600 hover:text-teal-600 hover:bg-gray-100"
+            onClick={() => router.push("/vendor/settings")}
+            title="Settings"
           >
             <Settings className="w-5 h-5" />
           </Button>
 
-          <Button
-            variant="ghost"
-            className="hidden sm:flex items-center gap-2 text-gray-700 hover:text-teal-600 hover:bg-gray-100"
-          >
-            <div className="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center">
-              <User className="w-4 h-4 text-white" />
+          {/* User Dropdown */}
+          <div className="relative group">
+            <Button
+              variant="ghost"
+              className="hidden sm:flex items-center gap-2 text-gray-700 hover:text-teal-600 hover:bg-gray-100"
+            >
+              <div className="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center">
+                <span className="text-sm font-semibold text-white">
+                  {getUserInitials(user?.name)}
+                </span>
+              </div>
+            </Button>
+
+            {/* Dropdown Menu */}
+            <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+              {/* User Info */}
+              <div className="p-4 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center">
+                    <span className="text-sm font-semibold text-white">
+                      {getUserInitials(user?.name)}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {user?.name || "Vendor"}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {user?.email || user?.phone}
+                    </p>
+                    <p className="text-xs text-teal-600 font-medium mt-0.5">
+                      {user?.role || "Vendor"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dropdown Items */}
+              <div className="p-1">
+                
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-gray-700 hover:text-teal-600 hover:bg-gray-100"
+                  onClick={() => router.push("/vendor/settings")}
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Button>
+              </div>
+
+              {/* Logout Button */}
+              <div className="p-1 border-t border-gray-100">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                >
+                  {isLoggingOut ? (
+                    <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin mr-2" />
+                  ) : (
+                    <LogOut className="w-4 h-4 mr-2" />
+                  )}
+                  {isLoggingOut ? "Logging out..." : "Logout"}
+                </Button>
+              </div>
             </div>
-            <span className="hidden lg:inline">Vendor Account</span>
-          </Button>
+          </div>
         </div>
       </div>
     </header>
