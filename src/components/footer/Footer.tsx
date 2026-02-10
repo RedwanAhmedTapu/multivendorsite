@@ -35,14 +35,18 @@ const Footer = () => {
 
   // Show error state or fallback to default values
   if (error || !footerSettings) {
-    console.error("Footer settings error:", error);
-    return null;
-  }
+  console.error("Footer settings error:", error, footerSettings);
+  return (
+    <div className="text-center py-6 text-red-500 text-sm">
+      Footer failed to load
+    </div>
+  );
+}
 
-  // Filter visible columns and sort by display order
+
+  // Filter visible columns
   const visibleColumns = footerSettings.columns
-    .filter((column) => column.isVisible)
-    .sort((a, b) => a.displayOrder - b.displayOrder);
+    .filter((column) => column.isVisible);
 
   // Calculate grid columns based on number of visible columns + contact + newsletter
   const totalColumns = visibleColumns.length + 2; // +2 for contact and newsletter
