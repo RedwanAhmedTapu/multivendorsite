@@ -109,7 +109,7 @@ export default function HelpCenter() {
         <Card className="bg-gradient-to-r from-teal-500 to-teal-600 text-white p-8 rounded-sm mb-8 shadow-sm">
           <div className="text-center">
             <h2 className="text-xl sm:text-2xl font-semibold mb-2">
-              Welcome to Cartup Help Center
+              Welcome to Finixmart Help Center
             </h2>
             <p className="text-sm sm:text-xl font-medium">
               Hi
