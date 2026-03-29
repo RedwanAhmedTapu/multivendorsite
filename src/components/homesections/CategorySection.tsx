@@ -104,7 +104,7 @@ export default function CategorySection() {
                   className="flex flex-col items-center text-center group cursor-pointer min-w-max"
                 >
                   <div
-                    className={`flex items-center justify-center w-20 h-20 rounded-full 
+                    className={`flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-full 
                     ${
                       cat.highlight
                         ? "bg-red-50 border-2 border-red-500"
@@ -120,7 +120,7 @@ export default function CategorySection() {
                       className="w-full h-full rounded-full object-cover"
                     />
                   </div>
-                  <p className="mt-2 text-sm line-clamp-2 min-h-[2.5rem] text-gray-700">{cat.name}</p>
+                  <p className="mt-2 text-xs md:text-sm line-clamp-2 min-h-[2.5rem] text-gray-700">{cat.name}</p>
                 </Link>
               ))}
             </div>

@@ -9,7 +9,7 @@ let isRefreshing = false;
 
 // Create base query with credentials
 const baseQuery = fetchBaseQuery({
-  baseUrl: "https://api.finixmart.com.bd/api",
+  baseUrl: "http://localhost:5000/api",
   credentials: "include",
   prepareHeaders: (headers, { getState }) => {
     const token = (getState() as RootState).auth.accessToken;
@@ -43,15 +43,17 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
     if (!isRefreshing) {
       isRefreshing = true;
       
-      refreshPromise = baseQuery(
-        {
-          url: "/auth/refresh",
-          method: "POST",
-        },
-        api,
-        extraOptions
-      )
-        .then(refreshResult => {
+      refreshPromise = (async () => {
+        try {
+          const refreshResult = await baseQuery(
+            {
+              url: "/auth/refresh",
+              method: "POST",
+            },
+            api,
+            extraOptions
+          );
+
           if (refreshResult.data) {
             const { accessToken, user } = refreshResult.data as any;
             
@@ -75,8 +77,7 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
           } else {
             throw new Error('Refresh failed with no data');
           }
-        })
-        .catch(error => {
+        } catch (error: any) {
           console.error('Token refresh failed:', error);
           
           // Only clear auth if refresh endpoint itself failed with 401/403
@@ -92,11 +93,11 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
             }
           }
           return { success: false, error };
-        })
-        .finally(() => {
+        } finally {
           isRefreshing = false;
           refreshPromise = null;
-        });
+        }
+      })();
     }
 
     // Wait for the refresh to complete

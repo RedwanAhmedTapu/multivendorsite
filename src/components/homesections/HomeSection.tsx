@@ -42,7 +42,7 @@ const HeroSlider = () => {
       <div className="grid grid-cols-1 lg:grid-cols-4 sm:gap-4">
         {/* Left Section - Hero Slider */}
         <div
-          className="lg:col-span-3 relative rounded-sm overflow-hidden h-64 sm:h-72 md:h-80 lg:h-[22rem] "
+        className="lg:col-span-3 relative rounded-sm overflow-hidden aspect-video w-full max-h-[50vh]"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
@@ -53,8 +53,8 @@ const HeroSlider = () => {
                 index === currentSlide
                   ? "opacity-100 translate-x-0"
                   : index < currentSlide
-                  ? "opacity-0 -translate-x-full"
-                  : "opacity-0 translate-x-full"
+                    ? "opacity-0 -translate-x-full"
+                    : "opacity-0 translate-x-full"
               }`}
             >
               <div className="relative w-full h-full">
@@ -62,9 +62,8 @@ const HeroSlider = () => {
                   src={slide.imageUrl}
                   alt={slide.title || "slider image"}
                   fill
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 75vw, 1200px"
                   priority={index === 0}
-                  className="object-cover object-left lg:object-center"
+                  className="absolute inset-0 w-full h-full object-cover"
                   quality={90}
                 />
               </div>

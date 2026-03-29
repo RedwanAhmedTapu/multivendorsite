@@ -1,411 +1,161 @@
-// app/vendor/orders/courier/page.tsx
 "use client";
 
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Package,
-  CheckCircle,
-  Clock,
-  Truck,
-  Download,
-  MoreVertical,
-  Search,
-  Filter,
-  MapPin,
-  Phone,
-  Calendar,
-  Printer,
-} from "lucide-react";
-import {
-  useGetVendorCourierOrdersQuery,
-  useVendorMarkReadyForPickupMutation,
-  useLazyGetShippingLabelQuery,
-  type CourierOrder,
-} from "@/features/courierApi";
+import { useState, useCallback } from "react";
+import { ShoppingBag, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
-export default function VendorCourierOrdersPage() {
-  const vendorId = "vendor-123"; // Get from auth context
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedOrder, setSelectedOrder] = useState<CourierOrder | null>(null);
+import { useGetVendorOrdersQuery, useExportVendorOrdersMutation } from "@/features/vendorOrderApi";
+import { useVendorOrderFilters } from "./components/useVendorOrderFilters";
+import { VendorOrderStatsBar } from "./components/VendorOrderStatsBar";
+import { VendorOrderFiltersBar } from "./components/VendorOrderFiltersBar";
+import { VendorOrdersTable } from "./components/VendorOrdersTable";
+import { VendorOrderDetailDrawer } from "./components/VendorOrderDetailDrawer";
+import type { VendorOrderRow } from "@/types/vendorOrderTypes";
 
-  const { data: ordersData, isLoading } = useGetVendorCourierOrdersQuery({
-    vendorId,
-    status: statusFilter !== "all" ? statusFilter : undefined,
-    page: 1,
-    limit: 20,
-  });
+export default function VendorOrdersPage() {
+  const {
+    filters,
+    setFilter,
+    resetFilters,
+    activeFilterCount,
+    queryString,
+    statsQueryString,
+  } = useVendorOrderFilters();
 
-  const orders = ordersData?.data || [];
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
-  const stats = [
-    {
-      label: "Pending Pickup",
-      value: orders.filter((o) => o.status === "PENDING_PICKUP").length,
-      icon: Clock,
-      color: "text-yellow-600",
-    },
-    {
-      label: "Ready for Pickup",
-      value: orders.filter((o) => o.status === "READY_FOR_PICKUP").length,
-      icon: Package,
-      color: "text-blue-600",
-    },
-    {
-      label: "In Transit",
-      value: orders.filter((o) => o.status === "IN_TRANSIT").length,
-      icon: Truck,
-      color: "text-purple-600",
-    },
-    {
-      label: "Delivered",
-      value: orders.filter((o) => o.status === "DELIVERED").length,
-      icon: CheckCircle,
-      color: "text-green-600",
-    },
-  ];
+  const {
+    data,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  } = useGetVendorOrdersQuery(queryString);
 
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      order.courierTrackingId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.courierOrderId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.recipientName.toLowerCase().includes(searchQuery.toLowerCase());
+  const [exportOrders] = useExportVendorOrdersMutation();
 
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+  const orders = data?.data || [];
+  const pagination = data?.pagination;
 
-    return matchesSearch && matchesStatus;
-  });
+  const handleViewOrder = useCallback((order: VendorOrderRow) => {
+    setSelectedOrderId(order.id);
+  }, []);
+
+  const handleExport = async () => {
+    try {
+      const blob = await exportOrders(queryString).unwrap();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `my-orders-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Orders exported");
+    } catch {
+      toast.error("Export failed");
+    }
+  };
+
+  const handleRefresh = () => {
+    refetch();
+    toast.success("Orders refreshed");
+  };
+
+  // Count new (CONFIRMED) orders that need action
+  const newOrderCount = orders.filter((o) => o.status === "CONFIRMED").length;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Courier Orders</h1>
-          <p className="text-muted-foreground">
-            Manage your shipments and track deliveries
-          </p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#F7F8FA]">
+      <div className="container mx-auto px-4 sm:px-6 py-8 max-w-[1400px] space-y-6">
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.label}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
-              <stat.icon className={`h-4 w-4 ${stat.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Orders List */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        {/* ── Header ─────────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-teal-700 text-white shadow-lg shadow-teal-700/20">
+              <ShoppingBag className="w-5 h-5" />
+            </div>
             <div>
-              <CardTitle>All Orders</CardTitle>
-              <CardDescription>View and manage your courier shipments</CardDescription>
+              <h1
+                className="text-2xl font-black tracking-tight text-slate-900"
+                style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
+              >
+                My Orders
+              </h1>
+              <p className="text-xs text-slate-500 -mt-0.5">
+                Manage and fulfill your store orders
+              </p>
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="flex gap-4 pt-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by tracking ID, order ID, or customer name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8"
-              />
-            </div>
-            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="PENDING_PICKUP">Pending</TabsTrigger>
-                <TabsTrigger value="READY_FOR_PICKUP">Ready</TabsTrigger>
-                <TabsTrigger value="IN_TRANSIT">In Transit</TabsTrigger>
-                <TabsTrigger value="DELIVERED">Delivered</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order Details</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Courier</TableHead>
-                  <TableHead>COD Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center">
-                      Loading orders...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredOrders.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      No orders found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredOrders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <p className="font-medium">#{order.courierOrderId}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Track: {order.courierTrackingId}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {order.itemQuantity} items • {order.itemWeight}kg
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <p className="font-medium">{order.recipientName}</p>
-                          <p className="text-sm text-muted-foreground flex items-center gap-1">
-                            <Phone className="w-3 h-3" />
-                            {order.recipientPhone}
-                          </p>
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {order.deliveryLocationId}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {order.courier_providers?.name || "N/A"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        ৳{order.codAmount.toFixed(2)}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={order.status} />
-                      </TableCell>
-                      <TableCell>
-                        <OrderActions order={order} vendorId={vendorId} />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Order Details Modal */}
-      {selectedOrder && (
-        <OrderDetailsModal
-          order={selectedOrder}
-          open={!!selectedOrder}
-          onClose={() => setSelectedOrder(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-// ==================== STATUS BADGE ====================
-function StatusBadge({ status }: { status: string }) {
-  const statusConfig: Record<string, { label: string; variant: any }> = {
-    PENDING_PICKUP: { label: "Pending Pickup", variant: "secondary" },
-    READY_FOR_PICKUP: { label: "Ready for Pickup", variant: "default" },
-    PICKED_UP: { label: "Picked Up", variant: "default" },
-    IN_TRANSIT: { label: "In Transit", variant: "default" },
-    OUT_FOR_DELIVERY: { label: "Out for Delivery", variant: "default" },
-    DELIVERED: { label: "Delivered", variant: "default" },
-    RETURNED: { label: "Returned", variant: "destructive" },
-    CANCELLED: { label: "Cancelled", variant: "destructive" },
-  };
-
-  const config = statusConfig[status] || { label: status, variant: "secondary" };
-
-  return <Badge variant={config.variant}>{config.label}</Badge>;
-}
-
-// ==================== ORDER ACTIONS ====================
-function OrderActions({ order, vendorId }: { order: CourierOrder; vendorId: string }) {
-  const [markReady, { isLoading: isMarking }] = useVendorMarkReadyForPickupMutation();
-  const [getLabel, { isLoading: isDownloading }] = useLazyGetShippingLabelQuery();
-
-  const handleMarkReady = async () => {
-    try {
-      await markReady({
-        orderId: order.orderId,
-        vendorId,
-      }).unwrap();
-      alert("Order marked as ready for pickup!");
-    } catch (error) {
-      alert("Failed to mark order as ready. Please try again.");
-    }
-  };
-
-  const handleDownloadLabel = async () => {
-    try {
-      const result = await getLabel({
-        orderId: order.orderId,
-        vendorId,
-      }).unwrap();
-
-      // Generate and download label (you'd implement actual label generation)
-      console.log("Label data:", result.data);
-      alert("Label downloaded successfully!");
-    } catch (error) {
-      alert("Failed to download label. Please try again.");
-    }
-  };
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm">
-          <MoreVertical className="w-4 h-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {order.status === "PENDING_PICKUP" && (
-          <DropdownMenuItem onClick={handleMarkReady} disabled={isMarking}>
-            <CheckCircle className="w-4 h-4 mr-2" />
-            {isMarking ? "Marking..." : "Mark Ready for Pickup"}
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={handleDownloadLabel} disabled={isDownloading}>
-          <Printer className="w-4 h-4 mr-2" />
-          {isDownloading ? "Downloading..." : "Print Shipping Label"}
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Package className="w-4 h-4 mr-2" />
-          View Details
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-// ==================== ORDER DETAILS MODAL ====================
-function OrderDetailsModal({
-  order,
-  open,
-  onClose,
-}: {
-  order: CourierOrder;
-  open: boolean;
-  onClose: () => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Order Details</DialogTitle>
-          <DialogDescription>
-            Tracking ID: {order.courierTrackingId}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Customer Information */}
-          <div className="space-y-2">
-            <h3 className="font-semibold">Customer Information</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground">Name</p>
-                <p className="font-medium">{order.recipientName}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* New orders alert badge */}
+            {newOrderCount > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                <p className="text-xs text-amber-700 font-semibold">
+                  {newOrderCount} new order{newOrderCount > 1 ? "s" : ""} need{newOrderCount === 1 ? "s" : ""} action
+                </p>
               </div>
-              <div>
-                <p className="text-muted-foreground">Phone</p>
-                <p className="font-medium">{order.recipientPhone}</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-muted-foreground">Address</p>
-                <p className="font-medium">{order.recipientAddress}</p>
-              </div>
-            </div>
-          </div>
+            )}
 
-          {/* Shipment Details */}
-          <div className="space-y-2">
-            <h3 className="font-semibold">Shipment Details</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground">Weight</p>
-                <p className="font-medium">{order.itemWeight} kg</p>
+            {/* Total count */}
+            {pagination && (
+              <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200 shadow-sm">
+                <p className="text-xs text-slate-500">
+                  <span className="font-bold text-slate-900 text-sm font-mono">
+                    {pagination.total.toLocaleString()}
+                  </span>{" "}
+                  total
+                  {activeFilterCount > 0 && (
+                    <span className="ml-1 text-teal-600 font-medium">
+                      · {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""}
+                    </span>
+                  )}
+                </p>
               </div>
-              <div>
-                <p className="text-muted-foreground">Quantity</p>
-                <p className="font-medium">{order.itemQuantity} items</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">COD Amount</p>
-                <p className="font-medium">৳{order.codAmount.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Delivery Charge</p>
-                <p className="font-medium">৳{order.deliveryCharge.toFixed(2)}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Tracking History */}
-          <div className="space-y-2">
-            <h3 className="font-semibold">Tracking History</h3>
-            <div className="space-y-2">
-              {order.courier_tracking_history?.length > 0 ? (
-                order.courier_tracking_history.map((history, index) => (
-                  <div key={index} className="flex items-start gap-2 text-sm">
-                    <div className="w-2 h-2 rounded-full bg-primary mt-1.5" />
-                    <div>
-                      <p className="font-medium">{history.messageEn}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(history.timestamp).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">No tracking updates yet</p>
-              )}
-            </div>
+            )}
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* ── Stats ──────────────────────────────────────────────────── */}
+        <VendorOrderStatsBar statsQueryString={statsQueryString} />
+
+        {/* ── Filters ────────────────────────────────────────────────── */}
+        <VendorOrderFiltersBar
+          filters={filters}
+          setFilter={setFilter}
+          resetFilters={resetFilters}
+          activeFilterCount={activeFilterCount}
+          isLoading={isLoading || isFetching}
+          onExport={handleExport}
+          onRefresh={handleRefresh}
+        />
+
+        {/* Updating indicator */}
+        {isFetching && !isLoading && (
+          <div className="flex items-center gap-2 text-xs text-slate-500 -mt-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+            Updating…
+          </div>
+        )}
+
+        {/* ── Table ──────────────────────────────────────────────────── */}
+        <VendorOrdersTable
+          orders={orders}
+          pagination={pagination}
+          isLoading={isLoading}
+          isError={isError}
+          filters={filters}
+          setFilter={setFilter}
+          onViewOrder={handleViewOrder}
+        />
+
+        {/* ── Detail Drawer ───────────────────────────────────────────── */}
+        <VendorOrderDetailDrawer
+          vendorOrderId={selectedOrderId}
+          onClose={() => setSelectedOrderId(null)}
+        />
+      </div>
+    </div>
   );
 }

@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function AccountingPage() {
-  return <QuickActions />; // Content will be rendered by @main parallel route
+  return <QuickActions />; 
 }

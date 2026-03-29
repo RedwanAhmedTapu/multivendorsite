@@ -38,30 +38,30 @@ const navigation = [
     href: '/accounting/accounts',
     icon: BarChart3,
   },
-  {
-    name: 'Payments',
-    href: '/accounting/payments',
-    icon: CreditCard,
-    subItems: [
-      { name: 'Transactions', href: '/accounting/payments/transactions' },
-      { name: 'Settlements', href: '/accounting/payments/settlements' },
-    ],
-  },
-  {
-    name: 'Refunds',
-    href: '/accounting/refunds',
-    icon: RefreshCw,
-  },
-  {
-    name: 'Payouts',
-    href: '/accounting/payouts',
-    icon: DollarSign,
-  },
-  {
-    name: 'Commissions',
-    href: '/accounting/commissions',
-    icon: Calculator,
-  },
+  // {
+  //   name: 'Payments',
+  //   href: '/accounting/payments',
+  //   icon: CreditCard,
+  //   subItems: [
+  //     { name: 'Transactions', href: '/accounting/payments/transactions' },
+  //     { name: 'Settlements', href: '/accounting/payments/settlements' },
+  //   ],
+  // },
+  // {
+  //   name: 'Refunds',
+  //   href: '/accounting/refunds',
+  //   icon: RefreshCw,
+  // },
+  // {
+  //   name: 'Payouts',
+  //   href: '/accounting/payouts',
+  //   icon: DollarSign,
+  // },
+  // {
+  //   name: 'Commissions',
+  //   href: '/accounting/commissions',
+  //   icon: Calculator,
+  // },
   {
     name: 'Accounting Periods',
     href: '/accounting/periods',
@@ -73,16 +73,16 @@ const navigation = [
     icon: PieChart,
     subItems: [
       { name: 'Trial Balance', href: '/accounting/reports/trial-balance' },
-      { name: 'Profit & Loss', href: '/accounting/reports/profit-loss' },
+      // { name: 'Profit & Loss', href: '/accounting/reports/profit-loss' },
       { name: 'Ledger Statements', href: '/accounting/reports/ledger' },
       { name: 'Vendor Payables', href: '/accounting/reports/vendor-payables' },
     ],
   },
-  {
-    name: 'Settings',
-    href: '/accounting/settings',
-    icon: Settings,
-  },
+  // {
+  //   name: 'Settings',
+  //   href: '/accounting/settings',
+  //   icon: Settings,
+  // },
 ];
 
 export default function AccountingSidebar() {

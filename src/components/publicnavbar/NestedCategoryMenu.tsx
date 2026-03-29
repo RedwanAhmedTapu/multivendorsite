@@ -28,21 +28,16 @@ export default function NestedCategoryMenu({
   const [hoveredLevel1, setHoveredLevel1] = useState<Category | null>(null);
   const [hoveredLevel2, setHoveredLevel2] = useState<Category | null>(null);
 
-  // Filter root categories (categories without parentId)
   const rootCategories = categories.filter(cat => !cat.parentId);
 
   const handleCategoryClick = (slug: string, event: React.MouseEvent, isRootCategory: boolean = false) => {
     event.stopPropagation();
-    
-    // Only navigate if it's NOT a root category (level 2 or 3)
     if (!isRootCategory) {
       if (onCategorySelect) {
         onCategorySelect(slug);
       } else {
         router.push(`/products?category=${slug}`);
       }
-      
-      // Close the modal after navigation
       if (onClose) {
         onClose();
       }
@@ -51,7 +46,7 @@ export default function NestedCategoryMenu({
 
   const handleLevel1MouseEnter = (category: Category) => {
     setHoveredLevel1(category);
-    setHoveredLevel2(null); // Reset level 2 when changing level 1
+    setHoveredLevel2(null);
   };
 
   const handleLevel2MouseEnter = (category: Category) => {
@@ -70,10 +65,8 @@ export default function NestedCategoryMenu({
             rootCategories.map((category) => (
               <div key={category.id}>
                 <div
-                  className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-all duration-200 text-gray-700 hover:bg-gray-50 hover:text-teal-500 ${
-                    hoveredLevel1?.id === category.id
-                      ? 'bg-teal-50 text-teal-500'
-                      : ''
+                  className={`flex items-center justify-between px-4 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 hover:text-teal-500 ${
+                    hoveredLevel1?.id === category.id ? 'bg-teal-50 text-teal-500' : ''
                   }`}
                   onMouseEnter={() => handleLevel1MouseEnter(category)}
                   onClick={(e) => handleCategoryClick(category.slug, e, true)}
@@ -100,9 +93,9 @@ export default function NestedCategoryMenu({
         </div>
       </div>
 
-      {/* Level 2: Child Categories */}
+      {/* Level 2: Child Categories — no animation */}
       {hoveredLevel1 && hoveredLevel1.children && hoveredLevel1.children.length > 0 && (
-        <div className="w-64 border-r border-gray-200 bg-white animate-in slide-in-from-left duration-200">
+        <div className="w-64 border-r border-gray-200 bg-white">
           <div className="p-3 bg-gray-100 font-semibold text-gray-600 border-b border-gray-200 text-sm truncate">
             {hoveredLevel1.name}
           </div>
@@ -110,10 +103,8 @@ export default function NestedCategoryMenu({
             {hoveredLevel1.children.map((child) => (
               <div key={child.id}>
                 <div
-                  className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-all duration-200 text-gray-600 hover:bg-gray-50 hover:text-teal-500 ${
-                    hoveredLevel2?.id === child.id
-                      ? 'bg-teal-50 text-teal-500'
-                      : ''
+                  className={`flex items-center justify-between px-4 py-2.5 cursor-pointer text-gray-600 hover:bg-gray-50 hover:text-teal-500 ${
+                    hoveredLevel2?.id === child.id ? 'bg-teal-50 text-teal-500' : ''
                   }`}
                   onMouseEnter={() => handleLevel2MouseEnter(child)}
                   onClick={(e) => handleCategoryClick(child.slug, e, false)}
@@ -134,20 +125,20 @@ export default function NestedCategoryMenu({
         </div>
       )}
 
-      {/* Level 3: Grand Child Categories */}
+      {/* Level 3: Grandchild Categories — no animation */}
       {hoveredLevel2 && hoveredLevel2.children && hoveredLevel2.children.length > 0 && (
-        <div className="w-64 bg-white animate-in slide-in-from-left duration-200">
+        <div className="w-64 bg-white">
           <div className="p-3 bg-gray-100 font-semibold text-gray-900 border-b border-gray-200 text-sm truncate">
             {hoveredLevel2.name}
           </div>
           <div className="max-h-[500px] overflow-y-auto">
-            {hoveredLevel2.children?.map((grandChild) => (
+            {hoveredLevel2.children.map((grandChild) => (
               <div key={grandChild.id}>
                 <div
-                  className="px-4 py-2.5 cursor-pointer text-gray-900 hover:bg-teal-50 hover:text-teal-500 transition-all duration-200"
+                  className="px-4 py-2.5 cursor-pointer text-gray-900 hover:bg-teal-50 hover:text-teal-500"
                   onClick={(e) => handleCategoryClick(grandChild.slug, e, false)}
                 >
-                  <span className="text-sm font-medium hover:font-semibold truncate block">
+                  <span className="text-sm font-medium truncate block">
                     {grandChild.name}
                   </span>
                 </div>

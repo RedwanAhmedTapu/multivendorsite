@@ -315,7 +315,8 @@ export function OfferProductSelector({
   open,
   onOpenChange,
 }: OfferProductSelectorProps) {
-  const { data: products = [], isLoading, error } = useGetProductsQuery();
+  const { data: productsResponse = [], isLoading, error } = useGetProductsQuery();
+  const products = Array.isArray(productsResponse) ? productsResponse : (productsResponse?.data ? productsResponse.data : []);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("ACTIVE");

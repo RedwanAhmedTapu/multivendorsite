@@ -3,34 +3,35 @@ import { io, Socket } from 'socket.io-client';
 
 class SocketService {
   private socket: Socket | null = null;
-  private dispatch: any = null;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private isInitialized = false;
+  private reconnectAttempts     = 0;
+  private maxReconnectAttempts  = 5;
+  private joinedRooms: Set<string> = new Set();
 
-  initialize(dispatch?: any) {
-    this.dispatch = dispatch || null;
-    this.isInitialized = true;
-  }
+  initialize(_dispatch?: any) {}
 
-  connect(token: string) {
-    if (this.socket?.connected) {
-      console.log('✅ Already connected');
-      return this.socket;
-    }
+  connect(token: string): Socket {
+    if (this.socket?.connected) return this.socket;
 
+    // Clean up any stale socket
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
+      this.socket = null;
     }
 
-    console.log('🔌 Connecting to socket server...');
-    this.socket = io('http://localhost:5000', {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: this.maxReconnectAttempts,
-    });
+    // ── Send the token exactly as stored in Redux (no "Bearer " prefix) ───────
+    // The server's socketAuth strips "Bearer " if present, so either format
+    // works — but be consistent. We send it raw here.
+    this.socket = io(
+      process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:5000',
+      {
+        auth:       { token },          // ← plain token, no "Bearer " prefix
+        transports: ['websocket', 'polling'],
+        reconnection:         true,
+        reconnectionDelay:    1000,
+        reconnectionAttempts: this.maxReconnectAttempts,
+      }
+    );
 
     this.registerCoreEvents();
     return this.socket;
@@ -42,6 +43,15 @@ class SocketService {
     this.socket.on('connect', () => {
       this.reconnectAttempts = 0;
       console.log('🟢 Socket connected:', this.socket?.id);
+
+      // Re-join all rooms after reconnect — Socket.IO drops membership on
+      // disconnect so we track them ourselves and re-emit on reconnect.
+      if (this.joinedRooms.size > 0) {
+        console.log(`🔄 Re-joining ${this.joinedRooms.size} room(s) after reconnect`);
+        this.joinedRooms.forEach((conversationId) => {
+          this.socket?.emit('join_conversation', { conversationId });
+        });
+      }
     });
 
     this.socket.on('disconnect', (reason) => {
@@ -49,7 +59,7 @@ class SocketService {
     });
 
     this.socket.on('connect_error', (err) => {
-      console.error('⚠️ Connection error:', err.message);
+      console.error('⚠️  Socket connect_error:', err.message);
       this.reconnectAttempts++;
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
         console.error('❌ Max reconnect attempts reached.');
@@ -57,14 +67,26 @@ class SocketService {
     });
 
     this.socket.on('error', (err) => {
-      console.error('🚨 Server error:', err);
+      console.error('🚨 Server socket error:', err);
     });
   }
 
-  // ✅ Socket helpers
-  isConnected() {
+  // ── State ──────────────────────────────────────────────────────────────────
+
+  isConnected(): boolean {
     return !!this.socket?.connected;
   }
+
+  disconnect() {
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    this.joinedRooms.clear();
+  }
+
+  // ── Listeners ──────────────────────────────────────────────────────────────
 
   on(event: string, callback: (...args: any[]) => void) {
     this.socket?.on(event, callback);
@@ -74,21 +96,26 @@ class SocketService {
     this.socket?.off(event, callback);
   }
 
-  // ✅ Messaging
-  sendMessage(conversationId: string, content: string) {
-    this.socket?.emit('send_message', { conversationId, content });
-  }
+  // ── Rooms ──────────────────────────────────────────────────────────────────
 
-  // ✅ Conversation
   joinConversation(conversationId: string) {
+    if (!conversationId) return;
+    this.joinedRooms.add(conversationId);
     this.socket?.emit('join_conversation', { conversationId });
   }
 
   leaveConversation(conversationId: string) {
+    if (!conversationId) return;
+    this.joinedRooms.delete(conversationId);
     this.socket?.emit('leave_conversation', { conversationId });
   }
 
-  // ✅ Typing
+  // ── Actions ────────────────────────────────────────────────────────────────
+
+  markRead(conversationId: string) {
+    this.socket?.emit('mark_read', { conversationId });
+  }
+
   startTyping(conversationId: string) {
     this.socket?.emit('user_typing', { conversationId });
   }
@@ -97,19 +124,11 @@ class SocketService {
     this.socket?.emit('user_stop_typing', { conversationId });
   }
 
-  // ✅ Read
-  markRead(conversationId: string) {
-    this.socket?.emit('mark_read', { conversationId });
+  // Primary send path is HTTP (sendMessageMutation).
+  // This exists as a fallback / for direct socket clients.
+  sendMessage(conversationId: string, content: string) {
+    this.socket?.emit('send_message', { conversationId, content });
   }
-  // ✅ Add this inside the SocketService class
-disconnect() {
-  if (this.socket) {
-    console.log("🔌 Disconnecting socket...");
-    this.socket.disconnect();
-    this.socket = null;
-  }
-}
-
 }
 
 export const socketService = new SocketService();

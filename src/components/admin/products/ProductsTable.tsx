@@ -76,9 +76,9 @@ export function ProductsTable() {
 
   // Filter and search products
   const filteredProducts = useMemo(() => {
-    if (!products) return [];
+    if (!products || !products.data) return [];
 
-    return products.filter((product) => {
+    return products.data.filter((product) => {
       const matchesSearch = searchTerm === '' || 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.vendor?.storeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||

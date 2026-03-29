@@ -229,7 +229,7 @@ export default function CustomerReviewManagement() {
             </div>
           ) : (
             <div className="space-y-4 max-h-[60vh] overflow-y-auto py-2">
-              {reviewsList.map((review) => {
+              {reviewsList&& reviewsList.map((review) => {
                 const reviewerName =
                   review.user?.name ?? review.customerName ?? review.authorName ?? "Anonymous";
                 const rating = review.rating ?? review.stars ?? "-";

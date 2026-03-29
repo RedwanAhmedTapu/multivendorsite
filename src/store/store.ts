@@ -17,6 +17,8 @@ import chatReducer from "../features/chatSlice";
 import { termsApi } from "../features/termsApi"; 
 import { shippingProviderApi } from "../features/shippingProviderApi";
 import { offerApi } from "../features/offerApi"; 
+import {adminOrderApi} from "@/features/adminOrderApi"; 
+import { vendorOrderApi } from "@/features/vendorOrderApi";
 import { employeeApi } from "@/features/employeeApi";
 import { storeEditorApi } from "@/features/storeEditorApi";
 import { faqApi } from "@/features/faqApi";
@@ -44,6 +46,8 @@ const apiMiddlewares = [
   termsApi.middleware,
   shippingProviderApi.middleware,
   offerApi.middleware, 
+  adminOrderApi.middleware,
+  vendorOrderApi.middleware,  
   employeeApi.middleware,
   locationApi.middleware,
   storeEditorApi.middleware,
@@ -71,6 +75,8 @@ const apiReducers = {
   [termsApi.reducerPath]: termsApi.reducer,
   [shippingProviderApi.reducerPath]: shippingProviderApi.reducer,
   [offerApi.reducerPath]: offerApi.reducer, 
+  [adminOrderApi.reducerPath]: adminOrderApi.reducer,
+  [vendorOrderApi.reducerPath]: vendorOrderApi.reducer, 
   [employeeApi.reducerPath]: employeeApi.reducer,
   [storeEditorApi.reducerPath]: storeEditorApi.reducer,
   [locationApi.reducerPath]:locationApi.reducer,

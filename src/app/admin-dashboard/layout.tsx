@@ -120,7 +120,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
             { title: "All Customers", href: "/admin-dashboard/customer-manage/accountmanage", icon: User },
             { title: "Wallet & Loyalty", href: "/admin-dashboard/customer-manage/wallet-loyalty", icon: CreditCard },
             { title: "Feedback & Reviews", href: "/admin-dashboard/customer-manage/customer-review", icon: Star },
-            { title: "Complaints", href: "/admin/customers/complaints", icon: HelpCircle },
+            // { title: "Complaints", href: "/admin/customers/complaints", icon: HelpCircle },
           ],
         },
       ],
@@ -136,7 +136,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
             { title: "All Employees", href: "/admin-dashboard/employees", icon: User },
             { title: "Add Employee", href: "/admin-dashboard/employees/add", icon: PlusCircle },
             { title: "Roles & Permissions", href: "/admin-dashboard/employees/roles-permissions", icon: Shield },
-            { title: "Task Management", href: "/admin-board/employees/tasks", icon: Calendar },
+            // { title: "Task Management", href: "/admin-board/employees/tasks", icon: Calendar },
           ],
         },
       ],
@@ -149,10 +149,10 @@ function AdminLayout({ main }: { main: ReactNode }) {
           href: "#",
           icon: FileText,
           subItems: [
-            { title: "All Orders", href: "/admin/orders/list", icon: Database },
-            { title: "Refunds & Returns", href: "/admin/orders/refunds", icon: CreditCard },
-            { title: "Order Notifications", href: "/admin/orders/notifications", icon: Bell },
-            { title: "Cancellations", href: "/admin/orders/cancellations", icon: Calendar },
+            { title: "All Orders", href: "/admin-dashboard/order", icon: Database },
+            // { title: "Refunds & Returns", href: "/admin/orders/refunds", icon: CreditCard },
+            // { title: "Order Notifications", href: "/admin/orders/notifications", icon: Bell },
+            // { title: "Cancellations", href: "/admin/orders/cancellations", icon: Calendar },
           ],
         },
       ],
@@ -180,8 +180,6 @@ function AdminLayout({ main }: { main: ReactNode }) {
           icon: Box,
           subItems: [
             { title: "All Products", href: "/admin-dashboard/products", icon: Database },
-            { title: "Categories", href: "/admin-dashboard/category-manage", icon: Layers },
-            { title: "Bulk Categories", href: "/admin-dashboard/bulk-category-upload", icon: Layers },
           ],
         },
       ],
@@ -196,6 +194,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
           subItems: [
             { title: "couriercredentials", href: "/admin-dashboard/courier/credentials", icon: Settings },
             { title: "courierprovider", href: "/admin-dashboard/courier", icon: Settings },
+            { title: "create-store", href: "/admin-dashboard/courier/courier-store", icon: Settings },
           ],
         },
       ],
@@ -211,30 +210,30 @@ function AdminLayout({ main }: { main: ReactNode }) {
             { title: "All Offers", href: "/admin-dashboard/offer-manage", icon: Database },
             { title: "Add Offer", href: "/admin-dashboard/offer-manage/add-offer", icon: PlusCircle },
             { title: "Email & SMS Campaigns", href: "/admin/promotions/email-sms", icon: Mail },
-            { title: "Ad Spaces", href: "/admin/promotions/ads", icon: Monitor },
+            // { title: "Ad Spaces", href: "/admin/promotions/ads", icon: Monitor },
           ],
         },
         { title: "Premium Membership", href: "/admin/promotions/premium", icon: Star },
       ],
     },
     
-    {
-      title: "Reports & Analytics",
-      items: [
-        { title: "Sales & Revenue", href: "/admin/reports/sales", icon: BarChart2 },
-        { title: "Product Analysis", href: "/admin/reports/products", icon: Box },
-        { title: "Customer Insights", href: "/admin/reports/customers", icon: Users },
-        { title: "Real-Time Monitoring", href: "/admin/reports/real-time", icon: Monitor },
-      ],
-    },
+    // {
+    //   title: "Reports & Analytics",
+    //   items: [
+    //     { title: "Sales & Revenue", href: "/admin/reports/sales", icon: BarChart2 },
+    //     { title: "Product Analysis", href: "/admin/reports/products", icon: Box },
+    //     // { title: "Customer Insights", href: "/admin/reports/customers", icon: Users },
+    //     // { title: "Real-Time Monitoring", href: "/admin/reports/real-time", icon: Monitor },
+    //   ],
+    // },
    
    
     {
       title: "Settings",
       items: [
         { title: "Themes & Layouts", href: "/admin-dashboard/theme-manage", icon: Layout },
-        { title: "SEO & Marketing", href: "/admin/settings/seo-marketing", icon: BarChart2 },
-        { title: "Third-Party Integrations", href: "/admin/settings/integrations", icon: Settings },
+        // { title: "SEO & Marketing", href: "/admin/settings/seo-marketing", icon: BarChart2 },
+        // { title: "Third-Party Integrations", href: "/admin/settings/integrations", icon: Settings },
         { title: "Terms & Conditions", href: "/admin-dashboard/settings/terms", icon: FileText },
         { title: "Footer Settings", href: "/admin-dashboard/settings/footer", icon: FileText },
       ],

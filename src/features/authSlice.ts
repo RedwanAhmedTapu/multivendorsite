@@ -1,7 +1,11 @@
+// features/authSlice.ts
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 export interface User {
-  id: number;
+  // ✅ FIX: id must be string — your DB uses cuid/uuid (e.g. "cmj72c9po0000o0ucd3proe4e")
+  // Declaring it as number causes silent === failures when comparing with
+  // message.senderId, participant.userId, etc. which are all strings from Prisma.
+  id: string;
   avatar?: string;
   name?: string;
   email?: string;
@@ -29,7 +33,12 @@ const authSlice = createSlice({
       state,
       action: PayloadAction<{ user: User; accessToken: string }>
     ) => {
-      state.user = action.payload.user;
+      state.user = {
+        ...action.payload.user,
+        // Coerce id to string at write time — guards against APIs that
+        // return id as a number despite the schema using string PKs
+        id: String(action.payload.user.id),
+      };
       state.accessToken = action.payload.accessToken;
     },
 
@@ -38,21 +47,23 @@ const authSlice = createSlice({
     },
 
     setUser: (state, action: PayloadAction<User>) => {
-      state.user = action.payload;
+      state.user = {
+        ...action.payload,
+        id: String(action.payload.id),
+      };
     },
 
     clearAuth: (state) => {
-      state.user = null;
+      state.user        = null;
       state.accessToken = null;
-      
-      // Clear localStorage if needed
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('user');
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("user");
       }
     },
   },
 });
 
-export const { setCredentials, setAccessToken, setUser, clearAuth } = authSlice.actions;
+export const { setCredentials, setAccessToken, setUser, clearAuth } =
+  authSlice.actions;
 export default authSlice.reducer;

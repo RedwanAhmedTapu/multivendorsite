@@ -88,6 +88,7 @@ export interface Message {
   conversationId: string;
   senderId?: string;
   senderVendorId?: string;
+  status:string;
   senderEmployeeId?: string;
   senderDeliveryPersonId?: string;
   senderType: string;
