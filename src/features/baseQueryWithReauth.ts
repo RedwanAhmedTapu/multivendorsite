@@ -9,7 +9,7 @@ let isRefreshing = false;
 
 // Create base query with credentials
 const baseQuery = fetchBaseQuery({
-  baseUrl: "http://localhost:5000/api",
+  baseUrl: "https://api.finixmart.com.bd/api",
   credentials: "include",
   prepareHeaders: (headers, { getState }) => {
     const token = (getState() as RootState).auth.accessToken;
