@@ -5,15 +5,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
-
 import { useLogoutMutation } from "@/features/authApi";
 import {
   ChevronDown,
   X,
   LogOut,
   HelpCircle,
-  Gift,
-  Loader2
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -59,17 +57,15 @@ export function UserSidebar({
   const router = useRouter();
   const { user } = useSelector((state: RootState) => state.auth);
   const [logoutMutation, { isLoading: isLoggingOut }] = useLogoutMutation();
-  
-  // Tooltip state management
+
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState<{top: number, left: number} | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number } | null>(null);
   const itemRefs = useRef<Map<string, HTMLElement>>(new Map());
-  
-  // Initialize all sections as open by default
+
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     const initialState: Record<string, boolean> = {};
-    sections.forEach(section => {
-      section.items.forEach(item => {
+    sections.forEach((section) => {
+      section.items.forEach((item) => {
         if (item.subItems && item.subItems.length > 0) {
           initialState[item.title] = true;
         }
@@ -94,45 +90,31 @@ export function UserSidebar({
     }
   };
 
-  // Get user initials for avatar
+  const getUserFirstName = () => {
+    if (!user?.name) return "there";
+    return user.name.split(" ")[0];
+  };
+
   const getUserInitials = () => {
     if (!user?.name) return "U";
     const names = user.name.split(" ");
-    if (names.length >= 2) {
-      return `${names[0][0]}${names[1][0]}`.toUpperCase();
-    }
+    if (names.length >= 2) return `${names[0][0]}${names[1][0]}`.toUpperCase();
     return user.name.substring(0, 2).toUpperCase();
   };
 
-  // Calculate tooltip position based on icon position
   const calculateTooltipPosition = (itemId: string) => {
-    const itemElement = itemRefs.current.get(itemId);
-    if (!itemElement) return null;
-
-    const rect = itemElement.getBoundingClientRect();
-    
-    // Calculate center point of the icon
-    const iconCenterY = rect.top + (rect.height / 2);
-    
-    // Position tooltip to the right of the icon with 8px gap
-    const tooltipLeft = rect.right + 8;
-    
-    return {
-      top: iconCenterY,
-      left: tooltipLeft
-    };
+    const el = itemRefs.current.get(itemId);
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return { top: rect.top + rect.height / 2, left: rect.right + 8 };
   };
 
-  // Handle hover events
   const handleItemHover = (itemId: string) => {
     setHoveredItem(itemId);
-    const position = calculateTooltipPosition(itemId);
-    if (position) {
-      setTooltipPosition(position);
-    }
+    const pos = calculateTooltipPosition(itemId);
+    if (pos) setTooltipPosition(pos);
   };
 
-  // Handle mouse leave
   const handleItemLeave = (itemId: string) => {
     if (hoveredItem === itemId) {
       setHoveredItem(null);
@@ -140,312 +122,242 @@ export function UserSidebar({
     }
   };
 
-  // Update tooltip position on scroll or resize
   useEffect(() => {
     if (!hoveredItem) return;
-
-    const updatePosition = () => {
-      const position = calculateTooltipPosition(hoveredItem);
-      if (position) {
-        setTooltipPosition(position);
-      }
+    const updatePos = () => {
+      const pos = calculateTooltipPosition(hoveredItem);
+      if (pos) setTooltipPosition(pos);
     };
-
-    window.addEventListener('scroll', updatePosition);
-    window.addEventListener('resize', updatePosition);
-
+    window.addEventListener("scroll", updatePos);
+    window.addEventListener("resize", updatePos);
     return () => {
-      window.removeEventListener('scroll', updatePosition);
-      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener("scroll", updatePos);
+      window.removeEventListener("resize", updatePos);
     };
   }, [hoveredItem]);
 
   const SidebarContent = (
-    <div className="h-full flex flex-col bg-white border-r shadow-sm overflow-visible relative">
-      {/* User Profile Section (Desktop) */}
-      {!isCollapsed && user && (
-        <div className=" md:p-4 border-b bg-gradient-to-br from-teal-50 to-cyan-50">
-          <div className="hidden md:flex items-center gap-2.5">
-            <div className="relative">
-              {user.avatar ? (
-                <img
-                  src={user.avatar}
-                  alt={user.name}
-                  className="w-10 h-10 rounded-full object-cover border-2 border-teal-200"
-                />
-              ) : (
-                <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                  {getUserInitials()}
-                </div>
-              )}
-              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+    <div className="h-full flex flex-col bg-[#f5f7f8] border-r border-slate-200 overflow-visible relative">
+
+      {/* ── Greeting Header ── */}
+      <div className="px-4 py-4 border-b border-slate-200 bg-[#f5f7f8]">
+        {!isCollapsed ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest">
+                Welcome back
+              </p>
+              <h2 className="text-sm font-semibold text-slate-800 mt-0.5">
+                Hi, {getUserFirstName()} 👋
+              </h2>
             </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm text-gray-800 truncate">{user.name}</h3>
-              <p className="text-xs text-gray-600 truncate">{user.email}</p>
-              {user.phone && (
-                <p className="text-xs text-gray-500 truncate">{user.phone}</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Collapsed User Avatar */}
-      {isCollapsed && user && (
-        <div className="p-3 border-b flex justify-center">
-          <div className="relative group"
-            ref={(el) => {
-              if (el) itemRefs.current.set('user-avatar', el);
-              else itemRefs.current.delete('user-avatar');
-            }}
-            onMouseEnter={() => handleItemHover('user-avatar')}
-            onMouseLeave={() => handleItemLeave('user-avatar')}
-          >
-            {user.avatar ? (
-              <img
-                src={user.avatar}
-                alt={user.name}
-                className="w-10 h-10 rounded-full object-cover border-2 border-teal-200"
-              />
-            ) : (
-              <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                {getUserInitials()}
-              </div>
-            )}
-            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile Header with Close Button */}
-      <div className="md:hidden flex items-center justify-between p-3 border-b">
-        <div className="flex items-center gap-2.5">
-          {user?.avatar ? (
-            <img
-              src={user.avatar}
-              alt={user.name}
-              className="w-9 h-9 rounded-full object-cover"
-            />
-          ) : (
-            <div className="w-9 h-9 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-              {getUserInitials()}
-            </div>
-          )}
-          <div>
-            <h3 className="font-semibold text-sm text-gray-800">{user?.name || "User"}</h3>
-          </div>
-        </div>
-        <button
-          onClick={onClose}
-          className="p-1.5 hover:bg-gray-100 rounded-lg"
-          aria-label="Close sidebar"
-        >
-          <X className="w-5 h-5 text-gray-600" />
-        </button>
-      </div>
-
-      {/* Navigation Menu */}
-       <nav className="flex-1 overflow-y-auto overflow-x-visible p-3 scrollbar-hide" style={{
-        scrollbarWidth: 'none',
-        msOverflowStyle: 'none',
-      }}>
-        {sections.map((section, sectionIdx) => (
-          <div key={sectionIdx} className="mb-4">
-            {section.title && !isCollapsed && (
-              <h3 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2 px-2">
-                {section.title}
-              </h3>
-            )}
-            
-            <div className="space-y-0.5">
-              {section.items.map((item, itemIdx) => {
-                const hasSubItems = item.subItems && item.subItems.length > 0;
-                const isOpen = openSections[item.title];
-                const itemIsActive = isActive(item.href);
-                const itemId = `item-${sectionIdx}-${itemIdx}`;
-                
-                return (
-                  <div key={itemIdx}>
-                    <div className="relative"
-                      ref={(el) => {
-                        if (el) itemRefs.current.set(itemId, el);
-                        else itemRefs.current.delete(itemId);
-                      }}
-                      onMouseEnter={() => isCollapsed && handleItemHover(itemId)}
-                      onMouseLeave={() => isCollapsed && handleItemLeave(itemId)}
-                    >
-                      <Link
-                        href={item.href}
-                        onClick={(e) => {
-                          if (hasSubItems) {
-                            e.preventDefault();
-                            toggleSection(item.title);
-                          }
-                        }}
-                        className={`flex items-center justify-between px-2.5 py-2 rounded-lg transition-all duration-200 ${
-                          itemIsActive || (hasSubItems && isOpen)
-                            ? "bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 shadow-sm"
-                            : "text-gray-700 hover:bg-gray-50"
-                        } ${item.color || ""} ${isCollapsed ? 'justify-center' : ''}`}
-                      >
-                        <div className={`flex items-center gap-2.5 ${isCollapsed ? 'w-full justify-center' : ''}`}>
-                          <item.icon className={`w-4 h-4 flex-shrink-0 ${itemIsActive ? 'text-teal-600' : ''}`} />
-                          {!isCollapsed && <span className="font-medium text-sm">{item.title}</span>}
-                        </div>
-                        
-                        {!isCollapsed && (
-                          <div className="flex items-center gap-1.5">
-                            {item.badge && (
-                              <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] rounded-full font-medium">
-                                {item.badge}
-                              </span>
-                            )}
-                            {hasSubItems && (
-                              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                            )}
-                          </div>
-                        )}
-                      </Link>
-                    </div>
-
-                    {/* Sub Items */}
-                    {hasSubItems && (
-                      <>
-                        {/* Expanded View */}
-                        {isOpen && !isCollapsed && (
-                          <div className="ml-3 mt-0.5 space-y-0.5 border-l-2 border-teal-100 pl-2.5">
-                            {item.subItems!.map((subItem, subIdx) => (
-                              <Link
-                                key={subIdx}
-                                href={subItem.href}
-                                className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-colors ${
-                                  isActive(subItem.href)
-                                    ? "bg-teal-100 text-teal-700 font-medium"
-                                    : "text-gray-600 hover:bg-gray-50"
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5">
-                                  <subItem.icon className="w-3.5 h-3.5 flex-shrink-0" />
-                                  <span className="text-xs">{subItem.title}</span>
-                                </div>
-                                {subItem.badge && (
-                                  <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] rounded-full font-medium">
-                                    {subItem.badge}
-                                  </span>
-                                )}
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {/* Collapsed View - Show all sub-items as centered icons with tooltips */}
-                        {isCollapsed && (
-                          <div className="mt-0.5 space-y-0.5">
-                            {item.subItems!.map((subItem, subIdx) => {
-                              const subItemId = `${itemId}-sub-${subIdx}`;
-                              return (
-                                <div key={subIdx} className="relative"
-                                  ref={(el) => {
-                                    if (el) itemRefs.current.set(subItemId, el);
-                                    else itemRefs.current.delete(subItemId);
-                                  }}
-                                  onMouseEnter={() => handleItemHover(subItemId)}
-                                  onMouseLeave={() => handleItemLeave(subItemId)}
-                                >
-                                  <Link
-                                    href={subItem.href}
-                                    className={`flex items-center justify-center px-2.5 py-2 rounded-lg transition-colors ${
-                                      isActive(subItem.href)
-                                        ? "bg-teal-100 text-teal-700"
-                                        : "text-gray-600 hover:bg-gray-50"
-                                    }`}
-                                  >
-                                    <subItem.icon className="w-4 h-4 flex-shrink-0 mx-auto" />
-                                  </Link>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </nav>
-
-      {/* Footer - Promo Card & Actions */}
-      {!isCollapsed && (
-        <div className="p-3 border-t bg-gray-50">
-          {/* Support & Logout */}
-          <div className="space-y-1">
-            <Link
-              href="/user-dashboard/support"
-              className="flex items-center gap-2.5 px-2.5 py-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <HelpCircle className="w-4 h-4 flex-shrink-0" />
-              <span className="text-xs">Help & Support</span>
-            </Link>
-            
+            {/* Mobile close button */}
             <button
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className="flex items-center gap-2.5 px-2.5 py-1.5 text-red-600 hover:bg-red-50 rounded-lg w-full transition-colors disabled:opacity-50"
+              onClick={onClose}
+              className="md:hidden p-1.5 hover:bg-slate-200 rounded-lg transition-colors"
+              aria-label="Close sidebar"
             >
-              {isLoggingOut ? (
-                <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />
-              ) : (
-                <LogOut className="w-4 h-4 flex-shrink-0" />
-              )}
-              <span className="text-xs">{isLoggingOut ? "Logging out..." : "Logout"}</span>
+              <X className="w-4 h-4 text-slate-500" />
             </button>
           </div>
-        </div>
-      )}
+        ) : (
+          /* Collapsed: show initials avatar */
+          <div className="flex justify-center">
+            <div className="w-8 h-8 rounded-full bg-[#0052cc]/10 flex items-center justify-center text-[#0052cc] text-xs font-semibold">
+              {getUserInitials()}
+            </div>
+          </div>
+        )}
+      </div>
 
-      {/* Collapsed Logout Button with Tooltip */}
-      {isCollapsed && (
-        <div className="p-2 border-t relative"
-          ref={(el) => {
-            if (el) itemRefs.current.set('logout', el);
-            else itemRefs.current.delete('logout');
-          }}
-          onMouseEnter={() => handleItemHover('logout')}
-          onMouseLeave={() => handleItemLeave('logout')}
-        >
-          <button
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="w-full p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50"
-          >
-            {isLoggingOut ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <LogOut className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-      )}
+      {/* ── Navigation ── */}
+      <nav
+        className="flex-1 overflow-y-auto overflow-x-visible py-3 scrollbar-hide"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {sections.map((section, sectionIdx) => {
+          const isLastSection = sectionIdx === sections.length - 1;
+          const isFirstSection = sectionIdx === 0;
+
+          return (
+            <div key={sectionIdx}>
+              {/* Horizontal divider between groups (skip before first) */}
+              {!isFirstSection && (
+                <div className="mx-3 my-2 border-t border-slate-200" />
+              )}
+
+              <div className={`px-2 ${isCollapsed ? "space-y-0.5" : "space-y-0.5"}`}>
+                {section.items.map((item, itemIdx) => {
+                  const hasSubItems = item.subItems && item.subItems.length > 0;
+                  const isOpen = openSections[item.title];
+                  const itemIsActive = isActive(item.href);
+                  const itemId = `item-${sectionIdx}-${itemIdx}`;
+                  const isLogout = item.href === "/logout" || item.color === "text-red-600";
+
+                  return (
+                    <div key={itemIdx}>
+                      <div
+                        className="relative"
+                        ref={(el) => {
+                          if (el) itemRefs.current.set(itemId, el);
+                          else itemRefs.current.delete(itemId);
+                        }}
+                        onMouseEnter={() => isCollapsed && handleItemHover(itemId)}
+                        onMouseLeave={() => isCollapsed && handleItemLeave(itemId)}
+                      >
+                        <Link
+                          href={item.href}
+                          onClick={(e) => {
+                            if (hasSubItems) {
+                              e.preventDefault();
+                              toggleSection(item.title);
+                            }
+                            if (isLogout) {
+                              e.preventDefault();
+                              handleLogout();
+                            }
+                          }}
+                          className={`
+                            flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all duration-150 group
+                            ${isCollapsed ? "justify-center" : "justify-between"}
+                            ${
+                              itemIsActive
+                                ? "bg-[#0052cc]/10 text-[#0052cc]"
+                                : isLogout
+                                ? "text-red-500 hover:bg-red-50"
+                                : "text-slate-600 hover:bg-white hover:shadow-sm"
+                            }
+                          `}
+                        >
+                          <div className={`flex items-center gap-2.5 min-w-0 ${isCollapsed ? "w-full justify-center" : ""}`}>
+                            <item.icon
+                              className={`w-4 h-4 flex-shrink-0 transition-colors
+                                ${itemIsActive ? "text-[#0052cc]" : isLogout ? "text-red-500" : "text-slate-400 group-hover:text-slate-600"}
+                              `}
+                            />
+                            {!isCollapsed && (
+                              <span className={`text-sm font-medium truncate ${itemIsActive ? "text-[#0052cc]" : ""}`}>
+                                {item.title}
+                              </span>
+                            )}
+                          </div>
+
+                          {!isCollapsed && (
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              {item.badge !== undefined && (
+                                <span className={`px-1.5 py-0.5 text-[10px] rounded-full font-medium
+                                  ${itemIsActive
+                                    ? "bg-[#0052cc]/10 text-[#0052cc]"
+                                    : "bg-[#0052cc]/10 text-[#0052cc]"
+                                  }`}
+                                >
+                                  {item.badge}
+                                </span>
+                              )}
+                              {hasSubItems && (
+                                <ChevronDown
+                                  className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                                />
+                              )}
+                            </div>
+                          )}
+                        </Link>
+                      </div>
+
+                      {/* Sub Items */}
+                      {hasSubItems && !isLogout && (
+                        <>
+                          {/* Expanded */}
+                          {isOpen && !isCollapsed && (
+                            <div className="ml-3 mt-0.5 mb-0.5 pl-3 border-l-2 border-[#0052cc]/20 space-y-0.5">
+                              {item.subItems!.map((subItem, subIdx) => (
+                                <Link
+                                  key={subIdx}
+                                  href={subItem.href}
+                                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all duration-150 group
+                                    ${isActive(subItem.href)
+                                      ? "bg-[#0052cc]/10 text-[#0052cc]"
+                                      : "text-slate-500 hover:bg-white hover:shadow-sm"
+                                    }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <subItem.icon
+                                      className={`w-3.5 h-3.5 flex-shrink-0 transition-colors
+                                        ${isActive(subItem.href) ? "text-[#0052cc]" : "text-slate-400 group-hover:text-slate-500"}
+                                      `}
+                                    />
+                                    <span className={`text-xs font-medium ${isActive(subItem.href) ? "text-[#0052cc]" : ""}`}>
+                                      {subItem.title}
+                                    </span>
+                                  </div>
+                                  {subItem.badge !== undefined && (
+                                    <span className="px-1.5 py-0.5 bg-[#0052cc]/10 text-[#0052cc] text-[10px] rounded-full font-medium">
+                                      {subItem.badge}
+                                    </span>
+                                  )}
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Collapsed */}
+                          {isCollapsed && (
+                            <div className="mt-0.5 space-y-0.5 px-2">
+                              {item.subItems!.map((subItem, subIdx) => {
+                                const subItemId = `${itemId}-sub-${subIdx}`;
+                                return (
+                                  <div
+                                    key={subIdx}
+                                    className="relative"
+                                    ref={(el) => {
+                                      if (el) itemRefs.current.set(subItemId, el);
+                                      else itemRefs.current.delete(subItemId);
+                                    }}
+                                    onMouseEnter={() => handleItemHover(subItemId)}
+                                    onMouseLeave={() => handleItemLeave(subItemId)}
+                                  >
+                                    <Link
+                                      href={subItem.href}
+                                      className={`flex items-center justify-center p-2 rounded-lg transition-colors
+                                        ${isActive(subItem.href)
+                                          ? "bg-[#0052cc]/10 text-[#0052cc]"
+                                          : "text-slate-400 hover:bg-white"
+                                        }`}
+                                    >
+                                      <subItem.icon className="w-4 h-4 flex-shrink-0" />
+                                    </Link>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </nav>
+
+      
     </div>
   );
 
-  // Tooltip component
+  // ── Tooltip ──
   const Tooltip = () => {
     if (!hoveredItem || !tooltipPosition || !isCollapsed) return null;
 
-    // Get item data for tooltip content
-    let tooltipContent = null;
-    let badge = null;
+    let tooltipContent: React.ReactNode = null;
+    let badge: string | number | undefined;
 
-    // Find the item data
-    sections.forEach(section => {
-      section.items.forEach(item => {
-        const itemId = `item-${sections.indexOf(section)}-${section.items.indexOf(item)}`;
-        
+    sections.forEach((section) => {
+      section.items.forEach((item, itemIdx) => {
+        const sectionIdx = sections.indexOf(section);
+        const itemId = `item-${sectionIdx}-${itemIdx}`;
+
         if (itemId === hoveredItem) {
           tooltipContent = item.title;
           badge = item.badge;
@@ -461,43 +373,26 @@ export function UserSidebar({
       });
     });
 
-    // Special cases
-    if (hoveredItem === 'user-avatar' && user) {
-      tooltipContent = (
-        <div>
-          <div className="font-semibold">{user.name}</div>
-          <div className="text-[10px] text-gray-300">{user.email}</div>
-        </div>
-      );
-    } else if (hoveredItem === 'logout') {
-      tooltipContent = 'Logout';
-    }
-
     if (!tooltipContent) return null;
 
     return (
       <div
-        className="fixed z-[9999] px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg whitespace-nowrap pointer-events-none"
+        className="fixed z-[9999] px-3 py-1.5 bg-slate-800 text-white text-xs rounded-lg shadow-lg whitespace-nowrap pointer-events-none"
         style={{
           top: tooltipPosition.top,
           left: tooltipPosition.left,
-          transform: 'translateY(-50%)'
+          transform: "translateY(-50%)",
         }}
       >
-        {typeof tooltipContent === 'string' ? (
-          <div className="flex items-center gap-2">
-            <span>{tooltipContent}</span>
-            {badge && (
-              <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded-full font-medium">
-                {badge}
-              </span>
-            )}
-          </div>
-        ) : (
-          tooltipContent
-        )}
-        {/* Arrow pointing to the icon */}
-        <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-gray-900"></div>
+        <div className="flex items-center gap-2">
+          <span>{tooltipContent as string}</span>
+          {badge !== undefined && (
+            <span className="px-1.5 py-0.5 bg-[#0052cc] text-white text-[10px] rounded-full font-medium">
+              {badge}
+            </span>
+          )}
+        </div>
+        <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-slate-800" />
       </div>
     );
   };
@@ -507,26 +402,21 @@ export function UserSidebar({
       {/* Mobile Overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={onClose}
         />
       )}
 
-      {/* Tooltip */}
       <Tooltip />
 
-      {/* Sidebar */}
       <aside
         className={`
-          fixed md:sticky
-          top-0 left-0
-          h-screen
-          z-50
-          transform transition-transform duration-300 ease-in-out
+          fixed md:sticky top-0 left-0 h-screen z-50
+          transform transition-all duration-300 ease-in-out
           ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-          ${isCollapsed ? "w-20" : "w-72"}
+          ${isCollapsed ? "w-[72px]" : "w-[272px]"}
         `}
-        style={{ overflow: 'visible' }}
+        style={{ overflow: "visible" }}
       >
         {SidebarContent}
       </aside>

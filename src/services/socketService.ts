@@ -23,7 +23,7 @@ class SocketService {
     // The server's socketAuth strips "Bearer " if present, so either format
     // works — but be consistent. We send it raw here.
     this.socket = io(
-      process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:5000',
+      process.env.NEXT_PUBLIC_SOCKET_URL ?? 'https://api.finixmart.com.bd',
       {
         auth:       { token },          // ← plain token, no "Bearer " prefix
         transports: ['websocket', 'polling'],

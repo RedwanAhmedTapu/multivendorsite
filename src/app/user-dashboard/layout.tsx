@@ -111,9 +111,8 @@ export default function UserProtectedLayout({
           icon: User,
           subItems: [
             { title: "My Profile", href: "/user-dashboard/profile", icon: User },
-            { title: "Address Book", href: "/user-dashboard/address-book", icon: MapPin },
+            { title: "Address Book", href: "/user-dashboard/address", icon: MapPin },
             { title: "Change Password", href: "/user-dashboard/change-password", icon: Shield },
-            { title: "Privacy Settings", href: "/user-dashboard/privacy", icon: ShieldCheck },
           ],
         },
         {
@@ -121,9 +120,9 @@ export default function UserProtectedLayout({
           href: "#",
           icon: CreditCard,
           subItems: [
-            { title: "Payment Methods", href: "/user-dashboard/payment-methods", icon: CreditCard },
+            // { title: "Payment Methods", href: "/user-dashboard/payment-methods", icon: CreditCard },
             { title: "Wallet Balance", href: "/user-dashboard/wallet", icon: Wallet, badge: "$250" },
-            { title: "Transaction History", href: "/user-dashboard/transactions", icon: History },
+            // { title: "Transaction History", href: "/user-dashboard/transactions", icon: History },
           ],
         },
       ],
@@ -135,12 +134,9 @@ export default function UserProtectedLayout({
           title: "Orders",
           href: "#",
           icon: Package,
-          badge: 3,
           subItems: [
             { title: "All Orders", href: "/user-dashboard/orders", icon: Package },
-            { title: "Pending Orders", href: "/user-dashboard/orders/pending", icon: Clock, badge: 2 },
-            { title: "Shipped Orders", href: "/user-dashboard/orders/shipped", icon: Truck },
-            { title: "Delivered Orders", href: "/user-dashboard/orders/delivered", icon: CheckCircle },
+            { title: "Pending Orders", href: "/user-dashboard/orders/pending", icon: Clock },
           ],
         },
         {
@@ -148,9 +144,9 @@ export default function UserProtectedLayout({
           href: "#",
           icon: RefreshCcw,
           subItems: [
-            { title: "My Returns", href: "/user-dashboard/returns", icon: RefreshCcw },
-            { title: "My Cancellations", href: "/user-dashboard/cancellations", icon: XCircle },
-            { title: "Refund Status", href: "/user-dashboard/refunds", icon: CreditCard },
+            { title: "My Returns", href: "/user-dashboard/orders/returns", icon: RefreshCcw },
+            { title: "My Cancellations", href: "/user-dashboard/orders/cancellations", icon: XCircle },
+            // { title: "Refund Status", href: "/user-dashboard/refunds", icon: CreditCard },
           ],
         },
       ],
@@ -163,28 +159,28 @@ export default function UserProtectedLayout({
           href: "#",
           icon: Tag,
           subItems: [
-            { title: "My Vouchers", href: "/user-dashboard/vouchers", icon: Tag, badge: 3 },
-            { title: "Available Offers", href: "/user-dashboard/offers", icon: Gift },
-            { title: "Reward Points", href: "/user-dashboard/rewards", icon: Award, badge: "1,250" },
+            { title: "My Vouchers", href: "/user-dashboard/vouchers", icon: Tag },
+            // { title: "My Voucher", href: "/user-dashboard/myvoucher", icon: Gift },
+            // { title: "Reward Points", href: "/user-dashboard/rewards", icon: Award, badge: "1,250" },
           ],
         },
       ],
     },
-    {
-      title: "My Reviews & Feedback",
-      items: [
-        {
-          title: "Reviews",
-          href: "#",
-          icon: Star,
-          subItems: [
-            { title: "My Reviews", href: "/user-dashboard/reviews", icon: Star },
-            { title: "Write a Review", href: "/user-dashboard/reviews/write", icon: Edit },
-            { title: "Product Ratings", href: "/user-dashboard/ratings", icon: Star },
-          ],
-        },
-      ],
-    },
+    // {
+    //   title: "My Reviews & Feedback",
+    //   items: [
+    //     {
+    //       title: "Reviews",
+    //       href: "#",
+    //       icon: Star,
+    //       subItems: [
+    //         { title: "My Reviews", href: "/user-dashboard/reviews", icon: Star },
+    //         { title: "Write a Review", href: "/user-dashboard/reviews/write", icon: Edit },
+    //         { title: "Product Ratings", href: "/user-dashboard/ratings", icon: Star },
+    //       ],
+    //     },
+    //   ],
+    // },
     {
       title: "Wishlist & Favorites",
       items: [
@@ -192,13 +188,9 @@ export default function UserProtectedLayout({
           title: "Wishlist",
           href: "/user-dashboard/wishlist",
           icon: Heart,
-          badge: 12,
+          // badge: 12,
         },
-        {
-          title: "Recently Viewed",
-          href: "/user-dashboard/recently-viewed",
-          icon: Eye,
-        },
+       
       ],
     },
     {
@@ -209,56 +201,56 @@ export default function UserProtectedLayout({
           href: "#",
           icon: HelpCircle,
           subItems: [
-            { title: "Live Chat", href: "/user-dashboard/support/chat", icon: MessageSquare },
-            { title: "Help Center", href: "/user-dashboard/support/help", icon: HelpCircle },
-            { title: "Contact Us", href: "/user-dashboard/support/contact", icon: Phone },
-            { title: "FAQ", href: "/user-dashboard/support/faq", icon: FileText },
+            // { title: "Live Chat", href: "/user-dashboard/support/chat", icon: MessageSquare },
+            { title: "Help Center", href: "/help-center", icon: HelpCircle },
+            // { title: "Contact Us", href: "/user-dashboard/support/contact", icon: Phone },
+            // { title: "FAQ", href: "/user-dashboard/support/faq", icon: FileText },
           ],
         },
-        {
-          title: "Complaints & Tickets",
-          href: "/user-dashboard/support/tickets",
-          icon: FileText,
-          badge: 2,
-        },
+        // {
+        //   title: "Complaints & Tickets",
+        //   href: "/user-dashboard/support/tickets",
+        //   icon: FileText,
+        //   badge: 2,
+        // },
       ],
     },
-    {
-      title: "Account Security",
-      items: [
-        {
-          title: "Security",
-          href: "#",
-          icon: Shield,
-          subItems: [
-            { title: "Login Activity", href: "/user-dashboard/security/login-activity", icon: History },
-            { title: "Two-Factor Auth", href: "/user-dashboard/security/2fa", icon: Shield },
-            { title: "Trusted Devices", href: "/user-dashboard/security/devices", icon: Monitor },
-          ],
-        },
-        {
-          title: "Notifications",
-          href: "/user-dashboard/notifications",
-          icon: Bell,
-          badge: 5,
-        },
-      ],
-    },
-    {
-      title: "Settings",
-      items: [
-        {
-          title: "Preferences",
-          href: "#",
-          icon: Settings,
-          subItems: [
-            { title: "Language", href: "/user-dashboard/settings/language", icon: Globe },
-            { title: "Theme", href: "/user-dashboard/settings/theme", icon: Palette },
-            { title: "Email Preferences", href: "/user-dashboard/settings/email", icon: Mail },
-          ],
-        },
-      ],
-    },
+    // {
+    //   title: "Account Security",
+    //   items: [
+    //     {
+    //       title: "Security",
+    //       href: "#",
+    //       icon: Shield,
+    //       subItems: [
+    //         { title: "Login Activity", href: "/user-dashboard/security/login-activity", icon: History },
+    //         { title: "Two-Factor Auth", href: "/user-dashboard/security/2fa", icon: Shield },
+    //         { title: "Trusted Devices", href: "/user-dashboard/security/devices", icon: Monitor },
+    //       ],
+    //     },
+    //     {
+    //       title: "Notifications",
+    //       href: "/user-dashboard/notifications",
+    //       icon: Bell,
+    //       badge: 5,
+    //     },
+    //   ],
+    // },
+    // {
+    //   title: "Settings",
+    //   items: [
+    //     {
+    //       title: "Preferences",
+    //       href: "#",
+    //       icon: Settings,
+    //       subItems: [
+    //         { title: "Language", href: "/user-dashboard/settings/language", icon: Globe },
+    //         { title: "Theme", href: "/user-dashboard/settings/theme", icon: Palette },
+    //         { title: "Email Preferences", href: "/user-dashboard/settings/email", icon: Mail },
+    //       ],
+    //     },
+    //   ],
+    // },
     {
       items: [
         {

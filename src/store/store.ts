@@ -6,6 +6,7 @@ import storage from "redux-persist/lib/storage";
 // Import all your APIs
 import { apiSlice } from "../features/apiSlice";
 import { authApi } from "../features/authApi";
+import customerProfileApi from "@/features/customerProfileApi";
 import authReducer from "../features/authSlice";
 import { sliderApi } from "../features/sliderApi";
 import { productApi } from "../features/productApi";
@@ -17,6 +18,7 @@ import chatReducer from "../features/chatSlice";
 import { termsApi } from "../features/termsApi"; 
 import { shippingProviderApi } from "../features/shippingProviderApi";
 import { offerApi } from "../features/offerApi"; 
+import { userOrderApi } from "@/features/userorderApi";
 import {adminOrderApi} from "@/features/adminOrderApi"; 
 import { vendorOrderApi } from "@/features/vendorOrderApi";
 import { employeeApi } from "@/features/employeeApi";
@@ -37,6 +39,7 @@ import { footerSettingsApi } from "@/features/footerSettingsApi";
 const apiMiddlewares = [
   apiSlice.middleware,
   authApi.middleware,
+  customerProfileApi.middleware,
   sliderApi.middleware,
   productApi.middleware,
   attributeSlice.middleware,
@@ -46,6 +49,7 @@ const apiMiddlewares = [
   termsApi.middleware,
   shippingProviderApi.middleware,
   offerApi.middleware, 
+  userOrderApi.middleware,  
   adminOrderApi.middleware,
   vendorOrderApi.middleware,  
   employeeApi.middleware,
@@ -66,6 +70,7 @@ const apiReducers = {
   chat: chatReducer,
   [apiSlice.reducerPath]: apiSlice.reducer,
   [authApi.reducerPath]: authApi.reducer,
+  [customerProfileApi.reducerPath]: customerProfileApi.reducer,
   [sliderApi.reducerPath]: sliderApi.reducer,
   [productApi.reducerPath]: productApi.reducer,
   [attributeSlice.reducerPath]: attributeSlice.reducer,
@@ -75,6 +80,7 @@ const apiReducers = {
   [termsApi.reducerPath]: termsApi.reducer,
   [shippingProviderApi.reducerPath]: shippingProviderApi.reducer,
   [offerApi.reducerPath]: offerApi.reducer, 
+  [userOrderApi.reducerPath]: userOrderApi.reducer, 
   [adminOrderApi.reducerPath]: adminOrderApi.reducer,
   [vendorOrderApi.reducerPath]: vendorOrderApi.reducer, 
   [employeeApi.reducerPath]: employeeApi.reducer,

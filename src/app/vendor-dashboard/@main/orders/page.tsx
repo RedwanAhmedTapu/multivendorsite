@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { ShoppingBag, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
-import { useGetVendorOrdersQuery, useExportVendorOrdersMutation } from "@/features/vendorOrderApi";
+import { useGetVendorOrdersQuery } from "@/features/vendorOrderApi";
 import { useVendorOrderFilters } from "./components/useVendorOrderFilters";
 import { VendorOrderStatsBar } from "./components/VendorOrderStatsBar";
 import { VendorOrderFiltersBar } from "./components/VendorOrderFiltersBar";
@@ -19,7 +19,6 @@ export default function VendorOrdersPage() {
     resetFilters,
     activeFilterCount,
     queryString,
-    statsQueryString,
   } = useVendorOrderFilters();
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -32,8 +31,6 @@ export default function VendorOrdersPage() {
     refetch,
   } = useGetVendorOrdersQuery(queryString);
 
-  const [exportOrders] = useExportVendorOrdersMutation();
-
   const orders = data?.data || [];
   const pagination = data?.pagination;
 
@@ -41,27 +38,11 @@ export default function VendorOrdersPage() {
     setSelectedOrderId(order.id);
   }, []);
 
-  const handleExport = async () => {
-    try {
-      const blob = await exportOrders(queryString).unwrap();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `my-orders-${new Date().toISOString().split("T")[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Orders exported");
-    } catch {
-      toast.error("Export failed");
-    }
-  };
-
   const handleRefresh = () => {
     refetch();
     toast.success("Orders refreshed");
   };
 
-  // Count new (CONFIRMED) orders that need action
   const newOrderCount = orders.filter((o) => o.status === "CONFIRMED").length;
 
   return (
@@ -88,7 +69,6 @@ export default function VendorOrdersPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* New orders alert badge */}
             {newOrderCount > 0 && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
@@ -98,7 +78,6 @@ export default function VendorOrdersPage() {
               </div>
             )}
 
-            {/* Total count */}
             {pagination && (
               <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200 shadow-sm">
                 <p className="text-xs text-slate-500">
@@ -118,7 +97,7 @@ export default function VendorOrdersPage() {
         </div>
 
         {/* ── Stats ──────────────────────────────────────────────────── */}
-        <VendorOrderStatsBar statsQueryString={statsQueryString} />
+        <VendorOrderStatsBar />
 
         {/* ── Filters ────────────────────────────────────────────────── */}
         <VendorOrderFiltersBar
@@ -127,7 +106,6 @@ export default function VendorOrdersPage() {
           resetFilters={resetFilters}
           activeFilterCount={activeFilterCount}
           isLoading={isLoading || isFetching}
-          onExport={handleExport}
           onRefresh={handleRefresh}
         />
 

@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   MapPin,
@@ -27,7 +28,6 @@ import {
 } from "@/features/userAddressApi";
 import { usePlaceOrderMutation } from "@/features/userorderApi";
 import AddressModal from "@/components/addressmodalcart/AddressModal";
-import baseQueryWithReauth from "@/features/baseQueryWithReauth"; // used only for direct fetch fallback
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 interface ExtendedCartItem extends Omit<CartItem, "product_variants"> {
@@ -57,11 +57,6 @@ export default function CheckoutPage() {
   const [orderSuccess, setOrderSuccess] = useState<string | null>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
 
-  // Checkout session state — created on demand
-  const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
-  const [creatingSession, setCreatingSession] = useState(false);
-  const sessionCreatedRef = useRef(false); // prevent double-creation in strict mode
-
   /* ── Queries ──────────────────────────────────────────────────────────── */
   const { data: cartData, isLoading: loadingCart } = useGetCartQuery();
   const { data: addressesData } = useGetAddressesQuery();
@@ -81,90 +76,27 @@ export default function CheckoutPage() {
   const totalDelivery = feesData?.data?.totalDeliveryFee ?? 0;
   const grandTotal = subtotal + totalDelivery;
 
-  // Group selected items by vendor
   const byVendor = selectedItems.reduce(
     (acc, item) => {
       const vid = item.products.vendorId;
       if (!acc[vid])
-        acc[vid] = { name: (item.products as any).vendorName ?? "Seller", items: [] };
+        acc[vid] = {
+          name: (item.products as any).vendorName ?? "Seller",
+          items: [],
+        };
       acc[vid].items.push(item);
       return acc;
     },
     {} as Record<string, { name: string; items: ExtendedCartItem[] }>
   );
 
-  /* ── Create checkout session on mount ────────────────────────────────── */
-  /**
-   * CheckoutSession is a separate DB record that must be created before
-   * an order can be placed. We create it here (POST /checkout/session)
-   * as soon as the page loads and we know which items are selected.
-   *
-   * If your backend already attaches a checkoutSession to the cart
-   * response, remove this block and read it from cartData instead.
-   */
-  const createSession = useCallback(async () => {
-    if (sessionCreatedRef.current) return;
-    if (!selectedItems.length) return;
-
-    sessionCreatedRef.current = true;
-    setCreatingSession(true);
-    setOrderError(null);
-
-    try {
-      // Build payload — send selected item IDs and basic pricing
-      const payload = {
-        selectedItemIds: selectedItems.map((i) => i.id),
-        subtotal,
-        discount: 0,
-        tax: 0,
-        shippingCost: 0,          // will be updated after fee calc
-        total: subtotal,           // will be recalculated server-side
-      };
-
-      const res = await fetch("/api/checkout/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error ?? `HTTP ${res.status}`);
-      }
-
-      const json = await res.json();
-      // Accept either { data: { id } } or { id } shapes
-      const sessionId = json?.data?.id ?? json?.id;
-      if (!sessionId) throw new Error("No session ID in response");
-
-      setCheckoutSessionId(sessionId);
-    } catch (err: any) {
-      sessionCreatedRef.current = false; // allow retry
-      setOrderError(
-        `Could not start checkout session: ${err.message}. Please go back and try again.`
-      );
-    } finally {
-      setCreatingSession(false);
-    }
-  }, [selectedItems.length, subtotal]);
-
   /* ── Effects ──────────────────────────────────────────────────────────── */
-  // Auto-select default address
   useEffect(() => {
     if (defaultAddressData?.data && !selectedAddressId) {
       setSelectedAddressId(defaultAddressData.data.id);
     }
   }, [defaultAddressData]);
 
-  // Create session once cart data is loaded
-  useEffect(() => {
-    if (!loadingCart && selectedItems.length > 0) {
-      createSession();
-    }
-  }, [loadingCart]);
-
-  // Recalculate delivery fees when address changes
   const recalcFees = useCallback(async () => {
     if (!selectedAddressId || !selectedItems.length) return;
     try {
@@ -179,7 +111,6 @@ export default function CheckoutPage() {
     recalcFees();
   }, [selectedAddressId]);
 
-  // Guard: no selected items → back to cart
   useEffect(() => {
     if (!loadingCart && selectedItems.length === 0 && allItems.length > 0) {
       router.replace("/cart");
@@ -189,15 +120,6 @@ export default function CheckoutPage() {
   /* ── Place order ──────────────────────────────────────────────────────── */
   const handlePlaceOrder = async () => {
     setOrderError(null);
-
-    if (!checkoutSessionId) {
-      // Try creating the session one more time
-      await createSession();
-      if (!checkoutSessionId) {
-        setOrderError("Checkout session not ready. Please wait a moment and try again.");
-        return;
-      }
-    }
     if (!selectedAddressId) {
       setOrderError("Please select a delivery address.");
       return;
@@ -206,11 +128,12 @@ export default function CheckoutPage() {
       setOrderError("Please agree to the Terms & Conditions.");
       return;
     }
-
     try {
-      const res = await placeOrder({ checkoutSessionId }).unwrap();
+      // ✅ FIXED: was `addressId`, must be `userAddressId` per PlaceOrderRequest
+      const res = await placeOrder({ userAddressId: selectedAddressId }).unwrap();
       setOrderSuccess(res.data.orderNumber ?? res.data.id);
     } catch (err: any) {
+      console.log("place order", err);
       setOrderError(
         err?.data?.error ?? "Failed to place order. Please try again."
       );
@@ -220,324 +143,264 @@ export default function CheckoutPage() {
   /* ── Success screen ───────────────────────────────────────────────────── */
   if (orderSuccess) {
     return (
-      <>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-teal-50 via-emerald-50/60 to-green-50 px-4">
         <style>{`
-          ${FONTS}
-          @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-          @keyframes pop{0%{transform:scale(.5);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+          @keyframes fadeUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+          @keyframes pop { 0%{transform:scale(.5);opacity:0} 70%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+          .anim-fadeup { animation: fadeUp .6s ease both; }
+          .anim-pop    { animation: pop .5s cubic-bezier(.34,1.56,.64,1) .2s both; }
         `}</style>
-        <div style={{
-          minHeight: "100vh", display: "flex", alignItems: "center",
-          justifyContent: "center",
-          background: "linear-gradient(135deg,#f0fdfa 0%,#e6f7f4 50%,#f0fdf4 100%)",
-          fontFamily: FONT_BODY,
-        }}>
-          <div style={{ textAlign: "center", padding: "48px 24px", animation: "fadeUp .6s ease both" }}>
-            <div style={{
-              width: 88, height: 88, borderRadius: "50%",
-              background: "linear-gradient(135deg,#14b8a6,#10b981)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              margin: "0 auto 24px", boxShadow: "0 16px 40px #14b8a640",
-              animation: "pop .5s cubic-bezier(.34,1.56,.64,1) .2s both",
-            }}>
-              <CheckCircle2 size={44} color="#fff" />
-            </div>
-            <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 34, fontWeight: 800, color: "#0f172a", margin: "0 0 8px" }}>
-              Order Confirmed!
-            </h1>
-            <p style={{ fontSize: 14, color: "#64748b", margin: "0 0 12px", fontFamily: FONT_BODY }}>
-              Your order has been placed successfully.
-            </p>
-            <div style={{
-              display: "inline-block", background: "#f0fdfa",
-              border: "1.5px solid #99f6e4", borderRadius: 10,
-              padding: "8px 20px", margin: "0 0 36px",
-            }}>
-              <span style={{ fontSize: 13, color: "#0d9488", fontWeight: 600, fontFamily: FONT_BODY }}>Order # </span>
-              <span style={{ fontSize: 17, color: "#0f766e", fontWeight: 800, fontFamily: FONT_DISPLAY }}>
-                {orderSuccess}
-              </span>
-            </div>
-            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-              <a href="/orders" style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                padding: "13px 26px",
-                background: "linear-gradient(135deg,#14b8a6,#0d9488)",
-                color: "#fff", borderRadius: 14, fontWeight: 700,
-                fontSize: 14, textDecoration: "none", fontFamily: FONT_BODY,
-                boxShadow: "0 8px 20px #14b8a630",
-              }}>
-                View My Orders <ArrowRight size={15} />
-              </a>
-              <a href="/" style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                padding: "13px 26px", background: "#fff",
-                border: "1.5px solid #e2e8f0", color: "#475569",
-                borderRadius: 14, fontWeight: 600,
-                fontSize: 14, textDecoration: "none", fontFamily: FONT_BODY,
-              }}>
-                Continue Shopping
-              </a>
-            </div>
+        <div className="text-center py-12 px-6 anim-fadeup">
+          <div className="anim-pop w-24 h-24 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center mx-auto mb-6 shadow-[0_16px_40px_rgba(20,184,166,0.35)]">
+            <CheckCircle2 size={48} className="text-white" />
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mb-2">
+            Order Confirmed!
+          </h1>
+          <p className="text-sm text-slate-500 mb-5">
+            Your order has been placed successfully.
+          </p>
+          <div className="inline-flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-5 py-2.5 mb-10">
+            <span className="text-sm font-semibold text-teal-600">Order #</span>
+            <span className="text-lg font-extrabold text-teal-700">{orderSuccess}</span>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <a
+              href="/orders"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-2xl font-bold text-sm shadow-[0_8px_20px_rgba(20,184,166,0.3)] hover:brightness-105 transition-all"
+            >
+              View My Orders <ArrowRight size={15} />
+            </a>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-semibold text-sm hover:bg-slate-50 transition-all"
+            >
+              Continue Shopping
+            </Link>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   /* ── Loading ──────────────────────────────────────────────────────────── */
   if (loadingCart) {
     return (
-      <>
-        <style>{`${FONTS}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc" }}>
-          <Loader2 size={32} color="#14b8a6" style={{ animation: "spin 1s linear infinite" }} />
-        </div>
-      </>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 size={32} className="text-teal-500 animate-spin" />
+      </div>
     );
   }
 
   /* ── Main ─────────────────────────────────────────────────────────────── */
-  const sessionReady = !!checkoutSessionId;
-  const isWorking = creatingSession || placingOrder || calcFees;
-
   return (
     <>
       <style>{`
-        ${FONTS}
-        *{box-sizing:border-box;}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-        .co-root{font-family:'${FONT_BODY_RAW}',sans-serif;background:#f8fafc;min-height:100vh;padding:28px 0 80px;}
-        .co-inner{max-width:1140px;margin:0 auto;padding:0 20px;}
-        .co-layout{display:flex;gap:24px;align-items:flex-start;}
-        .co-left{flex:1;min-width:0;display:flex;flex-direction:column;gap:20px;}
-        .co-sidebar{width:320px;flex-shrink:0;position:sticky;top:24px;}
-        @media(max-width:960px){.co-layout{flex-direction:column!important;}.co-sidebar{width:100%!important;position:static!important;}}
-        .co-card{background:#fff;border:1.5px solid #e2e8f0;border-radius:18px;overflow:hidden;}
-        .co-card-hd{padding:16px 22px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;}
-        .co-card-title{font-family:'${FONT_DISPLAY_RAW}',sans-serif;font-size:16px;font-weight:700;color:#0f172a;}
-        .co-addr{border:1.5px solid #e2e8f0;border-radius:13px;padding:14px 16px;cursor:pointer;position:relative;margin-bottom:10px;transition:border-color .2s,background .2s;}
-        .co-addr.sel{border-color:#14b8a6;background:#f0fdfa;}
-        .co-addr:hover:not(.sel){border-color:#7dd3c8;}
-        .co-vendor{background:#f8fafc;padding:10px 22px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;}
-        .co-vendor-name{font-size:11px;font-weight:800;color:#64748b;letter-spacing:.07em;text-transform:uppercase;}
-        .co-item{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid #f8fafc;}
-        .co-item:last-of-type{border-bottom:none;}
-        .co-del{display:flex;justify-content:space-between;align-items:center;padding:10px 22px;background:#f0fdfa;border-top:1px dashed #a7f3d0;}
-        .co-sb-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13.5px;}
-        .co-err{background:#fff1f2;border:1.5px solid #fecdd3;border-radius:10px;padding:11px 14px;display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#be123c;margin-bottom:14px;}
-        .co-cta{width:100%;padding:15px;border:none;border-radius:14px;font-family:'${FONT_BODY_RAW}',sans-serif;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;}
-        .co-cta-primary{background:linear-gradient(135deg,#14b8a6,#0d9488);color:#fff;}
-        .co-cta-primary:hover:not(:disabled){box-shadow:0 8px 24px #14b8a640;filter:brightness(1.04);}
-        .co-cta-primary:disabled{opacity:.4;cursor:not-allowed;}
-        .co-trust{display:flex;align-items:center;gap:6px;font-size:11.5px;color:#94a3b8;font-weight:500;}
-        /* Session banner */
-        .session-banner{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;font-size:12.5px;font-family:'${FONT_BODY_RAW}',sans-serif;margin-bottom:14px;}
-        .session-banner.loading{background:#f0fdfa;border:1.5px solid #99f6e4;color:#0d9488;}
-        .session-banner.ready{background:#f0fdf4;border:1.5px solid #86efac;color:#15803d;}
-        .fu{animation:fadeUp .3s ease both;}
-        .fu1{animation-delay:.06s}.fu2{animation-delay:.12s}.fu3{animation-delay:.18s}
+        @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+        .au  { animation: fadeUp .35s ease both; }
+        .au1 { animation-delay:.07s }
+        .au2 { animation-delay:.14s }
+        .au3 { animation-delay:.21s }
+        .au4 { animation-delay:.28s }
       `}</style>
 
-      <div className="co-root">
-        <div className="co-inner">
+      <div className="min-h-screen bg-slate-50 pb-24 pt-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
 
-          {/* Header */}
-          <div className="fu" style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28 }}>
+          {/* ── Page Header ──────────────────────────────────────────────── */}
+          <div className="flex items-center gap-4 mb-8 au">
             <button
               onClick={() => router.push("/cart")}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "8px 14px", borderRadius: 10,
-                border: "1.5px solid #e2e8f0", background: "#fff",
-                fontSize: 13, fontWeight: 600, color: "#475569",
-                cursor: "pointer", fontFamily: FONT_BODY,
-              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shrink-0"
             >
               <ArrowLeft size={14} /> Back to Cart
             </button>
             <div>
-              <h1 style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 800, color: "#0f172a", margin: 0 }}>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-none">
                 Checkout
               </h1>
-              <p style={{ fontSize: 12.5, color: "#94a3b8", margin: "2px 0 0", fontFamily: FONT_BODY }}>
+              <p className="text-xs text-slate-400 mt-1">
                 {selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""} selected
               </p>
             </div>
           </div>
 
-          <div className="co-layout fu fu1">
+          {/* ── Two-column layout ─────────────────────────────────────────── */}
+          <div className="flex flex-col xl:flex-row gap-6 items-start">
 
-            {/* ══ LEFT ══════════════════════════════════════════════════ */}
-            <div className="co-left">
+            {/* ══ LEFT COLUMN ══════════════════════════════════════════════ */}
+            <div className="flex-1 min-w-0 flex flex-col gap-5">
 
-              {/* Delivery Address */}
-              <div className="co-card fu">
-                <div className="co-card-hd">
-                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: 8,
-                      background: "#f0fdfa",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}>
-                      <MapPin size={15} color="#14b8a6" />
+              {/* ── Delivery Address Card ─────────────────────────────────── */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm au au1">
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center shrink-0">
+                      <MapPin size={15} className="text-teal-500" />
                     </div>
-                    <span className="co-card-title">Delivery Address</span>
-                    <span style={{
-                      fontSize: 10.5, fontWeight: 700,
-                      background: "#f0fdfa", color: "#0d9488",
-                      padding: "2px 8px", borderRadius: 99, letterSpacing: ".04em",
-                    }}>
+                    <span className="font-bold text-slate-900 text-[15px]">
+                      Delivery Address
+                    </span>
+                    <span className="text-[10.5px] font-bold bg-teal-50 text-teal-600 px-2.5 py-0.5 rounded-full border border-teal-100">
                       {addresses.length}/10
                     </span>
                   </div>
                   <button
                     onClick={() => setIsAddressModalOpen(true)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 5,
-                      fontSize: 13, fontWeight: 700, color: "#14b8a6",
-                      background: "#f0fdfa", border: "1.5px solid #99f6e4",
-                      borderRadius: 8, padding: "6px 12px", cursor: "pointer",
-                      fontFamily: FONT_BODY,
-                    }}
+                    className="flex items-center gap-1.5 text-[13px] font-bold text-teal-600 bg-teal-50 border border-teal-200 rounded-lg px-3 py-1.5 hover:bg-teal-100 transition-colors cursor-pointer"
                   >
                     <Plus size={12} /> Add New
                   </button>
                 </div>
 
-                <div style={{ padding: "16px 22px" }}>
+                {/* Address grid */}
+                <div className="p-5">
                   {addresses.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "32px 0", color: "#cbd5e1", fontSize: 13, fontFamily: FONT_BODY }}>
+                    <div className="text-center py-10 text-slate-400 text-sm">
                       No saved addresses.{" "}
                       <button
                         onClick={() => setIsAddressModalOpen(true)}
-                        style={{ color: "#14b8a6", fontWeight: 700, background: "none", border: "none", cursor: "pointer", fontFamily: FONT_BODY }}
+                        className="text-teal-500 font-bold hover:underline bg-transparent border-none cursor-pointer"
                       >
                         Add one
                       </button>
                     </div>
                   ) : (
-                    addresses.map((addr) => (
-                      <div
-                        key={addr.id}
-                        className={`co-addr ${addr.id === selectedAddressId ? "sel" : ""}`}
-                        onClick={() => setSelectedAddressId(addr.id)}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 5 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ fontSize: 13.5, fontWeight: 700, color: "#0f172a", fontFamily: FONT_BODY }}>
-                              {addr.fullName}
-                            </span>
-                            {addr.isDefault && (
-                              <span style={{
-                                fontSize: 10, fontWeight: 700,
-                                background: "#f0fdfa", color: "#0d9488",
-                                padding: "1px 7px", borderRadius: 99, letterSpacing: ".04em",
-                              }}>
-                                DEFAULT
-                              </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {addresses.map((addr) => {
+                        const sel = addr.id === selectedAddressId;
+                        return (
+                          <div
+                            key={addr.id}
+                            onClick={() => setSelectedAddressId(addr.id)}
+                            className={`relative rounded-xl border-2 p-4 cursor-pointer transition-all ${
+                              sel
+                                ? "border-teal-400 bg-teal-50/50 shadow-sm"
+                                : "border-slate-200 hover:border-teal-300 hover:bg-slate-50"
+                            }`}
+                          >
+                            {sel && (
+                              <CheckCircle2
+                                size={17}
+                                className="absolute top-3.5 right-3.5 text-teal-500 shrink-0"
+                              />
                             )}
+                            <div className="flex items-center gap-2 mb-1.5 pr-6">
+                              <span className="text-[13.5px] font-bold text-slate-900 leading-snug">
+                                {addr.fullName}
+                              </span>
+                              {addr.isDefault && (
+                                <span className="text-[10px] font-extrabold bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full border border-teal-100 uppercase tracking-wide">
+                                  Default
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed mb-1">
+                              {addr.addressLine1}
+                              {addr.addressLine2 ? `, ${addr.addressLine2}` : ""}
+                            </p>
+                            <p className="text-[11.5px] text-slate-400">
+                              📞 {addr.phone}
+                            </p>
                           </div>
-                          {addr.id === selectedAddressId && (
-                            <CheckCircle2 size={17} color="#14b8a6" style={{ flexShrink: 0 }} />
-                          )}
-                        </div>
-                        <div style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.65, fontFamily: FONT_BODY }}>
-                          {addr.addressLine1}
-                          {addr.addressLine2 ? `, ${addr.addressLine2}` : ""}
-                        </div>
-                        <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 3, fontFamily: FONT_BODY }}>
-                          📞 {addr.phone}
-                        </div>
-                      </div>
-                    ))
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
 
-              {/* Order Items read-only */}
-              <div className="co-card fu fu1">
-                <div className="co-card-hd">
-                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: 8,
-                      background: "#f0fdfa",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}>
-                      <Package size={15} color="#14b8a6" />
-                    </div>
-                    <span className="co-card-title">
-                      Order Items · {selectedItems.length}
-                    </span>
+              {/* ── Order Items Card ──────────────────────────────────────── */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm au au2">
+                {/* Header */}
+                <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
+                  <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center shrink-0">
+                    <Package size={15} className="text-teal-500" />
                   </div>
+                  <span className="font-bold text-slate-900 text-[15px]">
+                    Order Items
+                  </span>
+                  <span className="text-[11px] font-bold bg-slate-100 text-slate-500 px-2.5 py-0.5 rounded-full">
+                    {selectedItems.length}
+                  </span>
                 </div>
 
+                {/* Items grouped by vendor */}
                 {Object.entries(byVendor).map(([vendorId, { name, items }]) => {
                   const vd = deliveryCalcs.find((c) => c.vendorId === vendorId);
                   return (
-                    <div key={vendorId}>
-                      <div className="co-vendor">
-                        <Store size={12} color="#94a3b8" />
-                        <span className="co-vendor-name">{name}</span>
+                    <div key={vendorId} className="border-b border-slate-100 last:border-b-0">
+                      {/* Vendor strip */}
+                      <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 border-b border-slate-100">
+                        <Store size={12} className="text-slate-400 shrink-0" />
+                        <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest">
+                          {name}
+                        </span>
                       </div>
+
+                      {/* Item rows */}
                       {items.map((item) => {
                         const dp =
                           item.product_variants.specialPrice ??
                           item.product_variants.price;
                         return (
-                          <div className="co-item" key={item.id}>
+                          <div
+                            key={item.id}
+                            className="flex items-center gap-3.5 px-5 py-3.5 border-b border-slate-50 last:border-b-0"
+                          >
                             <img
                               src={item.product_variants.variantImage}
                               alt={item.products.name}
-                              style={{
-                                width: 52, height: 52, borderRadius: 9,
-                                objectFit: "cover",
-                                border: "1.5px solid #e2e8f0", flexShrink: 0,
-                              }}
+                              className="w-14 h-14 rounded-xl object-cover border border-slate-200 shrink-0"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src =
-                                  "https://placehold.co/52x52/f0fdfa/2dd4bf?text=img";
+                                  "https://placehold.co/56x56/f0fdfa/2dd4bf?text=img";
                               }}
                             />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a", marginBottom: 2, lineHeight: 1.4 }}>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[13.5px] font-semibold text-slate-900 leading-snug line-clamp-2 mb-0.5">
                                 {item.products.name}
-                              </div>
-                              <div style={{ fontSize: 11.5, color: "#94a3b8", fontFamily: FONT_BODY }}>
+                              </p>
+                              <p className="text-[11.5px] text-slate-400">
                                 Qty: {item.quantity}
                                 {item.product_variants.attributeValues &&
-                                  Object.keys(item.product_variants.attributeValues).length > 0 && (
-                                    <> ·{" "}
-                                      {Object.entries(item.product_variants.attributeValues)
+                                  Object.keys(
+                                    item.product_variants.attributeValues
+                                  ).length > 0 && (
+                                    <>
+                                      {" · "}
+                                      {Object.entries(
+                                        item.product_variants.attributeValues
+                                      )
                                         .map(([k, v]) => `${k}: ${v}`)
                                         .join(", ")}
                                     </>
                                   )}
-                              </div>
+                              </p>
                             </div>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", whiteSpace: "nowrap", flexShrink: 0 }}>
+                            <span className="text-[14px] font-bold text-slate-900 shrink-0">
                               {fmt(dp * item.quantity)}
-                            </div>
+                            </span>
                           </div>
                         );
                       })}
-                      {/* Per-vendor delivery */}
-                      <div className="co-del">
-                        <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, color: "#0d9488", fontWeight: 600, fontFamily: FONT_BODY }}>
-                          <Truck size={13} />
+
+                      {/* Delivery info row */}
+                      <div className="flex items-center justify-between px-5 py-3 bg-teal-50/60 border-t border-dashed border-teal-200">
+                        <div className="flex items-center gap-2 text-[12.5px] text-teal-700 font-semibold">
+                          <Truck size={13} className="shrink-0" />
                           {vd?.courierProvider ?? "Standard"} Delivery
                           {vd?.estimatedDeliveryDays && (
-                            <span style={{ color: "#94a3b8", fontWeight: 400 }}>
+                            <span className="text-slate-400 font-normal">
                               · Est. {vd.estimatedDeliveryDays}d
                             </span>
                           )}
                         </div>
                         {calcFees ? (
-                          <Loader2 size={14} color="#14b8a6" style={{ animation: "spin 1s linear infinite" }} />
+                          <Loader2 size={14} className="text-teal-500 animate-spin" />
                         ) : (
-                          <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", fontFamily: FONT_BODY }}>
+                          <span className="text-[13px] font-bold text-slate-800">
                             {vd ? fmt(vd.deliveryCharge) : "—"}
                           </span>
                         )}
@@ -548,100 +411,97 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* ══ SIDEBAR ════════════════════════════════════════════════ */}
-            <div className="co-sidebar fu fu2">
-              <div className="co-card" style={{ marginBottom: 14 }}>
-                <div style={{ padding: "22px 24px 0" }}>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontSize: 17, fontWeight: 700, color: "#0f172a", marginBottom: 18 }}>
+            {/* ══ SIDEBAR ══════════════════════════════════════════════════ */}
+            <div className="w-full xl:w-[330px] shrink-0 xl:sticky xl:top-6 flex flex-col gap-4 au au3">
+
+              {/* ── Payment Summary ───────────────────────────────────────── */}
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+
+                {/* Totals */}
+                <div className="px-6 pt-6 pb-4">
+                  <h2 className="font-extrabold text-slate-900 text-[17px] mb-5">
                     Payment Summary
-                  </div>
+                  </h2>
 
-                  {/* Session status indicator */}
-                  {creatingSession && (
-                    <div className="session-banner loading" style={{ marginBottom: 14 }}>
-                      <Loader2 size={14} style={{ animation: "spin 1s linear infinite", flexShrink: 0 }} />
-                      Preparing your checkout session…
-                    </div>
-                  )}
-                  {sessionReady && !creatingSession && (
-                    <div className="session-banner ready" style={{ marginBottom: 14 }}>
-                      <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
-                      Checkout session ready
-                    </div>
-                  )}
-
-                  <div className="co-sb-row">
-                    <span style={{ color: "#64748b" }}>
-                      Subtotal ({selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""})
-                    </span>
-                    <span style={{ fontWeight: 700, color: "#0f172a" }}>{fmt(subtotal)}</span>
-                  </div>
-
-                  <div className="co-sb-row">
-                    <span style={{ color: "#64748b" }}>Delivery Charge</span>
-                    {calcFees ? (
-                      <Loader2 size={13} color="#14b8a6" style={{ animation: "spin 1s linear infinite" }} />
-                    ) : (
-                      <span style={{ fontWeight: 700, color: totalDelivery === 0 ? "#cbd5e1" : "#0f172a" }}>
-                        {totalDelivery === 0 ? "—" : fmt(totalDelivery)}
+                  <div className="space-y-2.5">
+                    <div className="flex justify-between items-center text-[13.5px]">
+                      <span className="text-slate-500">
+                        Subtotal ({selectedItems.length} item
+                        {selectedItems.length !== 1 ? "s" : ""})
                       </span>
-                    )}
+                      <span className="font-bold text-slate-900">{fmt(subtotal)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[13.5px]">
+                      <span className="text-slate-500">Delivery Charge</span>
+                      {calcFees ? (
+                        <Loader2 size={13} className="text-teal-500 animate-spin" />
+                      ) : (
+                        <span
+                          className={`font-bold ${
+                            totalDelivery === 0 ? "text-slate-300" : "text-slate-900"
+                          }`}
+                        >
+                          {totalDelivery === 0 ? "—" : fmt(totalDelivery)}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  <div style={{ borderTop: "1.5px solid #f1f5f9", margin: "12px 0" }} />
+                  <div className="border-t border-slate-100 my-4" />
 
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Total</span>
-                    <span style={{ fontFamily: FONT_DISPLAY, fontSize: 24, fontWeight: 800, color: "#14b8a6" }}>
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-900 text-base">Total</span>
+                    <span className="font-extrabold text-teal-500 text-[26px] leading-none tracking-tight">
                       {fmt(grandTotal)}
                     </span>
                   </div>
                 </div>
 
                 {/* Terms */}
-                <div style={{ padding: "16px 24px 0", borderTop: "1px solid #f1f5f9", marginTop: 18 }}>
-                  <label style={{
-                    display: "flex", alignItems: "flex-start", gap: 9,
-                    cursor: "pointer", fontSize: 11.5, color: "#94a3b8",
-                    lineHeight: 1.7, fontFamily: FONT_BODY,
-                  }}>
+                <div className="px-6 py-4 border-t border-slate-100">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
                     <input
                       type="checkbox"
-                      style={{ marginTop: 2, accentColor: "#14b8a6", flexShrink: 0, width: 14, height: 14 }}
                       checked={agreedToTerms}
                       onChange={(e) => setAgreedToTerms(e.target.checked)}
+                      className="mt-0.5 w-3.5 h-3.5 accent-teal-500 shrink-0 cursor-pointer"
                     />
-                    I agree to the{" "}
-                    <a href="/terms" style={{ color: "#14b8a6", textDecoration: "none", fontWeight: 600 }}>Terms</a>,{" "}
-                    <a href="/privacy" style={{ color: "#14b8a6", textDecoration: "none", fontWeight: 600 }}>Privacy Policy</a>{" "}
-                    &amp;{" "}
-                    <a href="/returns" style={{ color: "#14b8a6", textDecoration: "none", fontWeight: 600 }}>Return Policy</a>
+                    <span className="text-[11.5px] text-slate-400 leading-relaxed">
+                      I agree to the{" "}
+                      <a href="/terms" className="text-teal-500 font-semibold hover:underline">
+                        Terms
+                      </a>
+                      ,{" "}
+                      <a href="/privacy" className="text-teal-500 font-semibold hover:underline">
+                        Privacy Policy
+                      </a>{" "}
+                      &amp;{" "}
+                      <a href="/returns" className="text-teal-500 font-semibold hover:underline">
+                        Return Policy
+                      </a>
+                    </span>
                   </label>
                 </div>
 
                 {/* Error */}
                 {orderError && (
-                  <div className="co-err" style={{ margin: "14px 24px 0" }}>
-                    <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <div className="mx-5 mb-3 flex items-start gap-2.5 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-[13px] text-rose-700">
+                    <AlertCircle size={15} className="shrink-0 mt-0.5" />
                     <span>{orderError}</span>
                   </div>
                 )}
 
                 {/* CTA */}
-                <div style={{ padding: "16px 24px 24px" }}>
+                <div className="px-5 pb-5 pt-1">
                   <button
-                    className="co-cta co-cta-primary"
-                    disabled={!selectedAddressId || !agreedToTerms || !sessionReady || isWorking}
                     onClick={handlePlaceOrder}
+                    disabled={!selectedAddressId || !agreedToTerms || placingOrder}
+                    className="w-full flex items-center justify-center gap-2 py-4 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 text-white font-bold text-[15px] shadow-[0_6px_20px_rgba(20,184,166,0.3)] hover:brightness-105 hover:shadow-[0_10px_28px_rgba(20,184,166,0.4)] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none cursor-pointer"
                   >
-                    {creatingSession ? (
+                    {placingOrder ? (
                       <>
-                        <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} />
-                        Preparing session…
-                      </>
-                    ) : placingOrder ? (
-                      <>
-                        <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} />
+                        <Loader2 size={16} className="animate-spin" />
                         Placing Order…
                       </>
                     ) : (
@@ -652,54 +512,51 @@ export default function CheckoutPage() {
                     )}
                   </button>
 
-                  {/* Contextual hint below button */}
-                  {!sessionReady && !creatingSession && !orderError && (
-                    <p style={{ textAlign: "center", fontSize: 11.5, color: "#f59e0b", margin: "8px 0 0", fontFamily: FONT_BODY }}>
-                      ⚠ Session not ready.{" "}
-                      <button
-                        onClick={() => { sessionCreatedRef.current = false; createSession(); }}
-                        style={{ color: "#14b8a6", background: "none", border: "none", cursor: "pointer", fontWeight: 700, fontFamily: FONT_BODY }}
-                      >
-                        Retry
-                      </button>
-                    </p>
-                  )}
-                  {!selectedAddressId && sessionReady && (
-                    <p style={{ textAlign: "center", fontSize: 11.5, color: "#94a3b8", margin: "8px 0 0", fontFamily: FONT_BODY }}>
+                  {!selectedAddressId && (
+                    <p className="text-center text-[11.5px] text-slate-400 mt-2">
                       Select a delivery address to continue
                     </p>
                   )}
                 </div>
 
-                {/* Trust */}
-                <div style={{ borderTop: "1px solid #f1f5f9", padding: "13px 24px", display: "flex", justifyContent: "space-around" }}>
-                  <div className="co-trust"><ShieldCheck size={13} color="#14b8a6" /> Secure Pay</div>
-                  <div className="co-trust"><Truck size={13} color="#14b8a6" /> Fast Delivery</div>
-                  <div className="co-trust"><Package size={13} color="#14b8a6" /> Easy Returns</div>
+                {/* Trust badges */}
+                <div className="flex justify-around border-t border-slate-100 px-4 py-3.5">
+                  {[
+                    { icon: <ShieldCheck size={13} />, label: "Secure Pay" },
+                    { icon: <Truck size={13} />, label: "Fast Delivery" },
+                    { icon: <Package size={13} />, label: "Easy Returns" },
+                  ].map(({ icon, label }) => (
+                    <div
+                      key={label}
+                      className="flex items-center gap-1.5 text-[11.5px] text-slate-400 font-medium"
+                    >
+                      <span className="text-teal-500">{icon}</span>
+                      {label}
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Payment badges */}
-              <div className="fu fu3" style={{ display: "flex", flexWrap: "wrap", gap: 7, justifyContent: "center" }}>
+              {/* ── Payment method badges ─────────────────────────────────── */}
+              <div className="flex flex-wrap gap-2 justify-center au au4">
                 {[
-                  { label: "bKash", bg: "#e2136e" },
-                  { label: "Nagad", bg: "#f47b20" },
-                  { label: "Rocket", bg: "#8B2FC9" },
-                  { label: "VISA", bg: "#1a1f71" },
-                  { label: "MC", bg: "#eb001b" },
-                  { label: "COD", bg: "#14b8a6" },
+                  { label: "bKash",  cls: "bg-[#e2136e]" },
+                  { label: "Nagad",  cls: "bg-[#f47b20]" },
+                  { label: "Rocket", cls: "bg-[#8B2FC9]" },
+                  { label: "VISA",   cls: "bg-[#1a1f71]" },
+                  { label: "MC",     cls: "bg-[#eb001b]" },
+                  { label: "COD",    cls: "bg-teal-500"  },
                 ].map((p) => (
-                  <div key={p.label} style={{
-                    background: p.bg, color: "#fff",
-                    fontSize: 10, fontWeight: 800,
-                    padding: "4px 10px", borderRadius: 6,
-                    letterSpacing: ".04em", fontFamily: FONT_BODY,
-                  }}>
+                  <span
+                    key={p.label}
+                    className={`${p.cls} text-white text-[10px] font-extrabold px-3 py-1 rounded-md tracking-wider`}
+                  >
                     {p.label}
-                  </div>
+                  </span>
                 ))}
               </div>
             </div>
+
           </div>
         </div>
       </div>
@@ -717,10 +574,3 @@ export default function CheckoutPage() {
     </>
   );
 }
-
-/* ─── Constants ──────────────────────────────────────────────────────────── */
-const FONT_DISPLAY_RAW = "Sora";
-const FONT_BODY_RAW = "DM Sans";
-const FONT_DISPLAY = `'${FONT_DISPLAY_RAW}', sans-serif`;
-const FONT_BODY = `'${FONT_BODY_RAW}', sans-serif`;
-const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');`;

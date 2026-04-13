@@ -1,7 +1,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import baseQueryWithReauth from "./baseQueryWithReauth";
 
-// ─── Shared sub-types ────────────────────────────────────────────────────────
+// ─── Shared sub-types ─────────────────────────────────────────────────────────
 
 export interface OrderVendor {
   id: string;
@@ -85,7 +85,7 @@ export interface VendorOrderDetail extends VendorOrderSummary {
   courierOrder: CourierInfo | null;
 }
 
-// ─── Payment & Refund ────────────────────────────────────────────────────────
+// ─── Payment & Refund ─────────────────────────────────────────────────────────
 
 export interface OrderPayment {
   id: string;
@@ -104,7 +104,7 @@ export interface OrderRefund {
   createdAt: string;
 }
 
-// ─── Enums (mirror Prisma) ───────────────────────────────────────────────────
+// ─── Enums (mirror Prisma) ────────────────────────────────────────────────────
 
 export type OrderStatus =
   | "PENDING"
@@ -129,9 +129,9 @@ export type FulfillmentStatus =
   | "RETURNED"
   | "CANCELLED";
 
-// ─── Order shapes ────────────────────────────────────────────────────────────
+// ─── Order shapes ─────────────────────────────────────────────────────────────
 
-/** Returned in list responses */
+/** Returned in list responses — matches GET /orders */
 export interface OrderSummary {
   id: string;
   orderNumber: string | null;
@@ -148,7 +148,7 @@ export interface OrderSummary {
   address: OrderAddress | null;
 }
 
-/** Returned in single-order / detail responses */
+/** Returned in single-order / detail responses — matches GET /orders/:id */
 export interface OrderDetail extends OrderSummary {
   paidAt: string | null;
   cancelledAt: string | null;
@@ -175,9 +175,11 @@ export interface VendorOrderTracking {
   shippedAt: string | null;
   deliveredAt: string | null;
   vendor: OrderVendor;
-  courierOrder: (CourierInfo & {
-    courier_tracking_history: TrackingEvent[];
-  }) | null;
+  courierOrder:
+    | (CourierInfo & {
+        courier_tracking_history: TrackingEvent[];
+      })
+    | null;
 }
 
 export interface OrderTracking {
@@ -189,16 +191,26 @@ export interface OrderTracking {
 
 // ─── Request types ────────────────────────────────────────────────────────────
 
+/**
+ * POST /orders
+ * Controller reads `userAddressId` from req.body — no checkoutSessionId needed.
+ */
 export interface PlaceOrderRequest {
-  checkoutSessionId: string;
+  userAddressId: string; // ✅ fixed: was `checkoutSessionId`
 }
 
+/**
+ * GET /orders
+ */
 export interface GetMyOrdersRequest {
   page?: number;
   limit?: number;
   status?: OrderStatus;
 }
 
+/**
+ * PATCH /orders/:orderId/cancel
+ */
 export interface CancelOrderRequest {
   orderId: string;
   reason?: string;
@@ -245,25 +257,28 @@ export const userOrderApi = createApi({
   tagTypes: ["Order", "OrderTracking"],
   endpoints: (builder) => ({
     /**
-     * Place a new order from a completed checkout session.
      * POST /orders
+     * Places a new order directly from the user's selected cart items.
+     * Body: { userAddressId }
      */
     placeOrder: builder.mutation<PlaceOrderResponse, PlaceOrderRequest>({
       query: (body) => ({
-        url: "/orders",
+        url: "/user-orders",
         method: "POST",
-        body,
+        body, // sends { userAddressId }
       }),
-      invalidatesTags: ["Order"],
+      invalidatesTags: [
+        { type: "Order", id: "LIST" },
+      ],
     }),
 
     /**
-     * Get all orders for the logged-in user (paginated, optional status filter).
      * GET /orders?page=1&limit=10&status=PENDING
+     * Returns paginated order list for the logged-in user.
      */
     getMyOrders: builder.query<PaginatedOrdersResponse, GetMyOrdersRequest>({
       query: ({ page = 1, limit = 10, status } = {}) => ({
-        url: "/orders",
+        url: "/user-orders",
         method: "GET",
         params: {
           page,
@@ -284,12 +299,12 @@ export const userOrderApi = createApi({
     }),
 
     /**
-     * Get a single order by ID.
      * GET /orders/:orderId
+     * Returns full detail for a single order.
      */
     getOrderById: builder.query<OrderDetailResponse, string>({
       query: (orderId) => ({
-        url: `/orders/${orderId}`,
+        url: `/user-orders/${orderId}`,
         method: "GET",
       }),
       providesTags: (_result, _error, orderId) => [
@@ -298,12 +313,12 @@ export const userOrderApi = createApi({
     }),
 
     /**
-     * Get courier tracking info for an order.
      * GET /orders/:orderId/tracking
+     * Returns courier tracking info for all vendor sub-orders.
      */
     trackOrder: builder.query<OrderTrackingResponse, string>({
       query: (orderId) => ({
-        url: `/orders/${orderId}/tracking`,
+        url: `/user-orders/${orderId}/tracking`,
         method: "GET",
       }),
       providesTags: (_result, _error, orderId) => [
@@ -312,12 +327,12 @@ export const userOrderApi = createApi({
     }),
 
     /**
-     * Cancel a PENDING order.
      * PATCH /orders/:orderId/cancel
+     * Cancels a PENDING order. Restores stock + creates refund if paid.
      */
     cancelOrder: builder.mutation<CancelOrderResponse, CancelOrderRequest>({
       query: ({ orderId, reason }) => ({
-        url: `/orders/${orderId}/cancel`,
+        url: `/user-orders/${orderId}/cancel`,
         method: "PATCH",
         body: { reason },
       }),
