@@ -8,11 +8,8 @@ import React, {
 } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useCreateProductMutation } from "@/features/productApi";
 import CategoryTreeSelector from "./CategoryTreeSelector";
-import ImageUploader from "@/components/imageuploader/ImageUploader";
-import VideoUploader from "@/components/videouploader/VideoUploader";
 import SpecAttributeManager from "./SpecAttributeManager";
 import VariantManager from "./VariantManager";
 import type { Attribute, VariantNamePart } from "@/types/type";
@@ -32,11 +29,29 @@ import {
   RightSidebarProvider,
 } from "@/app/vendor-dashboard/rightbar/RightSidebar";
 import { ProductCreationWizard } from "@/components/wizard/vendorrightsidewizard/ProductCreationWizard";
-import { Loader2, Search, AlertCircle, Check } from "lucide-react";
+import {
+  Loader2,
+  Search,
+  AlertCircle,
+  Check,
+  FileText,
+  Tag,
+  Image,
+  Layers,
+  Package,
+  Truck,
+  Percent,
+  Warehouse,
+} from "lucide-react";
 import { translateProductName } from "@/utils/translate";
 import { useGetCategoriesQuery } from "@/features/apiSlice";
+import ProductMediaUploader from "@/components/mediauploader/ProductMediaUploader";
+import WarehouseRackSelector, {
+  WarehouseRackSelection,
+} from "./WarehouseRack";
 
-// Define types for category data structure
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface Category {
   id: string;
   name: string;
@@ -50,7 +65,201 @@ interface CategorySuggestion {
   fullPath: string;
 }
 
-// Main Form Component
+// ─── Section Card Shell ───────────────────────────────────────────────────────
+
+function SectionCard({
+  icon,
+  title,
+  subtitle,
+  badge,
+  children,
+  error,
+  id,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+  badge?: "required" | "optional";
+  children: React.ReactNode;
+  error?: boolean;
+  id?: string;
+}) {
+  return (
+    <div
+      id={id}
+      style={{
+        background: "#fff",
+        border: `1.5px solid ${error ? "#FCA5A5" : "#E5EAF2"}`,
+        borderRadius: 14,
+        marginBottom: 0,
+        boxShadow: error
+          ? "0 0 0 3px rgba(239,68,68,0.08)"
+          : "0 1px 3px rgba(0,0,0,0.04)",
+        transition: "box-shadow 0.2s, border-color 0.2s",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "12px 18px",
+          borderBottom: "1px solid #F0F4FA",
+          background: "#FAFBFD",
+          borderRadius: "12px 12px 0 0",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 9,
+              background: error ? "#FEF2F2" : "#EEF3FB",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            {icon}
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: 13.5,
+                fontWeight: 700,
+                color: "#0D1B2E",
+                letterSpacing: "-0.2px",
+              }}
+            >
+              {title}
+            </div>
+            {subtitle && (
+              <div style={{ fontSize: 11, color: "#7A90AB", marginTop: 1 }}>
+                {subtitle}
+              </div>
+            )}
+          </div>
+        </div>
+        {badge && (
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              padding: "2px 9px",
+              borderRadius: 20,
+              background: badge === "required" ? "#FEF2F2" : "#F0F9F0",
+              color: badge === "required" ? "#DC2626" : "#16A34A",
+              border: `1px solid ${badge === "required" ? "#FECACA" : "#BBF7D0"}`,
+            }}
+          >
+            {badge === "required" ? "Required" : "Optional"}
+          </span>
+        )}
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: "18px 18px" }}>{children}</div>
+    </div>
+  );
+}
+
+// ─── Field Label ──────────────────────────────────────────────────────────────
+
+function FieldLabel({
+  children,
+  required,
+  hint,
+}: {
+  children: React.ReactNode;
+  required?: boolean;
+  hint?: string;
+}) {
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <label
+        style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: "#3D5068",
+          letterSpacing: "0.01em",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+        }}
+      >
+        {children}
+        {required && (
+          <span style={{ color: "#DC2626", fontWeight: 800 }}>*</span>
+        )}
+      </label>
+      {hint && (
+        <p style={{ fontSize: 10.5, color: "#9BAABB", marginTop: 2 }}>{hint}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Inline error ─────────────────────────────────────────────────────────────
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        marginTop: 5,
+        fontSize: 11.5,
+        color: "#DC2626",
+      }}
+    >
+      <AlertCircle size={12} />
+      {message}
+    </div>
+  );
+}
+
+// ─── Step indicator ───────────────────────────────────────────────────────────
+
+function StepDot({
+  n,
+  active,
+  done,
+}: {
+  n: number;
+  active?: boolean;
+  done?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        width: 26,
+        height: 26,
+        borderRadius: "50%",
+        background: done ? "#0D9488" : active ? "#1D4ED8" : "#E5EAF2",
+        color: done || active ? "#fff" : "#94A3B8",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 11,
+        fontWeight: 800,
+        flexShrink: 0,
+        transition: "all 0.2s",
+      }}
+    >
+      {done ? <Check size={12} /> : n}
+    </div>
+  );
+}
+
+// ─── Main Form ────────────────────────────────────────────────────────────────
+
 function AddProductFormContent() {
   const [name, setName] = useState("");
   const [nameBn, setNameBn] = useState("");
@@ -69,7 +278,6 @@ function AddProductFormContent() {
   >({});
   const [shippingWarranty, setShippingWarranty] =
     useState<ProductShippingWarrantyInput | null>(null);
-
   const [validationErrors, setValidationErrors] = useState<
     Record<string, boolean>
   >({});
@@ -79,10 +287,16 @@ function AddProductFormContent() {
     CategorySuggestion[]
   >([]);
 
-  const [createProduct, { isLoading }] = useCreateProductMutation();
-  const { data: categories, isLoading: categoriesLoading } =
-    useGetCategoriesQuery();
+  // ── VAT field ──────────────────────────────────────────────────────────────
+  const [vatPercentage, setVatPercentage] = useState<string>("");
+  const [vatError, setVatError] = useState<string>("");
 
+  // ── Warehouse & Rack ───────────────────────────────────────────────────────
+  const [warehouseRack, setWarehouseRack] =
+    useState<WarehouseRackSelection | null>(null);
+
+  const [createProduct, { isLoading }] = useCreateProductMutation();
+  const { data: categories } = useGetCategoriesQuery();
   const { user } = useSelector((state: RootState) => state.auth);
   const vendorId = user?.vendorId || "";
   const userRole = (user?.role as "VENDOR" | "ADMIN") || "VENDOR";
@@ -90,45 +304,50 @@ function AddProductFormContent() {
   const formRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const categorySuggestionRef = useRef<HTMLDivElement>(null);
-
-  // Translation timeout reference
   const translationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  // Category suggestion timeout reference
   const suggestionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Validate product name length
+  // ── Validation ──────────────────────────────────────────────────────────────
+
   const validateNameLength = useCallback((value: string) => {
-    if (value.length > 0 && value.length < 10) {
+    if (value.length > 0 && value.length < 10)
       return "Product name must be at least 10 characters";
-    }
-    if (value.length > 255) {
-      return "Product name cannot exceed 255 characters";
-    }
+    if (value.length > 255) return "Product name cannot exceed 255 characters";
     return "";
   }, []);
 
-  // Get name validation error
-  const nameValidationError = useMemo(() => {
-    return validateNameLength(name);
-  }, [name, validateNameLength]);
+  const nameValidationError = useMemo(
+    () => validateNameLength(name),
+    [name, validateNameLength]
+  );
 
-  // Find category suggestions based on product name
+  // ── VAT validation ─────────────────────────────────────────────────────────
+
+  const handleVatChange = useCallback((value: string) => {
+    if (value === "" || /^\d{0,3}(\.\d{0,2})?$/.test(value)) {
+      setVatPercentage(value);
+      const num = parseFloat(value);
+      if (value !== "" && (isNaN(num) || num < 0 || num > 100)) {
+        setVatError("VAT must be between 0% and 100%");
+      } else {
+        setVatError("");
+      }
+    }
+  }, []);
+
+  // ── Category suggestions ────────────────────────────────────────────────────
+
   const findCategorySuggestions = useCallback(
     (productName: string) => {
-      if (
-        !categories ||
-        !productName.trim() ||
-        productName.trim().length < 10
-      ) {
+      if (!categories || !productName.trim() || productName.trim().length < 10) {
         setSuggestedCategories([]);
         return;
       }
-
       const searchTerms = productName
         .toLowerCase()
         .split(/\s+/)
-        .filter((term) => term.length > 2);
-      if (searchTerms.length === 0) return;
+        .filter((t) => t.length > 2);
+      if (!searchTerms.length) return;
 
       const suggestions: Array<{
         id: string;
@@ -137,164 +356,113 @@ function AddProductFormContent() {
         matchScore: number;
       }> = [];
 
-      const traverseCategories = (
-        categoryList: Category[],
-        currentPath: string[] = [],
-        parentNames: string[] = []
+      const traverse = (
+        list: Category[],
+        path: string[] = [],
+        parents: string[] = []
       ) => {
-        categoryList.forEach((category: Category) => {
-          const fullPath = [...currentPath, category.name];
-          const allNames = [...parentNames, category.name];
-          const categoryText = allNames.join(" ").toLowerCase();
-
-          // Calculate match score
-          let matchScore = 0;
-          searchTerms.forEach((term) => {
-            if (categoryText.includes(term)) {
-              matchScore += term.length * 2; // Weight by term length
-            }
+        list.forEach((cat) => {
+          const fullPath = [...path, cat.name];
+          const allNames = [...parents, cat.name];
+          const catText = allNames.join(" ").toLowerCase();
+          const catNameLower = cat.name.toLowerCase();
+          let score = 0;
+          searchTerms.forEach((t) => {
+            if (catText.includes(t)) score += t.length * 2;
+            if (catNameLower.includes(t)) score += t.length * 3;
           });
-
-          // Also check if category name contains any search term
-          const categoryNameLower = category.name.toLowerCase();
-          searchTerms.forEach((term) => {
-            if (categoryNameLower.includes(term)) {
-              matchScore += term.length * 3; // Higher weight for exact category name match
-            }
-          });
-
-          // Add to suggestions if there's a match
-          if (matchScore > 0) {
+          if (score > 0)
             suggestions.push({
-              id: category.id,
-              name: category.name,
+              id: cat.id,
+              name: cat.name,
               fullPath: fullPath.join(" > "),
-              matchScore,
+              matchScore: score,
             });
-          }
-
-          // Recursively traverse children
-          if (category.children && category.children.length > 0) {
-            traverseCategories(category.children, fullPath, allNames);
-          }
+          if (cat.children?.length) traverse(cat.children, fullPath, allNames);
         });
       };
 
-      traverseCategories(categories as Category[]);
-
-      // Sort by match score and take top 5
-      const sortedSuggestions = suggestions
+      traverse(categories as Category[]);
+      const sorted = suggestions
         .sort((a, b) => b.matchScore - a.matchScore)
         .slice(0, 5)
         .map(({ id, name, fullPath }) => ({ id, name, fullPath }));
-
-      setSuggestedCategories(sortedSuggestions);
-      setShowCategorySuggestions(sortedSuggestions.length > 0);
+      setSuggestedCategories(sorted);
+      setShowCategorySuggestions(sorted.length > 0);
     },
     [categories]
   );
 
-  // Handle English name change with category suggestions
   const handleNameChange = useCallback(
     (value: string) => {
       setName(value);
-
-      // Clear previous timeout
-      if (suggestionTimeoutRef.current) {
+      if (suggestionTimeoutRef.current)
         clearTimeout(suggestionTimeoutRef.current);
-      }
-
-      // Debounce category suggestion
-      suggestionTimeoutRef.current = setTimeout(() => {
-        findCategorySuggestions(value);
-      }, 500);
+      suggestionTimeoutRef.current = setTimeout(
+        () => findCategorySuggestions(value),
+        500
+      );
     },
     [findCategorySuggestions]
   );
 
-  // Auto-translate when English name changes
+  // ── Translation ─────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (name.trim()) {
-      // Clear previous timeout
-      if (translationTimeoutRef.current) {
+      if (translationTimeoutRef.current)
         clearTimeout(translationTimeoutRef.current);
-      }
-
-      // Set new timeout to debounce translation
       translationTimeoutRef.current = setTimeout(async () => {
-        if (name.trim() && !nameBn.trim()) {
-          // Only auto-translate if Bengali field is empty
-          await translateName();
-        }
+        if (name.trim() && !nameBn.trim()) await translateName();
       }, 1000);
     }
-
     return () => {
-      if (translationTimeoutRef.current) {
+      if (translationTimeoutRef.current)
         clearTimeout(translationTimeoutRef.current);
-      }
-      if (suggestionTimeoutRef.current) {
+      if (suggestionTimeoutRef.current)
         clearTimeout(suggestionTimeoutRef.current);
-      }
     };
   }, [name, nameBn]);
 
-  // Close category suggestions when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handler = (e: MouseEvent) => {
       if (
         categorySuggestionRef.current &&
-        !categorySuggestionRef.current.contains(event.target as Node) &&
+        !categorySuggestionRef.current.contains(e.target as Node) &&
         nameInputRef.current &&
-        !nameInputRef.current.contains(event.target as Node)
-      ) {
+        !nameInputRef.current.contains(e.target as Node)
+      )
         setShowCategorySuggestions(false);
-      }
     };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Translation function
   const translateName = async () => {
     if (!name.trim()) return;
-
     setIsTranslating(true);
     try {
-      const translatedName = await translateProductName(name);
-      setNameBn(translatedName || "");
-    } catch (error) {
-      console.error("Translation error:", error);
+      const t = await translateProductName(name);
+      setNameBn(t || "");
+    } catch (e) {
+      console.error(e);
     } finally {
       setIsTranslating(false);
     }
   };
 
-  // Manual translation button handler
   const handleManualTranslate = async () => {
-    if (!name.trim()) {
-      alert("Please enter an English name first");
-      return;
-    }
+    if (!name.trim()) return alert("Please enter an English name first");
     await translateName();
   };
 
-  // Handle Bengali name change
-  const handleNameBnChange = (value: string) => {
-    setNameBn(value || "");
-  };
+  // ── Category ────────────────────────────────────────────────────────────────
 
-  // Find category by ID helper function
   const findCategoryById = useCallback(
     (cats: Category[], targetId: string): Category | null => {
       for (const cat of cats) {
-        if (cat.id === targetId) {
-          return cat;
-        }
-        if (cat.children && cat.children.length > 0) {
+        if (cat.id === targetId) return cat;
+        if (cat.children?.length) {
           const found = findCategoryById(cat.children, targetId);
           if (found) return found;
         }
@@ -304,75 +472,39 @@ function AddProductFormContent() {
     []
   );
 
-  // Handle category selection from suggestions
-  const handleCategorySuggestionSelect = (
-    categoryId: string,
-    fullPath: string
-  ) => {
-    // Find the category object from categories data
-    const category = findCategoryById(
-      (categories as Category[]) || [],
-      categoryId
-    );
-
-    if (category) {
-      const isLeaf = !category.children || category.children.length === 0;
-      const categoryAttrs: Attribute[] = category.attributes || [];
-
-      setCategoryId(categoryId);
-      setIsLeafCategory(isLeaf);
-      setCategoryAttributes(categoryAttrs);
-
-      const requiredAttrs = categoryAttrs.filter(
-        (attr: Attribute) => attr.isRequired
-      );
-      setRequiredAttributes(requiredAttrs);
-
-      const initialParts: Record<string, VariantNamePart> = {};
-      categoryAttrs.forEach((attr: Attribute) => {
-        if (attr.id) {
-          initialParts[attr.id] = {
-            name: attr.name || "",
-            value: "",
-            include: false,
-          };
-        }
-      });
-      setVariantNameParts(initialParts);
-
-      // Hide suggestions
-      setShowCategorySuggestions(false);
-    }
+  const handleCategorySuggestionSelect = (catId: string, _fullPath: string) => {
+    const cat = findCategoryById((categories as Category[]) || [], catId);
+    if (!cat) return;
+    const isLeaf = !cat.children || !cat.children.length;
+    const attrs: Attribute[] = cat.attributes || [];
+    setCategoryId(catId);
+    setIsLeafCategory(isLeaf);
+    setCategoryAttributes(attrs);
+    setRequiredAttributes(attrs.filter((a) => a.isRequired));
+    const parts: Record<string, VariantNamePart> = {};
+    attrs.forEach((a) => {
+      if (a.id) parts[a.id] = { name: a.name || "", value: "", include: false };
+    });
+    setVariantNameParts(parts);
+    setShowCategorySuggestions(false);
   };
 
-  // Handle category selection from tree selector
   const handleCategorySelect = useCallback(
-    (id: string, path: string, isLeaf: boolean, categoryAttrs: Attribute[]) => {
+    (id: string, _path: string, isLeaf: boolean, attrs: Attribute[]) => {
       setCategoryId(id || null);
       setIsLeafCategory(isLeaf);
-      setCategoryAttributes(categoryAttrs || []);
-
-      const requiredAttrs = (categoryAttrs || []).filter(
-        (attr: Attribute) => attr.isRequired
-      );
-      setRequiredAttributes(requiredAttrs);
-
-      const initialParts: Record<string, VariantNamePart> = {};
-      (categoryAttrs || []).forEach((attr: Attribute) => {
-        if (attr.id) {
-          initialParts[attr.id] = {
-            name: attr.name || "",
-            value: "",
-            include: false,
-          };
-        }
+      setCategoryAttributes(attrs || []);
+      setRequiredAttributes((attrs || []).filter((a) => a.isRequired));
+      const parts: Record<string, VariantNamePart> = {};
+      (attrs || []).forEach((a) => {
+        if (a.id)
+          parts[a.id] = { name: a.name || "", value: "", include: false };
       });
-      setVariantNameParts(initialParts);
+      setVariantNameParts(parts);
     },
     []
   );
 
-  // Handle attribute value change
   const handleVariantFieldChange = useCallback(
     (
       fieldId: string,
@@ -382,48 +514,36 @@ function AddProductFormContent() {
     ) => {
       setVariantNameParts((prev) => ({
         ...prev,
-        [fieldId]: {
-          name: fieldName || "",
-          value,
-          include: includeInVariant,
-        },
+        [fieldId]: { name: fieldName || "", value, include: includeInVariant },
       }));
     },
     []
   );
 
-  // Generate variant name using values
   const generateVariantName = useCallback((): string => {
-    const parts = Object.values(variantNameParts)
-      .filter((part) => part.include && part.value)
-      .map((part) => `${part.name}: ${part.value}`);
-
-    return parts.join(" | ") || "";
+    return (
+      Object.values(variantNameParts)
+        .filter((p) => p.include && p.value)
+        .map((p) => `${p.name}: ${p.value}`)
+        .join(" | ") || ""
+    );
   }, [variantNameParts]);
 
-  // Validate required fields
+  // ── Submit ──────────────────────────────────────────────────────────────────
+
   const validateRequiredFields = useCallback(() => {
     const errors: Record<string, boolean> = {};
-
-    // Basic info
     if (!name) errors.productName = true;
     if (nameValidationError) errors.productNameLength = true;
     if (!categoryId || !isLeafCategory) errors.categorySelector = true;
-
-    // Media
     if (images.length === 0) errors.productImages = true;
-
-    // Required attributes
-    requiredAttributes.forEach((attr: Attribute) => {
-      const filledAttribute = attributes.find((a) => a.attributeId === attr.id);
-      if (!filledAttribute) {
+    requiredAttributes.forEach((attr) => {
+      if (!attributes.find((a) => a.attributeId === attr.id))
         errors[`attribute-${attr.id}`] = true;
-      }
     });
-
-    // Variants
     if (variantInputs.length === 0) errors.variantsSection = true;
-
+    // Warehouse is required
+    if (!warehouseRack?.warehouseId) errors.warehouseId = true;
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   }, [
@@ -435,77 +555,57 @@ function AddProductFormContent() {
     requiredAttributes,
     attributes,
     variantInputs,
-    shippingWarranty,
+    warehouseRack,
   ]);
 
-  // Scroll to first error
   const scrollToFirstError = useCallback(() => {
-    if (!formRef.current) return;
-
-    const errorFields = Object.keys(validationErrors);
-    if (errorFields.length === 0) return;
-
-    const firstErrorId = errorFields[0];
-    const errorElement = document.getElementById(firstErrorId);
-
-    if (errorElement) {
-      errorElement.scrollIntoView({ behavior: "smooth", block: "center" });
-      errorElement.classList.add("border-red-500", "ring-2", "ring-red-200");
-      setTimeout(() => {
-        errorElement.classList.remove(
-          "border-red-500",
-          "ring-2",
-          "ring-red-200"
-        );
-      }, 3000);
+    const firstId = Object.keys(validationErrors)[0];
+    if (!firstId) return;
+    const el = document.getElementById(firstId);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("border-red-500", "ring-2", "ring-red-200");
+      setTimeout(
+        () => el.classList.remove("border-red-500", "ring-2", "ring-red-200"),
+        3000
+      );
     }
   }, [validationErrors]);
 
-  // Convert uploaded image URLs to ProductImageInput[]
   const convertImages = useCallback(
     (): ProductImageInput[] =>
-      images.map((url, index) => ({
+      images.map((url, i) => ({
         url: url || "",
-        altText: `${name} image ${index + 1}`,
-        sortOrder: index,
+        altText: `${name} image ${i + 1}`,
+        sortOrder: i,
       })),
     [images, name]
   );
 
-  // Handle submit with validation
   const handleSubmit = async () => {
-    // Validate name length first
     if (nameValidationError) {
-      setValidationErrors((prev) => ({ ...prev, productNameLength: true }));
+      setValidationErrors((p) => ({ ...p, productNameLength: true }));
       alert(`⚠️ ${nameValidationError}`);
       return;
     }
-
+    if (vatError) {
+      alert(`⚠️ ${vatError}`);
+      return;
+    }
     if (!validateRequiredFields()) {
       scrollToFirstError();
       alert("⚠️ Please fill in all required fields");
       return;
     }
-
-    if (variantInputs.length === 0) {
+    if (!variantInputs.length) {
       alert("⚠️ Please add at least one product variant");
       return;
     }
-
-    const invalidVariants = variantInputs.filter(
-      (v) => !v.sku || !v.price || v.price <= 0
-    );
-
-    if (invalidVariants.length > 0) {
+    if (variantInputs.some((v) => !v.sku || !v.price || v.price <= 0)) {
       alert("⚠️ All variants must have a SKU and valid price");
       return;
     }
-
-    const invalidPricing = variantInputs.filter(
-      (v) => v.specialPrice && v.specialPrice >= v.price
-    );
-
-    if (invalidPricing.length > 0) {
+    if (variantInputs.some((v) => v.specialPrice && v.specialPrice >= v.price)) {
       alert("⚠️ Special price must be less than regular price");
       return;
     }
@@ -518,19 +618,23 @@ function AddProductFormContent() {
       vendorId: vendorId || "",
       images: convertImages(),
       videoUrl: videoUrl || undefined,
-      attributes: attributes,
+      attributes,
       variants: variantInputs.map((v) => ({
         ...v,
         name: v.name || generateVariantName(),
         images: v.images?.map((img) => {
           if (typeof img === "string") return img;
-          if (img && typeof img === "object" && "url" in img) {
+          if (img && typeof img === "object" && "url" in img)
             return (img as ProductImageInput).url;
-          }
           return img;
         }),
       })),
       shippingWarranty: shippingWarranty || undefined,
+      // VAT — include only if a value was entered
+      ...(vatPercentage !== "" && { vatPercentage: parseFloat(vatPercentage) }),
+      // Warehouse & Rack — always include warehouseId; rackId only when set
+      warehouseId: warehouseRack?.warehouseId || "",
+      ...(warehouseRack?.rackId && { rackId: warehouseRack.rackId }),
     };
 
     try {
@@ -539,10 +643,10 @@ function AddProductFormContent() {
       console.log("Created product:", result);
       resetForm();
     } catch (err: any) {
-      console.error("❌ Error creating product:", err);
-      const errorMessage =
-        err?.data?.message || err?.message || "Failed to create product";
-      alert(`❌ ${errorMessage}`);
+      console.error("❌ Error:", err);
+      alert(
+        `❌ ${err?.data?.message || err?.message || "Failed to create product"}`
+      );
     }
   };
 
@@ -564,10 +668,12 @@ function AddProductFormContent() {
     setIsTranslating(false);
     setShowCategorySuggestions(false);
     setSuggestedCategories([]);
-    setResetKey((prev) => prev + 1);
+    setVatPercentage("");
+    setVatError("");
+    setWarehouseRack(null);
+    setResetKey((p) => p + 1);
   }, []);
 
-  // Form data for wizard - memoized to prevent unnecessary re-renders
   const formData = useMemo(
     () => ({
       name: name || "",
@@ -597,331 +703,673 @@ function AddProductFormContent() {
     ]
   );
 
+  // ── Derived state for step completeness ─────────────────────────────────────
+
+  const step1Done = name.length >= 10 && !nameValidationError;
+  const step2Done = !!categoryId && isLeafCategory;
+  const step3Done = images.length > 0;
+  const step4Done = isLeafCategory && attributes.length > 0;
+  const step5Done = variantInputs.length > 0;
+  const step6Done = !!shippingWarranty;
+  const step7Done = !!warehouseRack?.warehouseId;
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────────────────────
+
   return (
-    <div className="relative w-full">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_13rem] gap-4">
-        {/* MAIN CONTENT (scrolls naturally) */}
-        <div ref={formRef}>
-          <Card className="w-full mx-auto shadow-none border-none md:p-6">
-            <CardHeader>
-              <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                <span>Add New Product</span>
-                <span className="text-sm font-normal text-gray-600">
-                  Complete all required fields marked with *
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Product Name - Required */}
-              <div id="productName" className="relative">
-                <div
-                  className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
-                    validationErrors.productName
-                      ? "border-l-4 border-red-500 pl-4"
-                      : ""
-                  }`}
-                >
-                  <div className="relative">
-                    <label className="block font-medium mb-2">
-                      Product Name <span className="text-red-500">*</span>
-                      {name.length > 0 && (
-                        <span className="ml-2 text-xs font-normal text-gray-500">
-                          ({name.length}/255 characters)
-                        </span>
-                      )}
-                    </label>
-                    <div className="relative">
-                      <Input
-                        ref={nameInputRef}
-                        value={name}
-                        onChange={(e) => handleNameChange(e.target.value)}
-                        placeholder="Enter product name (min 10 characters)"
-                        required
-                        maxLength={255}
-                        className={`pl-10 ${
-                          validationErrors.productName ||
-                          validationErrors.productNameLength
-                            ? "border-red-500"
-                            : ""
-                        }`}
-                      />
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      {name.length > 0 &&
-                        name.length >= 10 &&
-                        !nameValidationError && (
-                          <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
-                        )}
-                    </div>
+    <div
+      style={{
+        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+        background: "#F0F4FA",
+        minHeight: "100vh",
+      }}
+    >
+      {/* ── Two-column layout ── */}
+      <div
+        ref={formRef}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 13rem",
+          gap: 16,
+          padding: "18px 20px",
+          maxWidth: 1200,
+          margin: "0 auto",
+          alignItems: "start",
+        }}
+      >
+        {/* ════ LEFT — form sections ════ */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
-                    {/* Validation messages */}
-                    {validationErrors.productName && (
-                      <p className="text-sm text-red-500 mt-1">
-                        Product name is required
-                      </p>
-                    )}
-                    {nameValidationError && (
-                      <div className="flex items-center gap-1 text-sm text-red-500 mt-1">
-                        <AlertCircle className="h-4 w-4" />
-                        <span>{nameValidationError}</span>
-                      </div>
-                    )}
-                    {name.length >= 10 && !nameValidationError && (
-                      <p className="text-sm text-green-600 mt-1 flex items-center gap-1">
-                        <Check className="h-4 w-4" />
-                        Product name length is good
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block font-medium">
-                        Product Name (Bengali)
-                      </label>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleManualTranslate}
-                        disabled={
-                          isTranslating || !name.trim() || name.length < 10
-                        }
-                        className="text-xs text-blue-600 hover:text-blue-800"
-                      >
-                        {isTranslating ? (
-                          <>
-                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                            Translating...
-                          </>
-                        ) : (
-                          "↻ Auto-translate"
-                        )}
-                      </Button>
-                    </div>
-                    <div className="relative">
-                      <Input
-                        value={nameBn}
-                        onChange={(e) => handleNameBnChange(e.target.value)}
-                        placeholder={
-                          name.length >= 10
-                            ? "Auto-translated from English"
-                            : "Enter English name first"
-                        }
-                        maxLength={255}
-                        className={isTranslating ? "opacity-50" : ""}
-                        disabled={name.length < 10}
-                      />
-                      {isTranslating && (
-                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {name.length >= 10
-                        ? "Auto-translates from English. You can edit if needed."
-                        : "Enter at least 10 characters in English name to enable translation"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Category Selection - Required */}
-              <div
-                id="categorySelector"
-                className={
-                  validationErrors.categorySelector
-                    ? "border-l-4 border-red-500 pl-4"
-                    : ""
-                }
-              >
-                <label className="block font-medium mb-2">
-                  Category <span className="text-red-500">*</span>
-                  {categoryId && (
-                    <span className="ml-2 text-xs font-normal text-teal-600">
-                      ✓ Selected
-                    </span>
-                  )}
-                </label>
-                <CategoryTreeSelector
-                  onSelect={handleCategorySelect}
-                  productName={name}
-                  suggestedCategories={suggestedCategories}
-                  onSuggestionSelect={handleCategorySuggestionSelect}
-                />
-                {validationErrors.categorySelector && (
-                  <p className="text-sm text-red-500 mt-1">
-                    Please select a leaf category
-                  </p>
-                )}
-              </div>
-
-              {/* Product Images - Required */}
-              <div
-                id="productImages"
-                className={
-                  validationErrors.productImages
-                    ? "border-l-4 border-red-500 pl-4"
-                    : ""
-                }
-              >
-                <label className="block font-medium mb-2">
-                  Product Images <span className="text-red-500">*</span>
-                  {images.length > 0 && (
-                    <span className="text-sm text-gray-500 ml-2">
-                      ({images.length}/10 uploaded)
-                    </span>
-                  )}
-                </label>
-                {validationErrors.productImages && (
-                  <p className="text-sm text-red-500 mb-2">
-                    At least one image is required
-                  </p>
-                )}
-                <ImageUploader
-                  images={images}
-                  setImages={setImages}
-                  maxImages={10}
-                />
-              </div>
-
-              {/* Product Video - Optional */}
+          {/* ── 1. Basic Information ── */}
+          <SectionCard
+            id="productName"
+            icon={
+              <FileText
+                size={15}
+                color={validationErrors.productName ? "#DC2626" : "#1D4ED8"}
+              />
+            }
+            title="Basic Information"
+            subtitle="Product name, identification and tax"
+            badge="required"
+            error={
+              !!(
+                validationErrors.productName ||
+                validationErrors.productNameLength
+              )
+            }
+          >
+            {/* Name row — two equal columns */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 14,
+                alignItems: "start",
+              }}
+            >
+              {/* English name */}
               <div>
-                <label className="block font-medium mb-2">
-                  Product Video{" "}
-                  <span className="text-sm text-gray-500">(Optional)</span>
-                </label>
-                <VideoUploader
-                  videoUrl={videoUrl}
-                  setVideoUrl={setVideoUrl}
-                  vendorId={vendorId}
-                  userRole={userRole}
-                />
-              </div>
-
-              {/* Specifications and Attributes */}
-              {isLeafCategory && (
-                <SpecAttributeManager
-                  categoryId={categoryId || ""}
-                  attributes={attributes}
-                  setAttributes={setAttributes}
-                  categoryAttributes={categoryAttributes}
-                  requiredAttributes={requiredAttributes}
-                  onVariantFieldChange={handleVariantFieldChange}
-                  validationErrors={validationErrors}
-                />
-              )}
-
-              {/* Variants */}
-              {isLeafCategory && (
-                <div
-                  id="variantsSection"
-                  className={
-                    validationErrors.variantsSection
-                      ? "border-l-4 border-red-500 pl-4"
-                      : ""
-                  }
-                >
-                  {validationErrors.variantsSection && (
-                    <p className="text-sm text-red-500 mb-2">
-                      At least one variant is required
-                    </p>
+                <FieldLabel required hint="Minimum 10 characters, max 255">
+                  Product Name (English)
+                  {name.length > 0 && (
+                    <span
+                      style={{
+                        marginLeft: 6,
+                        fontSize: 10,
+                        fontWeight: 500,
+                        color: name.length < 10 ? "#DC2626" : "#64748B",
+                      }}
+                    >
+                      {name.length}/255
+                    </span>
                   )}
-                  <VariantManager
-                    variants={variantInputs}
-                    setVariants={setVariantInputs}
-                    variantNameParts={variantNameParts}
-                    onGenerateVariantName={generateVariantName}
-                    categoryAttributes={categoryAttributes}
+                </FieldLabel>
+                <div style={{ position: "relative" }}>
+                  <Search
+                    size={14}
+                    color="#94A3B8"
+                    style={{
+                      position: "absolute",
+                      left: 10,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      pointerEvents: "none",
+                    }}
                   />
+                  <Input
+                    ref={nameInputRef}
+                    value={name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    placeholder="e.g. Samsung Galaxy S24 Ultra 5G"
+                    required
+                    maxLength={255}
+                    style={{
+                      paddingLeft: 32,
+                      paddingRight:
+                        name.length >= 10 && !nameValidationError ? 32 : 12,
+                      fontSize: 13,
+                      borderColor:
+                        validationErrors.productName ||
+                        validationErrors.productNameLength
+                          ? "#FCA5A5"
+                          : name.length >= 10 && !nameValidationError
+                          ? "#6EE7B7"
+                          : undefined,
+                    }}
+                  />
+                  {name.length >= 10 && !nameValidationError && (
+                    <Check
+                      size={14}
+                      color="#10B981"
+                      style={{
+                        position: "absolute",
+                        right: 10,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                      }}
+                    />
+                  )}
                 </div>
-              )}
-
-              {/* Warning for non-leaf categories */}
-              {!isLeafCategory && categoryId && (
-                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-                  <p className="text-yellow-800 font-medium">
-                    ⚠️ Please select a leaf category to add specifications and
-                    variants.
+                {validationErrors.productName && (
+                  <FieldError message="Product name is required" />
+                )}
+                {nameValidationError && (
+                  <FieldError message={nameValidationError} />
+                )}
+                {name.length >= 10 && !nameValidationError && (
+                  <p
+                    style={{
+                      fontSize: 11,
+                      color: "#10B981",
+                      marginTop: 4,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Check size={11} /> Name length is good
                   </p>
-                  <p className="text-yellow-600 text-sm mt-1">
-                    Leaf categories are the final level categories (not parent
-                    categories).
-                  </p>
-                </div>
-              )}
-
-              {/* Description - Optional */}
-              <div>
-                <label className="block font-medium mb-2">Description</label>
-                <ProductDescriptionEditor
-                  value={description}
-                  onChange={setDescription}
-                />
+                )}
               </div>
 
-              {/* Shipping & Warranty - Required */}
-              <ShippingWarrantyForm
-                key={resetKey}
-                value={shippingWarranty}
-                onChange={setShippingWarranty}
+              {/* Bengali name */}
+              <div>
+                <FieldLabel hint="Auto-translated or enter manually">
+                  Product Name (বাংলা)
+                  <button
+                    type="button"
+                    onClick={handleManualTranslate}
+                    disabled={
+                      isTranslating || !name.trim() || name.length < 10
+                    }
+                    style={{
+                      marginLeft: "auto",
+                      background: "none",
+                      border: "none",
+                      cursor:
+                        isTranslating || !name.trim() || name.length < 10
+                          ? "not-allowed"
+                          : "pointer",
+                      fontSize: 10.5,
+                      fontWeight: 600,
+                      color:
+                        name.length >= 10 && !isTranslating
+                          ? "#0891B2"
+                          : "#CBD5E1",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 3,
+                      padding: 0,
+                      fontFamily: "inherit",
+                      transition: "color 0.15s",
+                    }}
+                  >
+                    {isTranslating ? (
+                      <>
+                        <Loader2
+                          size={10}
+                          style={{ animation: "spin 1s linear infinite" }}
+                        />
+                        Translating…
+                      </>
+                    ) : (
+                      "↻ Auto-translate"
+                    )}
+                  </button>
+                </FieldLabel>
+                <div style={{ position: "relative" }}>
+                  <Input
+                    value={nameBn}
+                    onChange={(e) => setNameBn(e.target.value || "")}
+                    placeholder={
+                      name.length >= 10
+                        ? "স্বয়ংক্রিয়ভাবে অনুবাদ হবে…"
+                        : "প্রথমে ইংরেজি নাম লিখুন"
+                    }
+                    maxLength={255}
+                    disabled={name.length < 10}
+                    style={{
+                      fontSize: 13,
+                      opacity: isTranslating
+                        ? 0.5
+                        : name.length < 10
+                        ? 0.4
+                        : 1,
+                      transition: "opacity 0.2s",
+                    }}
+                  />
+                  {isTranslating && (
+                    <Loader2
+                      size={14}
+                      color="#0891B2"
+                      style={{
+                        position: "absolute",
+                        right: 10,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        animation: "spin 1s linear infinite",
+                      }}
+                    />
+                  )}
+                </div>
+                <p style={{ fontSize: 10.5, color: "#9BAABB", marginTop: 4 }}>
+                  {name.length >= 10
+                    ? "Auto-translated from English. You can edit if needed."
+                    : "Enter at least 10 characters in English to enable"}
+                </p>
+              </div>
+            </div>
+
+            {/* ── VAT field ── */}
+            <div
+              style={{
+                marginTop: 14,
+                paddingTop: 14,
+                borderTop: "1px dashed #E5EAF2",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 14,
+                alignItems: "start",
+              }}
+            >
+              <div>
+                <FieldLabel hint="Enter the applicable VAT/tax rate for this product (0–100%)">
+                  VAT / Tax Rate
+                  <span
+                    style={{
+                      marginLeft: 4,
+                      fontSize: 10,
+                      fontWeight: 500,
+                      color: "#9BAABB",
+                    }}
+                  >
+                    (%)
+                  </span>
+                </FieldLabel>
+                <div style={{ position: "relative" }}>
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 36,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: vatError ? "#FEF2F2" : "#F1F5F9",
+                      borderRight: `1px solid ${vatError ? "#FCA5A5" : "#E2E8F0"}`,
+                      borderRadius: "6px 0 0 6px",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <Percent
+                      size={13}
+                      color={vatError ? "#DC2626" : "#64748B"}
+                    />
+                  </div>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={vatPercentage}
+                    onChange={(e) => handleVatChange(e.target.value)}
+                    placeholder="e.g. 15"
+                    style={{
+                      paddingLeft: 44,
+                      paddingRight:
+                        vatPercentage !== "" && !vatError ? 32 : 12,
+                      fontSize: 13,
+                      borderColor: vatError
+                        ? "#FCA5A5"
+                        : vatPercentage !== "" && !vatError
+                        ? "#6EE7B7"
+                        : undefined,
+                    }}
+                  />
+                  {vatPercentage !== "" && !vatError && (
+                    <Check
+                      size={14}
+                      color="#10B981"
+                      style={{
+                        position: "absolute",
+                        right: 10,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                      }}
+                    />
+                  )}
+                </div>
+                {vatError && <FieldError message={vatError} />}
+                {!vatError && vatPercentage === "" && (
+                  <p style={{ fontSize: 10.5, color: "#9BAABB", marginTop: 4 }}>
+                    Leave blank if no VAT applies to this product
+                  </p>
+                )}
+                {!vatError && vatPercentage !== "" && (
+                  <p
+                    style={{
+                      fontSize: 11,
+                      color: "#10B981",
+                      marginTop: 4,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Check size={11} /> VAT set to {vatPercentage}%
+                  </p>
+                )}
+              </div>
+
+              {/* Right column — VAT info hint card */}
+              <div
+                style={{
+                  background: "#F8FAFC",
+                  border: "1px solid #E2E8F0",
+                  borderRadius: 9,
+                  padding: "10px 12px",
+                  fontSize: 11.5,
+                  color: "#475569",
+                  lineHeight: 1.6,
+                  marginTop: 22,
+                }}
+              >
+                <strong style={{ color: "#1E293B", fontWeight: 700 }}>
+                  What is VAT?
+                </strong>
+                <br />
+                VAT (Value Added Tax) will be displayed to buyers at checkout.
+                Standard rate in Bangladesh is{" "}
+                <strong style={{ color: "#0891B2" }}>15%</strong>. Enter{" "}
+                <strong>0</strong> for zero-rated items.
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* ── 2. Category ── */}
+          <SectionCard
+            id="categorySelector"
+            icon={
+              <Tag
+                size={15}
+                color={
+                  validationErrors.categorySelector ? "#DC2626" : "#7C3AED"
+                }
+              />
+            }
+            title="Product Category"
+            subtitle="Select the most specific category that fits your product"
+            badge="required"
+            error={!!validationErrors.categorySelector}
+          >
+            {categoryId && isLeafCategory && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 10px",
+                  background: "#F0FDF4",
+                  border: "1px solid #BBF7D0",
+                  borderRadius: 7,
+                  marginBottom: 10,
+                  fontSize: 11.5,
+                  color: "#15803D",
+                  fontWeight: 500,
+                }}
+              >
+                <Check size={13} color="#22C55E" />
+                Leaf category selected
+              </div>
+            )}
+            <CategoryTreeSelector
+              onSelect={handleCategorySelect}
+              productName={name}
+              suggestedCategories={suggestedCategories}
+              onSuggestionSelect={handleCategorySuggestionSelect}
+            />
+            {validationErrors.categorySelector && (
+              <FieldError message="Please select a leaf category (final level)" />
+            )}
+            {!isLeafCategory && categoryId && (
+              <div
+                style={{
+                  marginTop: 10,
+                  background: "#FFFBEB",
+                  border: "1px solid #FDE68A",
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  fontSize: 12,
+                  color: "#92400E",
+                  display: "flex",
+                  gap: 7,
+                  alignItems: "flex-start",
+                }}
+              >
+                <AlertCircle
+                  size={14}
+                  style={{ flexShrink: 0, marginTop: 1 }}
+                />
+                <span>
+                  Please select a <strong>leaf category</strong> to unlock
+                  attributes and variants. Leaf categories are the deepest
+                  level with no sub-categories.
+                </span>
+              </div>
+            )}
+          </SectionCard>
+
+          {/* ── 3. Media ── */}
+          <SectionCard
+            id="productImages"
+            icon={
+              <Image
+                size={15}
+                color={
+                  validationErrors.productImages ? "#DC2626" : "#0891B2"
+                }
+              />
+            }
+            title="Product Media"
+            subtitle="Images are required · Video is optional"
+            badge="required"
+            error={!!validationErrors.productImages}
+          >
+            <ProductMediaUploader
+              images={images}
+              setImages={setImages}
+              videoUrl={videoUrl}
+              setVideoUrl={setVideoUrl}
+              vendorId={vendorId}
+              userRole={userRole}
+            />
+            {validationErrors.productImages && (
+              <FieldError message="At least one product image is required" />
+            )}
+          </SectionCard>
+
+          {/* ── 4. Attributes ── */}
+          {isLeafCategory && (
+            <SectionCard
+              icon={<Layers size={15} color="#D97706" />}
+              title="Specifications & Attributes"
+              subtitle="Define product properties — toggle variant to generate listings"
+              badge="required"
+            >
+              <SpecAttributeManager
+                categoryId={categoryId || ""}
+                attributes={attributes}
+                setAttributes={setAttributes}
+                categoryAttributes={categoryAttributes}
+                requiredAttributes={requiredAttributes}
+                onVariantFieldChange={handleVariantFieldChange}
                 validationErrors={validationErrors}
               />
+            </SectionCard>
+          )}
 
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={
-                    isLoading || !!nameValidationError || name.length < 10
+          {/* ── 5. Variants ── */}
+          {isLeafCategory && (
+            <SectionCard
+              id="variantsSection"
+              icon={
+                <Package
+                  size={15}
+                  color={
+                    validationErrors.variantsSection ? "#DC2626" : "#16A34A"
                   }
-                  className="flex-1 bg-teal-600 hover:bg-teal-700"
-                  size="lg"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Create Product"
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="bg-amber-200"
-                  onClick={() => {
-                    if (
-                      confirm(
-                        "Are you sure you want to reset the form? All data will be lost."
-                      )
-                    ) {
-                      resetForm();
-                    }
-                  }}
-                  disabled={isLoading}
-                  size="lg"
-                >
-                  Reset Form
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                />
+              }
+              title="Product Variants"
+              subtitle="SKU, pricing, and stock per variant combination"
+              badge="required"
+              error={!!validationErrors.variantsSection}
+            >
+              {validationErrors.variantsSection && (
+                <FieldError message="At least one variant is required" />
+              )}
+              <VariantManager
+                variants={variantInputs}
+                setVariants={setVariantInputs}
+                variantNameParts={variantNameParts}
+                onGenerateVariantName={generateVariantName}
+                categoryAttributes={categoryAttributes}
+              />
+            </SectionCard>
+          )}
+
+          {/* ── 6. Description ── */}
+          <SectionCard
+            icon={<FileText size={15} color="#64748B" />}
+            title="Product Description"
+            subtitle="Rich text description — supports headings, lists, and images"
+            badge="optional"
+          >
+            <ProductDescriptionEditor
+              value={description}
+              onChange={setDescription}
+            />
+          </SectionCard>
+
+          {/* ── 7. Shipping & Warranty ── */}
+          <SectionCard
+            icon={<Truck size={15} color="#0891B2" />}
+            title="Shipping & Warranty"
+            subtitle="Package dimensions, weight, and warranty terms"
+            badge="required"
+          >
+            <ShippingWarrantyForm
+              key={resetKey}
+              value={shippingWarranty}
+              onChange={setShippingWarranty}
+              validationErrors={validationErrors}
+            />
+          </SectionCard>
+
+          {/* ── 8. Warehouse & Rack ── */}
+          <SectionCard
+            id="warehouseId"
+            icon={
+              <Warehouse
+                size={15}
+                color={validationErrors.warehouseId ? "#DC2626" : "#15803D"}
+              />
+            }
+            title="Warehouse & Storage"
+            subtitle="Assign a warehouse and optional rack/shelf for this product"
+            badge="required"
+            error={!!validationErrors.warehouseId}
+          >
+            <WarehouseRackSelector
+              key={resetKey}
+              vendorId={vendorId}
+              value={warehouseRack}
+              onChange={setWarehouseRack}
+              validationErrors={validationErrors}
+            />
+            {validationErrors.warehouseId && (
+              <FieldError message="Please select a warehouse" />
+            )}
+          </SectionCard>
+
+          {/* ── Bottom submit row ── */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 10,
+              padding: "14px 18px",
+              background: "#fff",
+              border: "1.5px solid #E5EAF2",
+              borderRadius: 14,
+            }}
+          >
+            <button
+              onClick={() => {
+                if (confirm("Reset all form data?")) resetForm();
+              }}
+              disabled={isLoading}
+              style={{
+                padding: "9px 20px",
+                borderRadius: 9,
+                border: "1.5px solid #E5EAF2",
+                background: "#fff",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#64748B",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Reset Form
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={
+                isLoading || !!nameValidationError || name.length < 10
+              }
+              style={{
+                padding: "9px 28px",
+                borderRadius: 9,
+                border: "none",
+                background:
+                  isLoading || !!nameValidationError || name.length < 10
+                    ? "#CBD5E1"
+                    : "linear-gradient(135deg,#1D4ED8,#0891B2)",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 700,
+                cursor:
+                  isLoading || !!nameValidationError || name.length < 10
+                    ? "not-allowed"
+                    : "pointer",
+                fontFamily: "inherit",
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                transition: "all 0.15s",
+              }}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2
+                    size={14}
+                    style={{ animation: "spin 1s linear infinite" }}
+                  />
+                  Saving…
+                </>
+              ) : (
+                "Create Product"
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* SIDEBAR (sticky works) */}
-        <div className="hidden lg:block">
-          <aside className="sticky top-0">
-            <RightSidebar
-              wizardComponent={<ProductCreationWizard formData={formData} />}
-            />
-          </aside>
+        {/* ════ RIGHT — sticky sidebar ════ */}
+        <div style={{ position: "sticky", top: 64 }}>
+          <RightSidebar
+            wizardComponent={<ProductCreationWizard formData={formData} />}
+          />
         </div>
       </div>
+
+      {/* Spinner keyframe */}
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 900px) {
+          .form-grid { grid-template-columns: 1fr !important; }
+          .name-grid { grid-template-columns: 1fr !important; }
+          .sidebar-col { display: none !important; }
+        }
+      `}</style>
     </div>
   );
 }
 
-// Main Export with Provider
+// ─── Export ───────────────────────────────────────────────────────────────────
+
 export default function AddProductForm() {
   return (
     <RightSidebarProvider>

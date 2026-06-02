@@ -15,23 +15,26 @@ import { vendorManageApi } from "../features/vendorManageApi";
 import { customerManageApi } from "../features/customerManageApi";
 import { chatApi } from "../features/chatApi";
 import chatReducer from "../features/chatSlice";
-import { termsApi } from "../features/termsApi"; 
+import { termsApi } from "../features/termsApi";
 import { shippingProviderApi } from "../features/shippingProviderApi";
-import { offerApi } from "../features/offerApi"; 
+import { offerApi } from "../features/offerApi";
 import { userOrderApi } from "@/features/userorderApi";
-import {adminOrderApi} from "@/features/adminOrderApi"; 
+import { adminOrderApi } from "@/features/adminOrderApi";
 import { vendorOrderApi } from "@/features/vendorOrderApi";
 import { employeeApi } from "@/features/employeeApi";
 import { storeEditorApi } from "@/features/storeEditorApi";
 import { faqApi } from "@/features/faqApi";
 import { themeApi } from "@/features/themeApi";
 import { locationApi } from "@/features/locationApi";
-import {courierApi} from "@/features/courierApi";
+import { courierApi } from "@/features/courierApi";
 import { cartWishApi } from "@/features/cartWishApi";
-import  {warehouseApi} from "@/features/warehouseApi";
+import { warehouseApi } from "@/features/warehouseApi";
 import { accountingApi } from "@/features/accountingApi";
 import userAddressApi from "@/features/userAddressApi";
-import { footerSettingsApi } from "@/features/footerSettingsApi"; 
+import { footerSettingsApi } from "@/features/footerSettingsApi";
+import { supplierApi } from "@/features/supplierApi";
+import { purchaseOrderApi } from "@/features/purchaseOrderApi";
+import { stockApi } from "@/features/stockApi";
 
 // --------------------
 // All API imports in one array for easier management
@@ -48,10 +51,10 @@ const apiMiddlewares = [
   chatApi.middleware,
   termsApi.middleware,
   shippingProviderApi.middleware,
-  offerApi.middleware, 
-  userOrderApi.middleware,  
+  offerApi.middleware,
+  userOrderApi.middleware,
   adminOrderApi.middleware,
-  vendorOrderApi.middleware,  
+  vendorOrderApi.middleware,
   employeeApi.middleware,
   locationApi.middleware,
   storeEditorApi.middleware,
@@ -62,7 +65,10 @@ const apiMiddlewares = [
   warehouseApi.middleware,
   accountingApi.middleware,
   userAddressApi.middleware,
-  footerSettingsApi.middleware, 
+  footerSettingsApi.middleware,
+  supplierApi.middleware,
+  purchaseOrderApi.middleware,
+  stockApi.middleware,
 ];
 
 const apiReducers = {
@@ -79,21 +85,24 @@ const apiReducers = {
   [chatApi.reducerPath]: chatApi.reducer,
   [termsApi.reducerPath]: termsApi.reducer,
   [shippingProviderApi.reducerPath]: shippingProviderApi.reducer,
-  [offerApi.reducerPath]: offerApi.reducer, 
-  [userOrderApi.reducerPath]: userOrderApi.reducer, 
+  [offerApi.reducerPath]: offerApi.reducer,
+  [userOrderApi.reducerPath]: userOrderApi.reducer,
   [adminOrderApi.reducerPath]: adminOrderApi.reducer,
-  [vendorOrderApi.reducerPath]: vendorOrderApi.reducer, 
+  [vendorOrderApi.reducerPath]: vendorOrderApi.reducer,
   [employeeApi.reducerPath]: employeeApi.reducer,
   [storeEditorApi.reducerPath]: storeEditorApi.reducer,
-  [locationApi.reducerPath]:locationApi.reducer,
+  [locationApi.reducerPath]: locationApi.reducer,
   [faqApi.reducerPath]: faqApi.reducer,
   [themeApi.reducerPath]: themeApi.reducer,
-  [courierApi.reducerPath]:courierApi.reducer,
-  [cartWishApi.reducerPath]:cartWishApi.reducer,
-  [warehouseApi.reducerPath]:warehouseApi.reducer,
-  [accountingApi.reducerPath]:accountingApi.reducer,  
+  [courierApi.reducerPath]: courierApi.reducer,
+  [cartWishApi.reducerPath]: cartWishApi.reducer,
+  [warehouseApi.reducerPath]: warehouseApi.reducer,
+  [accountingApi.reducerPath]: accountingApi.reducer,
   [userAddressApi.reducerPath]: userAddressApi.reducer,
-  [footerSettingsApi.reducerPath]: footerSettingsApi.reducer, 
+  [footerSettingsApi.reducerPath]: footerSettingsApi.reducer,
+  [supplierApi.reducerPath]: supplierApi.reducer,
+  [purchaseOrderApi.reducerPath]: purchaseOrderApi.reducer,
+  [stockApi.reducerPath]: stockApi.reducer,   
 };
 
 // --------------------

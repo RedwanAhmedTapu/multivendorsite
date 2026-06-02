@@ -2,7 +2,10 @@
 import React, { useState, useMemo, JSX, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Plus, X, Trash2, Copy, ChevronDown, Check } from "lucide-react";
+import {
+  Plus, X, Trash2, Copy, ChevronDown, Check, Package,
+  AlertCircle, Image as ImageIcon,
+} from "lucide-react";
 import ImageUploader from "@/components/imageuploader/ImageUploader";
 import { ProductVariantInput, ProductImageInput } from "@/types/product";
 import { VariantNamePart } from "@/types/product";
@@ -23,310 +26,220 @@ export default function VariantManager({
   onGenerateVariantName,
   categoryAttributes = [],
 }: Props) {
-  const [showImageUploaders, setShowImageUploaders] = useState<
-    Record<string, boolean>
-  >({});
+  const [showImageUploaders, setShowImageUploaders] = useState<Record<string, boolean>>({});
   const [showAttributeDropdown, setShowAttributeDropdown] = useState(false);
-  const [selectedAttributeId, setSelectedAttributeId] = useState<string | null>(
-    null
-  );
+  const [selectedAttributeId, setSelectedAttributeId] = useState<string | null>(null);
   const [showValueDropdown, setShowValueDropdown] = useState(false);
 
-  // Check if a variant is the default empty variant
-  const isDefaultEmptyVariant = (variant: ProductVariantInput): boolean => {
-    return (
-      !variant.name &&
-      !variant.sku &&
-      variant.price === 0 &&
-      variant.stock === 0 &&
-      (!variant.attributes || variant.attributes.length === 0)
-    );
-  };
+  const isDefaultEmptyVariant = (variant: ProductVariantInput): boolean =>
+    !variant.name &&
+    !variant.sku &&
+    variant.price === 0 &&
+    variant.stock === 0 &&
+    (!variant.attributes || variant.attributes.length === 0);
 
-  // Create a map of attribute values for quick lookup
   const attributeValuesMap = useMemo(() => {
     const map: Record<string, AttributeValue[]> = {};
-    
-    if (categoryAttributes) {
-      categoryAttributes.forEach((attr) => {
-        if (attr.values && attr.values.length > 0) {
-          map[attr.id] = attr.values;
-        }
-      });
-    }
-    
+    categoryAttributes.forEach((attr) => {
+      if (attr.values && attr.values.length > 0) map[attr.id] = attr.values;
+    });
     return map;
   }, [categoryAttributes]);
 
-  // Get all available attributes for selection
   const availableAttributes = useMemo(() => {
-    const attributesList: Array<{
-      id: string;
-      name: string;
-      value: any;
-      includeInVariant: boolean;
-      attributeValues?: AttributeValue[];
-    }> = [];
-
-    Object.entries(variantNameParts).forEach(([id, part]) => {
-      if (part.include && part.value && part.value !== "") {
-        attributesList.push({
-          id,
-          name: part.name || "",
-          value: part.value,
-          includeInVariant: part.include,
-          attributeValues: attributeValuesMap[id] || [],
-        });
-      }
-    });
-
-    return attributesList;
+    return Object.entries(variantNameParts)
+      .filter(([_, part]) => part.include && part.value && part.value !== "")
+      .map(([id, part]) => ({
+        id,
+        name: part.name || "",
+        value: part.value,
+        includeInVariant: part.include,
+        attributeValues: attributeValuesMap[id] || [],
+      }));
   }, [variantNameParts, attributeValuesMap]);
 
-  // Helper function to find attribute value ID by value
   const findAttributeValueId = (attributeId: string, value: string): string => {
     const values = attributeValuesMap[attributeId];
-    if (!values || values.length === 0) {
-      return attributeId;
-    }
-    
-    const found = values.find((v) => v.value === value);
-    return found?.id || attributeId;
+    if (!values || values.length === 0) return attributeId;
+    return values.find((v) => v.value === value)?.id || attributeId;
   };
 
-  // Check if variant exists with specific attribute value
   const variantExists = (attributeId: string, value: string): boolean => {
     const attributeValueId = findAttributeValueId(attributeId, value);
-    
-    return variants.some((v) =>
-      v.attributes?.some(
-        (a) => a.attributeValueId === attributeValueId
-      )
-    );
+    return variants.some((v) => v.attributes?.some((a) => a.attributeValueId === attributeValueId));
   };
 
-  // Toggle variant - add if not exists, remove if exists
-  const toggleVariantByAttribute = (
-    attributeId: string,
-    attributeName: string,
-    value: string
-  ) => {
+  const toggleVariantByAttribute = (attributeId: string, attributeName: string, value: string) => {
     const attributeValueId = findAttributeValueId(attributeId, value);
     const exists = variantExists(attributeId, value);
 
     if (exists) {
-      // Remove variant
-      const filtered = variants.filter(
-        (v) =>
-          !v.attributes?.some(
-            (a) => a.attributeValueId === attributeValueId
-          )
-      );
-      setVariants(filtered);
+      setVariants(variants.filter((v) => !v.attributes?.some((a) => a.attributeValueId === attributeValueId)));
     } else {
-      // Remove default empty variants first
-      const filteredVariants = variants.filter(v => !isDefaultEmptyVariant(v));
-      
-      // Add new variant
-      const variantName = `${attributeName}: ${value}`;
-      const newVariant: ProductVariantInput = {
-        id: String(Date.now()),
-        name: variantName,
-        sku: "",
-        price: 0,
-        stock: 0,
-        images: [],
-        attributes: [
-          {
-            attributeValueId: attributeValueId,
-            value: value,
-          },
-        ],
-        availability: true,
-      };
-      setVariants([...filteredVariants, newVariant]);
+      const filteredVariants = variants.filter((v) => !isDefaultEmptyVariant(v));
+      setVariants([
+        ...filteredVariants,
+        {
+          id: String(Date.now()),
+          name: `${attributeName}: ${value}`,
+          sku: "",
+          price: 0,
+          stock: 0,
+          images: [],
+          attributes: [{ attributeValueId, value }],
+          availability: true,
+        },
+      ]);
     }
   };
 
   const removeVariant = (id?: string) => {
     if (!id) return;
-
-    if (variants.length <= 1) {
-      alert("At least one variant row is required");
-      return;
-    }
-
+    if (variants.length <= 1) { alert("At least one variant row is required"); return; }
     setVariants(variants.filter((v) => v.id !== id));
-    setShowImageUploaders((prev) => {
-      const newState = { ...prev };
-      delete newState[id];
-      return newState;
-    });
+    setShowImageUploaders((prev) => { const s = { ...prev }; delete s[id]; return s; });
   };
 
-  const handleChange = (
-    id: string | undefined,
-    field: keyof ProductVariantInput,
-    value: string | number | boolean | null
-  ) => {
+  const handleChange = (id: string | undefined, field: keyof ProductVariantInput, value: string | number | boolean | null) => {
     if (!id) return;
-    const updated = variants.map((v) =>
-      v.id === id ? { ...v, [field]: value } : v
-    );
-    setVariants(updated);
+    setVariants(variants.map((v) => (v.id === id ? { ...v, [field]: value } : v)));
   };
 
-  const handleImagesChange = (
-    id: string | undefined,
-    images: (string | ProductImageInput)[]
-  ) => {
+  const handleImagesChange = (id: string | undefined, images: (string | ProductImageInput)[]) => {
     if (!id) return;
-    const updated = variants.map((v) =>
-      v.id === id ? { ...v, images: images.slice(0, 8) } : v
-    );
-    setVariants(updated);
+    setVariants(variants.map((v) => (v.id === id ? { ...v, images: images.slice(0, 8) } : v)));
   };
 
   const toggleImageUploader = (id: string | undefined) => {
     if (!id) return;
-    setShowImageUploaders((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
+    setShowImageUploaders((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleSpecialPriceChange = (
-    id: string | undefined,
-    specialPrice: number | null
-  ) => {
+  const handleSpecialPriceChange = (id: string | undefined, specialPrice: number | null) => {
     if (!id) return;
     const variant = variants.find((v) => v.id === id);
     if (!variant) return;
-
-    let discount = 0;
-    if (specialPrice && specialPrice < variant.price) {
-      discount = Math.round(
-        ((variant.price - specialPrice) / variant.price) * 100
-      );
-    }
-
-    const updated = variants.map((v) =>
-      v.id === id ? { ...v, specialPrice: specialPrice || null, discount } : v
-    );
-    setVariants(updated);
+    const discount = specialPrice && specialPrice < variant.price
+      ? Math.round(((variant.price - specialPrice) / variant.price) * 100)
+      : 0;
+    setVariants(variants.map((v) => (v.id === id ? { ...v, specialPrice: specialPrice || null, discount } : v)));
   };
 
-  // Apply price to all from column header
   const applyPriceToAll = (price: number) => {
     if (price <= 0) return;
-    const updated = variants.map((v) => ({ ...v, price }));
-    setVariants(updated);
+    setVariants(variants.map((v) => ({ ...v, price })));
   };
 
-  // Apply special price to all from column header
   const applySpecialPriceToAll = (specialPrice: number) => {
     if (specialPrice <= 0) return;
-    const updated = variants.map((v) => {
-      let discount = 0;
-      if (specialPrice < v.price) {
-        discount = Math.round(((v.price - specialPrice) / v.price) * 100);
-      }
+    setVariants(variants.map((v) => {
+      const discount = specialPrice < v.price ? Math.round(((v.price - specialPrice) / v.price) * 100) : 0;
       return { ...v, specialPrice, discount };
-    });
-    setVariants(updated);
+    }));
   };
 
-  // Apply stock to all
   const applyStockToAll = (stock: number) => {
     if (stock < 0) return;
-    const updated = variants.map((v) => ({ ...v, stock }));
-    setVariants(updated);
+    setVariants(variants.map((v) => ({ ...v, stock })));
   };
 
-  // Duplicate variant
   const duplicateVariant = (variantId: string) => {
-    const variantToDuplicate = variants.find((v) => v.id === variantId);
-    if (!variantToDuplicate) return;
-
-    const newVariant: ProductVariantInput = {
-      ...variantToDuplicate,
-      id: String(Date.now()),
-      sku: "",
-      name: `${variantToDuplicate.name} (Copy)`,
-    };
-
-    setVariants([...variants, newVariant]);
+    const v = variants.find((v) => v.id === variantId);
+    if (!v) return;
+    setVariants([...variants, { ...v, id: String(Date.now()), sku: "", name: `${v.name} (Copy)` }]);
   };
 
-  // Ensure at least one empty variant exists when there are no variants
   useEffect(() => {
-    const hasNonEmptyVariants = variants.some(v => !isDefaultEmptyVariant(v));
-    
-    if (variants.length === 0 || (!hasNonEmptyVariants && variants.length === 1)) {
-      const emptyVariant: ProductVariantInput = {
-        id: String(Date.now()),
-        name: "",
-        sku: "",
-        price: 0,
-        stock: 0,
-        images: [],
-        attributes: [],
-        availability: true,
-      };
-      setVariants([emptyVariant]);
-    } else {
-      // Filter out empty variants if we have real variants
-      const hasRealVariants = variants.some(v => !isDefaultEmptyVariant(v));
-      if (hasRealVariants) {
-        const filtered = variants.filter(v => !isDefaultEmptyVariant(v));
-        if (filtered.length !== variants.length) {
-          setVariants(filtered);
-        }
-      }
+    const hasNonEmpty = variants.some((v) => !isDefaultEmptyVariant(v));
+    if (variants.length === 0 || (!hasNonEmpty && variants.length === 1)) {
+      setVariants([{ id: String(Date.now()), name: "", sku: "", price: 0, stock: 0, images: [], attributes: [], availability: true }]);
+    } else if (hasNonEmpty) {
+      const filtered = variants.filter((v) => !isDefaultEmptyVariant(v));
+      if (filtered.length !== variants.length) setVariants(filtered);
     }
   }, [variants.length]);
 
-  // Render value dropdown
+  const displayVariants = variants.filter((v) => !isDefaultEmptyVariant(v) || variants.length === 1);
+
+  /* ── shared thin header input (apply-to-all) ── */
+  const ApplyInput = ({ onApply, placeholder }: { onApply: (n: number) => void; placeholder: string }) => (
+    <Input
+      type="number"
+      step="0.01"
+      min="0"
+      placeholder={placeholder}
+      style={{ fontSize: 11, height: 28, marginTop: 4, borderColor: "#BFDBFE", background: "#F8FAFC" }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          const val = Number((e.target as HTMLInputElement).value);
+          if (val >= 0) { onApply(val); (e.target as HTMLInputElement).value = ""; }
+        }
+      }}
+    />
+  );
+
+  /* ── Th helper ── */
+  const Th = ({ children, minW = 120 }: { children: React.ReactNode; minW?: number }) => (
+    <th
+      style={{
+        padding: "10px 12px",
+        textAlign: "left",
+        fontSize: 11.5,
+        fontWeight: 700,
+        color: "#3D5068",
+        background: "#EFF6FF",
+        borderBottom: "0.5px solid #BFDBFE",
+        borderRight: "0.5px solid #E2E8F0",
+        minWidth: minW,
+        whiteSpace: "nowrap",
+        letterSpacing: "0.01em",
+      }}
+    >
+      {children}
+    </th>
+  );
+
+  /* ── Td helper ── */
+  const Td = ({ children, center = false, span = 1 }: { children: React.ReactNode; center?: boolean; span?: number }) => (
+    <td
+      rowSpan={span}
+      style={{
+        padding: "8px 10px",
+        fontSize: 13,
+        color: "#0F172A",
+        borderBottom: "0.5px solid #E2E8F0",
+        borderRight: "0.5px solid #E2E8F0",
+        textAlign: center ? "center" : "left",
+        verticalAlign: "middle",
+      }}
+    >
+      {children}
+    </td>
+  );
+
   const renderValueDropdown = () => {
     if (!selectedAttributeId) return null;
-
     const attribute = availableAttributes.find((a) => a.id === selectedAttributeId);
     if (!attribute) return null;
 
     let values: Array<{ id: string; value: string }> = [];
-    
+
     if (attribute.attributeValues && attribute.attributeValues.length > 0) {
-      values = attribute.attributeValues.map((av) => ({
-        id: av.id,
-        value: av.value
-      }));
+      values = attribute.attributeValues.map((av) => ({ id: av.id, value: av.value }));
     } else {
       try {
         const parsed = JSON.parse(attribute.value);
-        if (Array.isArray(parsed)) {
-          values = parsed.map((v, idx) => ({
-            id: `${attribute.id}-${idx}`,
-            value: String(v)
-          }));
-        } else {
-          values = [{
-            id: attribute.id,
-            value: String(parsed || attribute.value)
-          }];
-        }
+        values = Array.isArray(parsed)
+          ? parsed.map((v, idx) => ({ id: `${attribute.id}-${idx}`, value: String(v) }))
+          : [{ id: attribute.id, value: String(parsed || attribute.value) }];
       } catch {
-        values = [{
-          id: attribute.id,
-          value: String(attribute.value)
-        }];
+        values = [{ id: attribute.id, value: String(attribute.value) }];
       }
     }
 
     if (values.length === 0) {
       return (
-        <div key="no-values" className="px-4 py-3 text-sm text-gray-500">
-          No values available
-        </div>
+        <div style={{ padding: "12px 14px", fontSize: 12, color: "#64748B" }}>No values available</div>
       );
     }
 
@@ -335,584 +248,642 @@ export default function VariantManager({
       return (
         <button
           key={item.id}
-          className={`w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center justify-between border-b border-gray-100 last:border-b-0 cursor-pointer ${
-            exists
-              ? "bg-green-50 hover:bg-green-100"
-              : ""
-          }`}
-          onClick={() => {
-            toggleVariantByAttribute(
-              attribute.id,
-              attribute.name,
-              item.value
-            );
+          onClick={() => toggleVariantByAttribute(attribute.id, attribute.name, item.value)}
+          style={{
+            width: "100%",
+            padding: "9px 14px",
+            textAlign: "left",
+            background: exists ? "#EFF6FF" : "none",
+            border: "none",
+            borderBottom: "0.5px solid #F0F4FA",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            transition: "background 0.12s",
           }}
+          onMouseEnter={(e) => { if (!exists) e.currentTarget.style.background = "#F8FAFC"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = exists ? "#EFF6FF" : "none"; }}
         >
-          <div className="flex items-center space-x-2">
-            <div
-              className={`w-4 h-4 flex items-center justify-center ${
-                exists
-                  ? "text-green-600"
-                  : "text-gray-400"
-              }`}
-            >
-              {exists ? "✓" : "○"}
-            </div>
-            <span
-              className={
-                exists
-                  ? "font-medium text-green-700"
-                  : "text-gray-700"
-              }
-            >
-              {item.value}
-            </span>
+          <div
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: 5,
+              border: `1.5px solid ${exists ? "#1D4ED8" : "#CBD5E1"}`,
+              background: exists ? "#1D4ED8" : "#FFFFFF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              transition: "all 0.15s",
+            }}
+          >
+            {exists && <Check size={10} color="#FFFFFF" />}
           </div>
+          <span style={{ fontSize: 13, color: exists ? "#1D4ED8" : "#0F172A", fontWeight: exists ? 600 : 400 }}>
+            {item.value}
+          </span>
         </button>
       );
     });
   };
 
-  // Filter out default empty rows when displaying
-  const displayVariants = variants.filter(v => !isDefaultEmptyVariant(v) || variants.length === 1);
-
   return (
-    <div className="border  p-4 rounded-lg mt-4">
-      <div className="flex justify-between items-center mb-4">
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 4 }}>
+
+      {/* ── Header row ── */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
         <div>
-          <h3 className="font-semibold text-lg">Product Variants</h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Manage product variants with different attributes
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: "#DBEAFE", border: "0.5px solid #93C5FD", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Package size={14} color="#1D4ED8" />
+            </div>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: "#0D1B2E", letterSpacing: "-0.2px" }}>
+              Product variants
+            </span>
+          </div>
+          <p style={{ fontSize: 11.5, color: "#64748B", marginLeft: 36 }}>
+            Manage variants with different attributes — SKU, price, and stock per combination
           </p>
           {availableAttributes.length === 0 && (
-            <p className="text-sm text-amber-600 mt-1">
-              ⚠️ No attributes marked for variant. Go to Specifications section
-              and toggle "Include" switch for attributes you want to use for
-              variants.
-            </p>
+            <div
+              style={{
+                marginTop: 8,
+                marginLeft: 36,
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 7,
+                padding: "8px 12px",
+                background: "#FFFBEB",
+                border: "0.5px solid #FCD34D",
+                borderRadius: 8,
+                fontSize: 12,
+                color: "#92400E",
+              }}
+            >
+              <AlertCircle size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+              No attributes marked for variant. Go to Specifications and toggle the "Use for variant" switch.
+            </div>
+          )}
+        </div>
+
+        {/* Select Variant button + dropdown */}
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <button
+            onClick={() => {
+              if (availableAttributes.length === 0) {
+                alert("No attributes available. Please mark attributes as 'Use for variant' in Specifications.");
+                return;
+              }
+              setShowAttributeDropdown((p) => !p);
+              setShowValueDropdown(false);
+              setSelectedAttributeId(null);
+            }}
+            disabled={availableAttributes.length === 0}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "8px 16px",
+              borderRadius: 9,
+              border: "none",
+              background: availableAttributes.length === 0
+                ? "#CBD5E1"
+                : "linear-gradient(135deg,#1D4ED8,#0891B2)",
+              color: "#FFFFFF",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: availableAttributes.length === 0 ? "not-allowed" : "pointer",
+              fontFamily: "inherit",
+              transition: "all 0.15s",
+            }}
+          >
+            <Plus size={14} />
+            Select variant
+            <ChevronDown size={13} />
+          </button>
+
+          {/* Attribute dropdown */}
+          {showAttributeDropdown && (
+            <div
+              style={{
+                position: "absolute",
+                top: "calc(100% + 6px)",
+                right: 0,
+                background: "#FFFFFF",
+                border: "0.5px solid #BFDBFE",
+                borderRadius: 10,
+                boxShadow: "0 8px 24px rgba(37,99,235,0.1)",
+                zIndex: 100,
+                minWidth: 200,
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ padding: "7px 12px", background: "#EFF6FF", borderBottom: "0.5px solid #BFDBFE", fontSize: 10.5, fontWeight: 700, color: "#1D4ED8", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Choose attribute
+              </div>
+              {availableAttributes.map((attr) => (
+                <button
+                  key={attr.id}
+                  onClick={() => { setSelectedAttributeId(attr.id); setShowValueDropdown(true); setShowAttributeDropdown(false); }}
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    textAlign: "left",
+                    background: "none",
+                    border: "none",
+                    borderBottom: "0.5px solid #F0F4FA",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    transition: "background 0.12s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#EFF6FF")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Check size={12} color="#10B981" />
+                    <span style={{ fontSize: 13, fontWeight: 500, color: "#0F172A" }}>{attr.name}</span>
+                  </div>
+                  <ChevronDown size={12} color="#94A3B8" style={{ transform: "rotate(-90deg)" }} />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Value dropdown */}
+          {showValueDropdown && selectedAttributeId && (
+            <div
+              style={{
+                position: "absolute",
+                top: "calc(100% + 6px)",
+                right: 0,
+                background: "#FFFFFF",
+                border: "0.5px solid #BFDBFE",
+                borderRadius: 10,
+                boxShadow: "0 8px 24px rgba(37,99,235,0.1)",
+                zIndex: 100,
+                minWidth: 220,
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ padding: "8px 12px", background: "#EFF6FF", borderBottom: "0.5px solid #BFDBFE", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#1D4ED8" }}>
+                  {availableAttributes.find((a) => a.id === selectedAttributeId)?.name}
+                </span>
+                <button
+                  onClick={() => { setShowValueDropdown(false); setSelectedAttributeId(null); }}
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#64748B", display: "flex" }}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+              <div style={{ maxHeight: 240, overflowY: "auto" }}>
+                {renderValueDropdown()}
+              </div>
+            </div>
           )}
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse border border-gray-300">
-          <thead>
-            <tr className="bg-gray-100">
-              {/* Select Variant Column */}
-              <th className="p-3 text-left text-sm font-semibold border border-gray-300 min-w-[180px]">
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      if (availableAttributes.length === 0) {
-                        alert(
-                          "No attributes available for variants. Please mark attributes as 'Include in Variant' in the Specifications section."
-                        );
-                        return;
-                      }
-                      setShowAttributeDropdown(!showAttributeDropdown);
-                      setShowValueDropdown(false);
-                      setSelectedAttributeId(null);
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded hover:from-purple-600 hover:to-pink-600 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={availableAttributes.length === 0}
-                  >
-                    <span>Select Variant</span>
-                    <ChevronDown className="h-4 w-4 ml-1" />
-                  </button>
-
-                  {showAttributeDropdown && (
-                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[200px]">
-                      {availableAttributes.length === 0 ? (
-                        <div className="px-4 py-3 text-sm text-gray-500">
-                          No attributes available for variants
-                        </div>
-                      ) : (
-                        availableAttributes.map((attr) => (
-                          <div key={attr.id} className="group relative">
-                            <button
-                              className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center justify-between border-b border-gray-200 last:border-b-0 bg-blue-50"
-                              onClick={() => {
-                                setSelectedAttributeId(attr.id);
-                                setShowValueDropdown(true);
-                                setShowAttributeDropdown(false);
-                              }}
-                            >
-                              <div className="flex items-center space-x-2">
-                                <Check className="h-4 w-4 text-green-500" />
-                                <span className="font-medium text-sm">
-                                  {attr.name}
-                                </span>
-                              </div>
-                              <ChevronDown className="h-4 w-4 rotate-[-90deg]" />
-                            </button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-
-                  {showValueDropdown && selectedAttributeId && (
-                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[200px]">
-                      <div className="px-3 py-2 border-b border-gray-300 bg-gradient-to-r from-purple-50 to-pink-50">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold text-purple-900">
-                            {
-                              availableAttributes.find(
-                                (a) => a.id === selectedAttributeId
-                              )?.name
-                            }
-                          </span>
-                          <button
-                            onClick={() => {
-                              setShowValueDropdown(false);
-                              setSelectedAttributeId(null);
-                            }}
-                            className="p-1 hover:bg-purple-200 rounded"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="max-h-60 overflow-y-auto">
-                        {renderValueDropdown()}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </th>
-              <th className="p-3 text-center text-sm font-semibold border border-gray-300 min-w-[150px]">
-                Attribute Value
-              </th>
-              <th className="p-3 text-left text-sm font-semibold border border-gray-300 min-w-[150px]">
-                <div>
-                  SKU <span className="text-red-500">*</span>
-                </div>
-              </th>
-
-              <th className="p-3 text-left text-sm font-semibold border border-gray-300 min-w-[140px]">
-                <div className="mb-2">
-                  Price <span className="text-red-500">*</span>
-                </div>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="Apply to all"
-                  className="text-xs h-8"
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter") {
-                      const value = Number(
-                        (e.target as HTMLInputElement).value
-                      );
-                      if (value > 0) {
-                        applyPriceToAll(value);
-                        (e.target as HTMLInputElement).value = "";
-                      }
-                    }
-                  }}
-                />
-              </th>
-
-              <th className="p-3 text-left text-sm font-semibold border border-gray-300 min-w-[140px]">
-                <div className="mb-2">Special Price</div>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="Apply to all"
-                  className="text-xs h-8"
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter") {
-                      const value = Number(
-                        (e.target as HTMLInputElement).value
-                      );
-                      if (value > 0) {
-                        applySpecialPriceToAll(value);
-                        (e.target as HTMLInputElement).value = "";
-                      }
-                    }
-                  }}
-                />
-              </th>
-
-              <th className="p-3 text-left text-sm font-semibold border border-gray-300 min-w-[120px]">
-                <div className="mb-2">Stock</div>
-                <Input
-                  type="number"
-                  min="0"
-                  placeholder="Apply to all"
-                  className="text-xs h-8"
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter") {
-                      const value = Number(
-                        (e.target as HTMLInputElement).value
-                      );
-                      if (value >= 0) {
-                        applyStockToAll(value);
-                        (e.target as HTMLInputElement).value = "";
-                      }
-                    }
-                  }}
-                />
-              </th>
-
-              <th className="p-3 text-center text-sm font-semibold border border-gray-300 min-w-[120px]">
-                Availability
-              </th>
-
-              <th className="p-3 text-center text-sm font-semibold border border-gray-300 min-w-[140px]">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {displayVariants.length === 0 ? (
+      {/* ── Table ── */}
+      <div
+        style={{
+          border: "0.5px solid #BFDBFE",
+          borderRadius: 12,
+          overflow: "hidden",
+          boxShadow: "0 1px 4px rgba(37,99,235,0.06)",
+        }}
+      >
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
               <tr>
-                <td
-                  colSpan={8}
-                  className="p-8 text-center border border-gray-300"
-                >
-                  <div className="text-gray-500">
-                    <p className="mb-2">No variants created yet.</p>
-                    <p className="text-sm">
-                      Use the "Select Variant" dropdown above to add variants.
-                    </p>
-                  </div>
-                </td>
+                <Th minW={160}>Attribute</Th>
+                <Th minW={140}>Value</Th>
+                <Th minW={150}>
+                  <div>SKU <span style={{ color: "#DC2626" }}>*</span></div>
+                </Th>
+                <Th minW={150}>
+                  <div>Price <span style={{ color: "#DC2626" }}>*</span></div>
+                  <ApplyInput onApply={applyPriceToAll} placeholder="Apply to all…" />
+                </Th>
+                <Th minW={150}>
+                  <div>Special price</div>
+                  <ApplyInput onApply={applySpecialPriceToAll} placeholder="Apply to all…" />
+                </Th>
+                <Th minW={120}>
+                  <div>Stock</div>
+                  <ApplyInput onApply={applyStockToAll} placeholder="Apply to all…" />
+                </Th>
+                <Th minW={110}>Availability</Th>
+                <Th minW={120}>Actions</Th>
               </tr>
-            ) : (
-              (() => {
-                const groupedVariants: Record<string, ProductVariantInput[]> =
-                  {};
+            </thead>
+            <tbody>
+              {displayVariants.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    style={{ padding: "40px 0", textAlign: "center", borderBottom: "0.5px solid #E2E8F0" }}
+                  >
+                    <Package size={28} color="#BFDBFE" style={{ margin: "0 auto 10px" }} />
+                    <p style={{ fontSize: 13, color: "#64748B", marginBottom: 4 }}>No variants created yet</p>
+                    <p style={{ fontSize: 11.5, color: "#94A3B8" }}>
+                      Use "Select variant" above to add product variants
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                (() => {
+                  const groupedVariants: Record<string, ProductVariantInput[]> = {};
+                  displayVariants.forEach((variant) => {
+                    const firstAttr = variant.attributes?.[0];
+                    const groupKey = firstAttr
+                      ? `${firstAttr.attributeValueId}-${firstAttr.value}`
+                      : "no-attr";
+                    if (!groupedVariants[groupKey]) groupedVariants[groupKey] = [];
+                    groupedVariants[groupKey].push(variant);
+                  });
 
-                displayVariants.forEach((variant) => {
-                  const firstAttr = variant.attributes?.[0];
-                  const groupKey = firstAttr
-                    ? `${firstAttr.attributeValueId}-${firstAttr.value}`
-                    : "no-attr";
-
-                  if (!groupedVariants[groupKey]) {
-                    groupedVariants[groupKey] = [];
-                  }
-                  groupedVariants[groupKey].push(variant);
-                });
-
-                const rows: JSX.Element[] = [];
-                Object.entries(groupedVariants).forEach(
-                  ([groupKey, groupVariants]) => {
-                    const firstVariant = groupVariants[0];
-                    const firstAttr = firstVariant.attributes?.[0];
-                    const secondAttr = firstVariant.attributes?.[1];
-
+                  const rows: JSX.Element[] = [];
+                  Object.entries(groupedVariants).forEach(([, groupVariants]) => {
                     groupVariants.forEach((variant, variantIndex) => {
                       const isFirstInGroup = variantIndex === 0;
+                      const firstAttr = variant.attributes?.[0];
 
                       rows.push(
                         <React.Fragment key={`${variant.id}-${variantIndex}`}>
-                          <tr className="hover:bg-gray-50">
-                            {isFirstInGroup && firstAttr && (
+                          <tr
+                            style={{ background: variantIndex % 2 === 0 ? "#FFFFFF" : "#F8FAFC" }}
+                          >
+                            {/* Attribute name cell (spans group) */}
+                            {isFirstInGroup && (
                               <td
                                 rowSpan={groupVariants.length}
-                                className="p-3 border border-gray-300 text-center align-middle bg-gradient-to-r from-purple-50 to-blue-50 font-semibold text-purple-800"
+                                style={{
+                                  padding: "10px 12px",
+                                  fontSize: 12.5,
+                                  fontWeight: 600,
+                                  color: "#1D4ED8",
+                                  background: "#EFF6FF",
+                                  borderBottom: "0.5px solid #BFDBFE",
+                                  borderRight: "0.5px solid #BFDBFE",
+                                  verticalAlign: "middle",
+                                  textAlign: "center",
+                                }}
                               >
-                                {(() => {
-                                  const attrPart = Object.values(variantNameParts).find(
-                                    part => {
-                                      const attribute = categoryAttributes?.find(
-                                        attr => attr.values?.some(v => v.id === firstAttr.attributeValueId)
+                                {firstAttr
+                                  ? (() => {
+                                      const attr = categoryAttributes?.find((a) =>
+                                        a.values?.some((v) => v.id === firstAttr.attributeValueId)
                                       );
-                                      return attribute?.name || "Attribute";
-                                    }
-                                  );
-                                  return attrPart?.name || "Attribute";
-                                })()}
-                              </td>
-                            )}
-                            {!firstAttr && isFirstInGroup && (
-                              <td
-                                rowSpan={groupVariants.length}
-                                className="p-3 border border-gray-300 text-center align-middle bg-gray-100 font-semibold text-gray-700"
-                              >
-                                No Attribute
+                                      return attr?.name || "Attribute";
+                                    })()
+                                  : "No attribute"}
                               </td>
                             )}
 
-                            {isFirstInGroup && firstAttr && (
+                            {/* Attribute value cell (spans group) */}
+                            {isFirstInGroup && (
                               <td
                                 rowSpan={groupVariants.length}
-                                className="p-3 border border-gray-300 text-center align-middle bg-gradient-to-r from-blue-50 to-pink-50 font-semibold text-blue-800"
+                                style={{
+                                  padding: "10px 12px",
+                                  fontSize: 12.5,
+                                  fontWeight: 600,
+                                  color: "#0369A1",
+                                  background: "#F0F9FF",
+                                  borderBottom: "0.5px solid #BFDBFE",
+                                  borderRight: "0.5px solid #E2E8F0",
+                                  verticalAlign: "middle",
+                                  textAlign: "center",
+                                }}
                               >
-                                {firstAttr.value}
-                              </td>
-                            )}
-                            {!firstAttr && isFirstInGroup && (
-                              <td
-                                rowSpan={groupVariants.length}
-                                className="p-3 border border-gray-300 text-center align-middle bg-gray-100 font-semibold text-gray-700"
-                              >
-                                -
-                              </td>
-                            )}
-
-                            {secondAttr && variantIndex === 0 && (
-                              <td
-                                rowSpan={groupVariants.length}
-                                className="p-3 border border-gray-300 text-center align-middle bg-gradient-to-r from-green-50 to-yellow-50 font-semibold text-green-800"
-                              >
-                                {secondAttr.value}
+                                {firstAttr?.value || "—"}
                               </td>
                             )}
 
-                            <td className="p-3 border border-gray-300">
+                            {/* SKU */}
+                            <Td>
                               <Input
                                 value={variant.sku}
-                                onChange={(e) =>
-                                  handleChange(
-                                    variant.id,
-                                    "sku",
-                                    e.target.value
-                                  )
-                                }
+                                onChange={(e) => handleChange(variant.id, "sku", e.target.value)}
                                 placeholder="Enter SKU"
                                 required
-                                className="text-sm"
+                                style={{
+                                  fontSize: 13,
+                                  borderColor: variant.sku ? "#6EE7B7" : "#BFDBFE",
+                                  background: variant.sku ? "#F0FDF4" : "#FFFFFF",
+                                }}
                               />
-                            </td>
+                            </Td>
 
-                            <td className="p-3 border border-gray-300">
+                            {/* Price */}
+                            <Td>
                               <Input
                                 type="number"
                                 step="0.01"
                                 min="0"
                                 value={variant.price || ""}
-                                onChange={(e) =>
-                                  handleChange(
-                                    variant.id,
-                                    "price",
-                                    Number(e.target.value)
-                                  )
-                                }
+                                onChange={(e) => handleChange(variant.id, "price", Number(e.target.value))}
                                 placeholder="0.00"
                                 required
-                                className="text-sm"
+                                style={{
+                                  fontSize: 13,
+                                  borderColor: variant.price > 0 ? "#6EE7B7" : "#BFDBFE",
+                                  background: variant.price > 0 ? "#F0FDF4" : "#FFFFFF",
+                                }}
                               />
-                            </td>
+                            </Td>
 
-                            <td className="p-3 border border-gray-300">
-                              <div className="flex gap-1">
+                            {/* Special price */}
+                            <Td>
+                              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                                 <Input
                                   type="number"
                                   step="0.01"
                                   min="0"
                                   value={variant.specialPrice || ""}
-                                  onChange={(e) =>
-                                    handleSpecialPriceChange(
-                                      variant.id,
-                                      e.target.value
-                                        ? Number(e.target.value)
-                                        : null
-                                    )
-                                  }
+                                  onChange={(e) => handleSpecialPriceChange(variant.id, e.target.value ? Number(e.target.value) : null)}
                                   placeholder="0.00"
-                                  className="text-sm flex-1"
+                                  style={{ fontSize: 13, flex: 1, borderColor: "#BFDBFE" }}
                                 />
                                 {variant.specialPrice && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleSpecialPriceChange(variant.id, null)
-                                    }
-                                    className="px-1 h-9"
+                                  <button
+                                    onClick={() => handleSpecialPriceChange(variant.id, null)}
+                                    style={{ background: "none", border: "none", cursor: "pointer", padding: 3, color: "#94A3B8", display: "flex", flexShrink: 0 }}
                                   >
-                                    <X className="h-3 w-3" />
-                                  </Button>
+                                    <X size={12} />
+                                  </button>
                                 )}
                               </div>
-                              {variant.specialPrice &&
-                                variant.specialPrice >= variant.price && (
-                                  <p className="text-xs text-red-500 mt-1">
-                                    Must be less than price
-                                  </p>
-                                )}
-                              {variant.specialPrice &&
-                                variant.specialPrice < variant.price && (
-                                  <p className="text-xs text-green-600 mt-1">
-                                    Save: $
-                                    {(
-                                      variant.price - variant.specialPrice
-                                    ).toFixed(2)}{" "}
-                                    ({variant.discount}%)
-                                  </p>
-                                )}
-                            </td>
+                              {variant.specialPrice && variant.specialPrice >= variant.price && (
+                                <p style={{ fontSize: 10.5, color: "#DC2626", marginTop: 3, display: "flex", alignItems: "center", gap: 3 }}>
+                                  <AlertCircle size={10} /> Must be less than price
+                                </p>
+                              )}
+                              {variant.specialPrice && variant.specialPrice < variant.price && (
+                                <p style={{ fontSize: 10.5, color: "#059669", marginTop: 3, display: "flex", alignItems: "center", gap: 3 }}>
+                                  <Check size={10} /> Save {variant.discount}%
+                                </p>
+                              )}
+                            </Td>
 
-                            <td className="p-3 border border-gray-300">
+                            {/* Stock */}
+                            <Td>
                               <Input
                                 type="number"
                                 min="0"
                                 value={variant.stock || 0}
-                                onChange={(e) =>
-                                  handleChange(
-                                    variant.id,
-                                    "stock",
-                                    Number(e.target.value)
-                                  )
-                                }
+                                onChange={(e) => handleChange(variant.id, "stock", Number(e.target.value))}
                                 placeholder="0"
-                                className="text-sm"
+                                style={{ fontSize: 13, borderColor: "#BFDBFE" }}
                               />
-                            </td>
+                            </Td>
 
-                            <td className="p-3 border border-gray-300 text-center">
-                              <label className="relative inline-flex items-center cursor-pointer">
+                            {/* Availability toggle */}
+                            <Td center>
+                              <label style={{ position: "relative", display: "inline-flex", alignItems: "center", cursor: "pointer" }}>
                                 <input
                                   type="checkbox"
                                   checked={variant.availability !== false}
-                                  onChange={(e) =>
-                                    handleChange(
-                                      variant.id,
-                                      "availability",
-                                      e.target.checked
-                                    )
-                                  }
-                                  className="sr-only peer"
+                                  onChange={(e) => handleChange(variant.id, "availability", e.target.checked)}
+                                  style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
                                 />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                <div
+                                  style={{
+                                    width: 40,
+                                    height: 22,
+                                    borderRadius: 11,
+                                    background: variant.availability !== false ? "#1D4ED8" : "#CBD5E1",
+                                    position: "relative",
+                                    transition: "background 0.2s",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      top: 2,
+                                      left: variant.availability !== false ? 20 : 2,
+                                      width: 18,
+                                      height: 18,
+                                      borderRadius: "50%",
+                                      background: "#FFFFFF",
+                                      transition: "left 0.2s",
+                                      boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                                    }}
+                                  />
+                                </div>
                               </label>
-                            </td>
+                            </Td>
 
-                            <td className="p-3 border border-gray-300 text-center">
-                              <div className="flex justify-center gap-1">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() =>
-                                    toggleImageUploader(variant.id)
-                                  }
+                            {/* Actions */}
+                            <Td center>
+                              <div style={{ display: "flex", justifyContent: "center", gap: 4 }}>
+                                <button
+                                  onClick={() => toggleImageUploader(variant.id)}
                                   title="Add images"
-                                  className="px-2"
+                                  style={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: 7,
+                                    border: "0.5px solid #BFDBFE",
+                                    background: showImageUploaders[variant.id!] ? "#EFF6FF" : "#F8FAFC",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#1D4ED8",
+                                    transition: "all 0.12s",
+                                  }}
                                 >
-                                  <Plus className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
+                                  <ImageIcon size={13} />
+                                </button>
+                                <button
                                   onClick={() => duplicateVariant(variant.id!)}
-                                  title="Duplicate variant"
-                                  className="px-2"
+                                  title="Duplicate"
+                                  style={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: 7,
+                                    border: "0.5px solid #BFDBFE",
+                                    background: "#F8FAFC",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#0891B2",
+                                    transition: "all 0.12s",
+                                  }}
                                 >
-                                  <Copy className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
+                                  <Copy size={13} />
+                                </button>
+                                <button
                                   onClick={() => removeVariant(variant.id)}
-                                  title="Delete variant"
-                                  className="px-2"
+                                  title="Delete"
                                   disabled={variants.length <= 1}
+                                  style={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: 7,
+                                    border: "0.5px solid #FCA5A5",
+                                    background: "#FEF2F2",
+                                    cursor: variants.length <= 1 ? "not-allowed" : "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: variants.length <= 1 ? "#CBD5E1" : "#DC2626",
+                                    transition: "all 0.12s",
+                                    opacity: variants.length <= 1 ? 0.4 : 1,
+                                  }}
                                 >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
+                                  <Trash2 size={13} />
+                                </button>
                               </div>
-                            </td>
+                            </Td>
                           </tr>
 
+                          {/* Image uploader row */}
                           {showImageUploaders[variant.id!] && (
-                            <tr className="bg-blue-50">
+                            <tr>
                               <td
                                 colSpan={8}
-                                className="p-4 border border-gray-300"
+                                style={{
+                                  padding: "14px 16px",
+                                  background: "#EFF6FF",
+                                  borderBottom: "0.5px solid #BFDBFE",
+                                }}
                               >
-                                <div className="mb-2 flex justify-between items-center">
-                                  <label className="text-sm font-medium">
-                                    Variant Images{" "}
-                                    {variant.images &&
-                                      variant.images.length > 0 && (
-                                        <span className="text-xs text-gray-500">
-                                          ({variant.images.length}/8)
-                                        </span>
-                                      )}
-                                  </label>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      toggleImageUploader(variant.id)
-                                    }
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                                  <span style={{ fontSize: 12, fontWeight: 600, color: "#1D4ED8" }}>
+                                    Variant images
+                                    {variant.images && variant.images.length > 0 && (
+                                      <span style={{ fontSize: 10.5, color: "#64748B", marginLeft: 6 }}>
+                                        ({variant.images.length}/8)
+                                      </span>
+                                    )}
+                                  </span>
+                                  <button
+                                    onClick={() => toggleImageUploader(variant.id)}
+                                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11.5, color: "#64748B", fontFamily: "inherit" }}
                                   >
                                     Close
-                                  </Button>
+                                  </button>
                                 </div>
                                 <ImageUploader
-                                  images={(variant.images || []).map((img) =>
-                                    typeof img === "string" ? img : img.url
-                                  )}
-                                  setImages={(images) =>
-                                    handleImagesChange(variant.id, images)
-                                  }
+                                  images={(variant.images || []).map((img) => (typeof img === "string" ? img : img.url))}
+                                  setImages={(images) => handleImagesChange(variant.id, images)}
                                   maxImages={8}
                                 />
                               </td>
                             </tr>
                           )}
 
-                          {variant.images &&
-                            variant.images.length > 0 &&
-                            !showImageUploaders[variant.id!] && (
-                              <tr className="bg-gray-50">
-                                <td
-                                  colSpan={8}
-                                  className="p-3 border border-gray-300"
-                                >
-                                  <div className="flex gap-2 overflow-x-auto">
-                                    {variant.images
-                                      .slice(0, 6)
-                                      .map((img, imgIdx) => (
-                                        <div
-                                          key={imgIdx}
-                                          className="flex-shrink-0"
-                                        >
-                                          <img
-                                            src={
-                                              typeof img === "string"
-                                                ? img
-                                                : img.url
-                                            }
-                                            alt={
-                                              typeof img === "string"
-                                                ? `Image ${imgIdx + 1}`
-                                                : img.altText || ""
-                                            }
-                                            className="w-12 h-12 object-cover rounded border"
-                                          />
-                                        </div>
-                                      ))}
-                                    {variant.images.length > 6 && (
-                                      <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-gray-200 rounded border text-xs text-gray-600">
-                                        +{variant.images.length - 6}
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
+                          {/* Image preview row */}
+                          {variant.images && variant.images.length > 0 && !showImageUploaders[variant.id!] && (
+                            <tr>
+                              <td
+                                colSpan={8}
+                                style={{
+                                  padding: "8px 12px",
+                                  background: "#F8FAFC",
+                                  borderBottom: "0.5px solid #E2E8F0",
+                                }}
+                              >
+                                <div style={{ display: "flex", gap: 6, overflowX: "auto" }}>
+                                  {variant.images.slice(0, 6).map((img, imgIdx) => (
+                                    <div
+                                      key={imgIdx}
+                                      style={{
+                                        flexShrink: 0,
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: 7,
+                                        overflow: "hidden",
+                                        border: "0.5px solid #BFDBFE",
+                                      }}
+                                    >
+                                      <img
+                                        src={typeof img === "string" ? img : img.url}
+                                        alt={typeof img === "string" ? `Image ${imgIdx + 1}` : (img.altText || "")}
+                                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                      />
+                                    </div>
+                                  ))}
+                                  {variant.images.length > 6 && (
+                                    <div
+                                      style={{
+                                        flexShrink: 0,
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: 7,
+                                        background: "#EFF6FF",
+                                        border: "0.5px solid #BFDBFE",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        color: "#1D4ED8",
+                                      }}
+                                    >
+                                      +{variant.images.length - 6}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
                         </React.Fragment>
                       );
                     });
-                  }
-                );
+                  });
 
-                return rows;
-              })()
-            )}
-          </tbody>
-        </table>
+                  return rows;
+                })()
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      {/* ── Summary bar ── */}
+      {displayVariants.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 8,
+            padding: "8px 14px",
+            background: "#EFF6FF",
+            border: "0.5px solid #BFDBFE",
+            borderRadius: 9,
+            fontSize: 11.5,
+            color: "#1D4ED8",
+            fontWeight: 500,
+          }}
+        >
+          <span>{displayVariants.length} variant{displayVariants.length !== 1 ? "s" : ""} created</span>
+          <span style={{ color: "#64748B" }}>
+            {displayVariants.filter((v) => v.sku && v.price > 0).length}/{displayVariants.length} fully configured
+          </span>
+        </div>
+      )}
+
+      <style>{`
+        @media (max-width: 640px) {
+          table { font-size: 12px; }
+          th, td { padding: 6px 8px !important; }
+        }
+      `}</style>
     </div>
   );
 }

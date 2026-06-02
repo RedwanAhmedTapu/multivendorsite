@@ -10,300 +10,271 @@ interface StoreInfoStepProps {
   onClearError: (field: string) => void;
   onAvatarChange?: (file: File | null) => void;
   avatarPreview?: string | null;
-  viewMode?: boolean; // New prop to control view/edit mode
-  onEditClick?: () => void; // Callback when edit button is clicked
+  viewMode?: boolean;
+  onEditClick?: () => void;
 }
 
-const StoreInfoStep: React.FC<StoreInfoStepProps> = ({ 
-  form, 
-  onSubmit, 
-  isSubmitting, 
-  vendor, 
+const StoreInfoStep: React.FC<StoreInfoStepProps> = ({
+  form,
+  onSubmit,
+  isSubmitting,
+  vendor,
   onClearError,
   onAvatarChange,
   avatarPreview,
   viewMode = false,
-  onEditClick
+  onEditClick,
 }) => {
-  const { 
-    register, 
-    handleSubmit, 
-    formState: { errors, isValid }, 
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isValid },
     watch,
     trigger,
-    setValue
+    setValue,
   } = form;
-  
+
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(avatarPreview || null);
-  
+  const [dragOver, setDragOver] = useState(false);
+
   const watchedFields = watch(['storeName']);
-  
+
   useEffect(() => {
     onClearError('submit');
   }, [watchedFields, onClearError]);
 
-  // Load existing vendor data
   useEffect(() => {
     if (vendor) {
-      console.log('🔄 Loading vendor data in StoreInfoStep:', {
-        storeName: vendor.storeName,
-        avatar: vendor.avatar
-      });
-      
-      if (vendor.storeName) {
-        setValue('storeName', vendor.storeName);
-      }
-      
-      if (vendor.avatar) {
-        setPreviewUrl(vendor.avatar);
-      }
+      if (vendor.storeName) setValue('storeName', vendor.storeName);
+      if (vendor.avatar) setPreviewUrl(vendor.avatar);
     }
   }, [vendor, setValue]);
 
-  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null;
-    
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
-        return;
-      }
-      
-      // Validate file size (2MB limit)
-      if (file.size > 2 * 1024 * 1024) {
-        alert('Image size should be less than 2MB');
-        return;
-      }
-      
-      setAvatarFile(file);
-      
-      // Create preview URL
-      const objectUrl = URL.createObjectURL(file);
-      setPreviewUrl(objectUrl);
-      
-      // Notify parent component
-      onAvatarChange?.(file);
-    } else {
+  const processFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image size should be less than 2MB');
+      return;
+    }
+    setAvatarFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+    onAvatarChange?.(file);
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+    else {
       setAvatarFile(null);
       setPreviewUrl(vendor?.avatar || null);
       onAvatarChange?.(null);
     }
   };
 
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  };
+
   const removeAvatar = () => {
     setAvatarFile(null);
     setPreviewUrl(vendor?.avatar || null);
     onAvatarChange?.(null);
-    
-    // Clear file input
-    const fileInput = document.getElementById('avatar') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = '';
-    }
+    const el = document.getElementById('avatar') as HTMLInputElement;
+    if (el) el.value = '';
   };
 
-  // Validate form before submission and pass avatar file
   const handleFormSubmit = async (data: any) => {
-    const isValid = await trigger();
-    if (isValid) {
-      onSubmit(data, avatarFile);
-    }
+    const valid = await trigger();
+    if (valid) onSubmit(data, avatarFile);
   };
 
-  // Render view mode (summary of completed data)
+  /* ─── VIEW MODE ─── */
   if (viewMode && vendor?.storeName) {
     return (
-      <div className="space-y-6 max-w-2xl mx-auto">
-        <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-4">
-                <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+      <div className="max-w-2xl mx-auto">
+        {/* Completed card */}
+        <div
+          className="rounded-2xl border border-slate-100 shadow-sm overflow-hidden"
+          style={{ backgroundColor: '#f2f3ff' }}
+        >
+          {/* Header strip */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                <h3 className="text-lg font-bold text-green-900">Store Information Completed</h3>
               </div>
-              
-              <div className="space-y-4">
-                {/* Avatar Display */}
-                <div className="flex items-center gap-4">
-                  {vendor.avatar ? (
-                    <img 
-                      src={vendor.avatar} 
-                      alt="Store avatar" 
-                      className="w-16 h-16 rounded-full object-cover border-2 border-green-300"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm text-gray-600">Store Logo</p>
-                    <p className="text-gray-900 font-medium">
-                      {vendor.avatar ? 'Uploaded' : 'No logo uploaded'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Store Name Display */}
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Store Name</p>
-                  <p className="text-lg font-semibold text-gray-900">{vendor.storeName}</p>
-                </div>
-
-                {/* Email Display (if available) */}
-                {vendor.user?.email && (
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Email</p>
-                    <p className="text-gray-900">{vendor.user.email}</p>
-                  </div>
-                )}
-              </div>
+              <span className="text-white font-bold text-sm tracking-wide uppercase">Store Information Saved</span>
             </div>
-            
             <button
               type="button"
               onClick={onEditClick}
-              className="ml-4 px-4 py-2 bg-white border-2 border-green-600 text-green-700 rounded-lg hover:bg-green-50 font-semibold transition-colors flex items-center gap-2"
+              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/30 text-white text-sm font-semibold rounded-lg transition-all"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
               Edit
             </button>
           </div>
-        </div>
 
-        {/* Navigation hint */}
-        <div className="text-center text-sm text-gray-500 pt-4">
-          Click "Edit" to modify your store information, or continue to the next step
-        </div>
-      </div>
-    );
-  }
-
-  // Render edit mode (form)
-  return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6 max-w-2xl mx-auto">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Store Information</h2>
-        <p className="text-gray-600">Tell us about your business</p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6">
-        {/* Store Avatar Upload */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Store Logo/Avatar
-          </label>
-          <div className="flex items-center space-x-4">
-            <div className="flex-shrink-0">
-              {previewUrl ? (
-                <div className="relative">
-                  <img
-                    src={previewUrl}
-                    alt="Store avatar preview"
-                    className="w-20 h-20 rounded-full object-cover border-2 border-gray-300 shadow-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={removeAvatar}
-                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600 shadow-md transition-colors"
-                  >
-                    ×
-                  </button>
-                </div>
+          {/* Content */}
+          <div className="p-8">
+            <div className="flex items-center gap-6">
+              {vendor.avatar ? (
+                <img
+                  src={vendor.avatar}
+                  alt="Store logo"
+                  className="w-20 h-20 rounded-2xl object-cover border-4 border-white shadow-md"
+                />
               ) : (
-                <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                <div className="w-20 h-20 rounded-2xl bg-blue-100 flex items-center justify-center border-4 border-white shadow-md">
+                  <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 </div>
               )}
-            </div>
-            <div className="flex-1">
-              <input
-                type="file"
-                id="avatar"
-                accept="image/*"
-                onChange={handleAvatarChange}
-                className="hidden"
-              />
-              <label
-                htmlFor="avatar"
-                className="cursor-pointer inline-flex items-center px-4 py-2 border-2 border-gray-300 rounded-lg shadow-sm text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-              >
-                <svg className="-ml-1 mr-2 h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                {previewUrl ? 'Change Logo' : 'Upload Logo'}
-              </label>
-              <p className="text-xs text-gray-500 mt-2">
-                {vendor?.avatar && !avatarFile ? (
-                  <span className="text-green-600 font-medium">✓ Current logo loaded</span>
-                ) : (
-                  'Recommended: Square image, 2MB max, JPG, PNG, or GIF'
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Store Name</p>
+                <h3 className="text-2xl font-black text-slate-900">{vendor.storeName}</h3>
+                {vendor.user?.email && (
+                  <p className="text-sm text-slate-500 mt-1">{vendor.user.email}</p>
                 )}
-              </p>
-              {avatarFile && (
-                <p className="text-xs text-blue-600 mt-1 font-medium">
-                  ✓ New avatar selected: {avatarFile.name}
-                </p>
-              )}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Store Name */}
-        <div>
-          <label htmlFor="storeName" className="block text-sm font-semibold text-gray-700 mb-2">
-            Store Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            id="storeName"
-            {...register('storeName', { 
-              required: 'Store name is required',
-              minLength: { value: 2, message: 'Store name must be at least 2 characters' },
-              maxLength: { value: 100, message: 'Store name must be less than 100 characters' }
-            })}
-            className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
-              errors.storeName ? 'border-red-300' : 'border-gray-300'
-            } hover:border-gray-400`}
-            placeholder="Enter your store name"
-          />
-          {errors.storeName && (
-            <p className="mt-2 text-sm text-red-600 flex items-center font-medium">
-              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              {errors.storeName.message as string}
-            </p>
-          )}
-          {vendor?.storeName && !errors.storeName && (
-            <p className="mt-2 text-xs text-green-600 font-medium">
-              ✓ Current: {vendor.storeName}
-            </p>
-          )}
-        </div>
+        <p className="text-center text-xs text-slate-400 mt-4 font-medium">
+          Click <span className="text-blue-600 font-bold">Edit</span> to modify store information, or continue to the next step
+        </p>
+      </div>
+    );
+  }
+
+  /* ─── EDIT MODE ─── */
+  return (
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="max-w-2xl mx-auto space-y-8">
+      {/* Title */}
+      <div className="text-center">
+        <h2 className="text-2xl font-black text-slate-900 tracking-tight">Store Information</h2>
+        <p className="text-slate-500 mt-1 text-sm">Tell us about your business</p>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex justify-end pt-6 border-t-2 border-gray-200">
+      {/* Logo upload */}
+      <div
+        className="rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-200 cursor-pointer"
+        style={{
+          borderColor: dragOver ? '#2563eb' : '#c3c6d7',
+          backgroundColor: dragOver ? '#eaedff' : '#f2f3ff',
+        }}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => !previewUrl && document.getElementById('avatar')?.click()}
+      >
+        {previewUrl ? (
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative inline-block">
+              <img
+                src={previewUrl}
+                alt="Store logo"
+                className="w-24 h-24 rounded-2xl object-cover border-4 border-white shadow-lg"
+              />
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); removeAvatar(); }}
+                className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md transition-colors text-sm font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-700">
+                {avatarFile ? avatarFile.name : 'Current logo'}
+              </p>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); document.getElementById('avatar')?.click(); }}
+                className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-semibold underline underline-offset-2"
+              >
+                Change logo
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center">
+              <svg className="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-700">Drop your logo here</p>
+              <p className="text-xs text-slate-400 mt-0.5">or <span className="text-blue-600 font-semibold">browse files</span></p>
+            </div>
+            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">JPG · PNG · GIF · Max 2MB</p>
+          </div>
+        )}
+        <input type="file" id="avatar" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+      </div>
+
+      {/* Store Name */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-2">
+        <label htmlFor="storeName" className="block text-xs font-black uppercase tracking-widest text-slate-500">
+          Store Name <span className="text-red-500 normal-case">*</span>
+        </label>
+        <input
+          type="text"
+          id="storeName"
+          {...register('storeName', {
+            required: 'Store name is required',
+            minLength: { value: 2, message: 'Minimum 2 characters' },
+            maxLength: { value: 100, message: 'Maximum 100 characters' },
+          })}
+          className={`w-full px-4 py-3 rounded-xl border-2 text-slate-900 font-medium text-sm placeholder-slate-300 focus:outline-none transition-all ${
+            errors.storeName
+              ? 'border-red-300 bg-red-50 focus:border-red-400'
+              : 'border-slate-200 focus:border-blue-500 focus:bg-white'
+          }`}
+          placeholder="e.g. Nordic Goods Co."
+          style={{ backgroundColor: errors.storeName ? undefined : '#faf8ff' }}
+        />
+        {errors.storeName ? (
+          <p className="flex items-center gap-1.5 text-xs text-red-500 font-semibold pt-1">
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            {errors.storeName.message as string}
+          </p>
+        ) : vendor?.storeName ? (
+          <p className="text-xs text-blue-600 font-semibold pt-1">✓ Current: {vendor.storeName}</p>
+        ) : null}
+      </div>
+
+      {/* Submit */}
+      <div className="flex justify-end pt-2">
         <button
           type="submit"
           disabled={isSubmitting || !isValid}
-          className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-all font-semibold shadow-lg"
+          className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all"
         >
-          {isSubmitting && (
-            <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          {isSubmitting ? (
+            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
           )}
           {isSubmitting ? 'Saving...' : 'Continue to Address'}

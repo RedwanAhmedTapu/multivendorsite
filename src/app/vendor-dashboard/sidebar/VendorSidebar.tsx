@@ -1,10 +1,9 @@
-// components/vendor/layout/sidebar/VendorSidebar.tsx
 "use client";
 
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronDown, LogOut, X, User, Store } from "lucide-react";
+import { ChevronDown, LogOut, X } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store/store";
 import { useLogoutMutation } from "@/features/authApi";
@@ -27,10 +26,9 @@ type SidebarSection = {
 };
 
 type Logo = {
-  icon: Icon;
+  icon?: Icon;
   title: string;
   subtitle?: string;
-  iconBgColor?: string;
 };
 
 type VendorSidebarProps = {
@@ -40,6 +38,16 @@ type VendorSidebarProps = {
   onClose?: () => void;
   isCollapsed?: boolean;
 };
+
+function getDefaultOpenMenus(sections: SidebarSection[]): Record<string, boolean> {
+  const map: Record<string, boolean> = {};
+  sections.forEach((section) => {
+    section.items.forEach((item) => {
+      if (item.subItems) map[item.title] = true;
+    });
+  });
+  return map;
+}
 
 export function VendorSidebar({
   logo,
@@ -51,19 +59,15 @@ export function VendorSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const dispatch = useDispatch();
-  const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({});
 
-  // Get auth state from Redux
-  const { user } = useSelector((state: RootState) => state.auth);
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>(
+    () => getDefaultOpenMenus(sections)
+  );
 
-  // Logout mutation
   const [logoutMutation, { isLoading: isLoggingOut }] = useLogoutMutation();
 
   const toggleMenu = (title: string) => {
-    setOpenMenus((prev) => ({
-      ...prev,
-      [title]: !prev[title],
-    }));
+    setOpenMenus((prev) => ({ ...prev, [title]: !prev[title] }));
   };
 
   const isActive = (href: string) => pathname === href;
@@ -75,42 +79,21 @@ export function VendorSidebar({
       await logoutMutation().unwrap();
       dispatch(clearAuth());
       router.push("/vendor/login");
-    } catch (error) {
-      console.error("Logout failed:", error);
-      // Still logout locally even if API fails
+    } catch {
       dispatch(clearAuth());
       router.push("/vendor/login");
     }
   };
 
-  // Get user initials for avatar
-  const getUserInitials = (name?: string) => {
-    if (!name) return "V";
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  // Get vendor-specific badge color
-  const getVendorBadgeColor = (vendorType?: string) => {
-    switch (vendorType?.toUpperCase()) {
-      case "PREMIUM":
-        return "bg-purple-500";
-      case "PARTNER":
-        return "bg-blue-500";
-      case "VERIFIED":
-        return "bg-green-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
-
+  /*
+   * KEY FIX: On desktop the sidebar is rendered as a normal in-flow element
+   * (position: static) inside its wrapper div in VendorLayout.
+   * On mobile it becomes fixed/off-canvas via the translate classes.
+   * This eliminates the z-index/overlap issues entirely.
+   */
   return (
     <>
-      {/* Mobile Overlay */}
+      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -118,263 +101,200 @@ export function VendorSidebar({
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`
-          fixed lg:relative inset-y-0 left-0 z-50
-          bg-white border-r border-gray-200
-          transition-all duration-300 ease-in-out
-          ${isCollapsed ? "w-20" : "w-64"}
-          ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-          flex flex-col h-screen overflow-hidden
+          h-screen flex flex-col border-r border-transparent
+          transition-all duration-300 ease-in-out overflow-hidden
+          ${isCollapsed ? "w-20" : "w-72"}
+          /* Mobile: fixed off-canvas, slides in */
+          max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50
+          ${mobileOpen ? "max-lg:translate-x-0" : "max-lg:-translate-x-full"}
         `}
+        style={{ backgroundColor: "#f2f3ff" }}
       >
-        {/* Logo */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div
-              className={`${
-                logo.iconBgColor || "bg-teal-500"
-              } p-2 rounded-lg flex items-center justify-center flex-shrink-0`}
-            >
-              <logo.icon className="w-6 h-6 text-white" />
+        {/* Brand */}
+        <div className={`shrink-0 ${isCollapsed ? "px-3 py-6" : "px-8 py-6 mb-2"}`}>
+          {isCollapsed ? (
+            <div className="flex justify-center">
+              <div className="w-10 h-10 rounded-lg bg-blue-700 flex items-center justify-center">
+                <span className="text-white font-black text-sm">P</span>
+              </div>
             </div>
-            {!isCollapsed && (
-              <div className="overflow-hidden">
-                <h1 className="text-lg font-bold text-gray-900 truncate">
+          ) : (
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-lg font-black text-blue-700 tracking-tight leading-tight">
                   {logo.title}
                 </h1>
                 {logo.subtitle && (
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold mt-0.5">
                     {logo.subtitle}
                   </p>
                 )}
               </div>
-            )}
-          </div>
-          {mobileOpen && (
-            <button
-              onClick={onClose}
-              className="lg:hidden p-2 rounded-md hover:bg-gray-100 flex-shrink-0"
-              aria-label="Close sidebar"
-            >
-              <X className="w-5 h-5" />
-            </button>
+              {mobileOpen && (
+                <button
+                  onClick={onClose}
+                  className="lg:hidden p-1.5 rounded-md hover:bg-white/60 text-slate-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           )}
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-3 px-3">
+        {/* Nav */}
+        <nav
+          className="flex-1 overflow-y-auto px-4 pb-4 space-y-1"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}
+        >
           <style jsx>{`
-            nav::-webkit-scrollbar {
-              display: none;
-            }
-            nav {
-              -ms-overflow-style: none;
-              scrollbar-width: none;
-            }
+            nav::-webkit-scrollbar { display: none; }
           `}</style>
 
-          {sections.map((section, sectionIdx) => (
-            <ul key={sectionIdx} className="space-y-2">
-              {section.items.map((item) => (
-                <li key={item.title}>
-                  {item.subItems ? (
-                    /* Parent Menu with Dropdown */
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => toggleMenu(item.title)}
-                        className={`
-                          w-full flex items-center justify-between
-                          px-3 py-2.5 rounded-lg text-left
-                          transition-all duration-200 group
-                          ${
-                            isParentActive(item.subItems)
-                              ? "bg-teal-50 text-teal-600"
-                              : "text-gray-700 hover:bg-gray-100"
-                          }
-                        `}
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <item.icon
-                            className={`w-5 h-5 flex-shrink-0 ${
-                              item.color || ""
-                            } ${isCollapsed ? "mx-auto" : ""}`}
-                          />
-                          {!isCollapsed && (
-                            <span className="font-medium text-sm truncate flex items-center gap-2">
-                              {item.title}
-                              {item.badge && (
-                                <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                                  {item.badge}
-                                </span>
-                              )}
-                            </span>
-                          )}
-                        </div>
-                        {!isCollapsed && (
-                          <ChevronDown
-                            className={`w-4 h-4 transition-transform duration-400 ease-in-out flex-shrink-0 ${
-                              openMenus[item.title] ? "rotate-180" : ""
-                            }`}
-                          />
-                        )}
-                      </button>
-
-                      {/* Smooth & Slow Dropdown */}
-                      <div
-                        className={`
-                          overflow-hidden transition-all duration-400 ease-in-out
-                          ${openMenus[item.title] && !isCollapsed ? "mt-2" : ""}
-                        `}
-                        style={{
-                          maxHeight:
-                            openMenus[item.title] && !isCollapsed
-                              ? "320px"
-                              : "0px",
-                          opacity:
-                            openMenus[item.title] && !isCollapsed ? 1 : 0,
-                          transition:
-                            "max-height 400ms ease-in-out, opacity 400ms ease-in-out, margin 400ms ease-in-out",
-                        }}
-                      >
-                        <ul className="ml-10 space-y-1.5 border-l-2 border-gray-200">
-                          {item.subItems.map((subItem) => (
-                            <li key={subItem.title}>
-                              <Link
-                                href={subItem.href}
-                                onClick={onClose}
-                                className={`
-                                  flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm
-                                  transition-all duration-200
-                                  ${
-                                    isActive(subItem.href)
-                                      ? "bg-teal-50 text-teal-600 font-medium"
-                                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                                  }
-                                `}
-                              >
-                                <subItem.icon className="w-4 h-4 flex-shrink-0" />
-                                <span className="truncate flex items-center gap-2">
-                                  {subItem.title}
-                                  {subItem.badge && (
-                                    <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                                      {subItem.badge}
-                                    </span>
-                                  )}
-                                </span>
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  ) : (
-                    /* Regular Item */
-                    <Link
-                      href={item.href}
-                      onClick={onClose}
+          {sections.map((section, sIdx) =>
+            section.items.map((item) => (
+              <div key={`${sIdx}-${item.title}`} className="mb-1">
+                {item.subItems ? (
+                  <div>
+                    <button
+                      onClick={() => !isCollapsed && toggleMenu(item.title)}
+                      title={isCollapsed ? item.title : undefined}
                       className={`
-                        flex items-center gap-3 px-3 py-2.5 rounded-lg
-                        transition-all duration-200 group
+                        w-full flex items-center justify-between
+                        px-4 py-3 rounded-lg text-left transition-all duration-200
                         ${
-                          isActive(item.href)
-                            ? "bg-teal-50 text-teal-600 font-medium"
-                            : "text-gray-700 hover:bg-gray-100"
+                          isParentActive(item.subItems)
+                            ? "bg-white text-blue-600 shadow-sm font-bold"
+                            : "text-slate-600 hover:bg-white/50"
                         }
                       `}
                     >
-                      <item.icon
-                        className={`w-5 h-5 flex-shrink-0 ${item.color || ""} ${
-                          isCollapsed ? "mx-auto" : ""
-                        }`}
-                      />
+                      <div className={`flex items-center gap-3 ${isCollapsed ? "justify-center w-full" : ""}`}>
+                        <item.icon className={`w-5 h-5 flex-shrink-0 ${item.color || "text-slate-500"}`} />
+                        {!isCollapsed && (
+                          <span className="text-sm font-medium truncate">
+                            {item.title}
+                            {item.badge && (
+                              <span className="ml-2 bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
+                                {item.badge}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </div>
                       {!isCollapsed && (
-                        <span className="font-medium text-sm truncate">
-                          {item.title}
-                          {item.badge && (
-                            <span className="ml-2 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                              {item.badge}
-                            </span>
-                          )}
-                        </span>
+                        <ChevronDown
+                          className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform duration-300 ${
+                            openMenus[item.title] ? "rotate-180" : ""
+                          }`}
+                        />
                       )}
-                    </Link>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ))}
+                    </button>
+
+                    {!isCollapsed && (
+                      <div
+                        className="overflow-hidden"
+                        style={{
+                          maxHeight: openMenus[item.title]
+                            ? `${item.subItems.length * 38 + 16}px`
+                            : "0px",
+                          opacity: openMenus[item.title] ? 1 : 0,
+                          transition: "max-height 350ms ease-in-out, opacity 300ms ease-in-out",
+                        }}
+                      >
+                        <div className="pl-12 pt-1 pb-2 space-y-1">
+                          {item.subItems.map((sub) => (
+                            <Link
+                              key={sub.title}
+                              href={sub.href}
+                              onClick={onClose}
+                              className={`
+                                flex items-center gap-2 text-[13px] py-1.5 px-2 rounded-md
+                                transition-colors duration-150
+                                ${
+                                  isActive(sub.href)
+                                    ? "text-blue-600 font-semibold bg-blue-50/70"
+                                    : "text-slate-500 hover:text-blue-600"
+                                }
+                              `}
+                            >
+                              {sub.title}
+                              {sub.badge && (
+                                <span className="ml-auto bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
+                                  {sub.badge}
+                                </span>
+                              )}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Link
+                    href={item.href}
+                    onClick={onClose}
+                    title={isCollapsed ? item.title : undefined}
+                    className={`
+                      flex items-center gap-3 px-4 py-3 rounded-lg
+                      transition-all duration-200
+                      ${isCollapsed ? "justify-center" : ""}
+                      ${
+                        isActive(item.href)
+                          ? "bg-white text-blue-600 shadow-sm font-bold"
+                          : "text-slate-600 hover:bg-white/50"
+                      }
+                    `}
+                  >
+                    <item.icon className={`w-5 h-5 flex-shrink-0 ${item.color || "text-slate-500"}`} />
+                    {!isCollapsed && (
+                      <span className="text-sm font-medium truncate">
+                        {item.title}
+                        {item.badge && (
+                          <span className="ml-2 bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
+                            {item.badge}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </Link>
+                )}
+              </div>
+            ))
+          )}
         </nav>
 
-        {/* Footer with User Info */}
-        <div className="border-t border-gray-200 p-4 shrink-0">
+        {/* Footer — logout only */}
+        <div className="shrink-0 border-t border-slate-200/60 p-4">
           {!isCollapsed ? (
-            <div className="space-y-3">
-              {/* Store Info Card - Minimal */}
-              <div className="bg-gradient-to-r from-teal-50 to-gray-50 rounded-lg p-3 border border-teal-100">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-teal-500 rounded-lg">
-                    <Store className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-gray-900 truncate">
-                      {user?.vendor?.storeName || "My Store"}
-                    </h3>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-xs text-teal-600 font-medium capitalize">
-                        {user?.role?.toLowerCase() || "vendor"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Logout Button - Compact */}
-              <button
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white hover:bg-red-50 border border-red-200 text-red-600 rounded-lg transition-all duration-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed group"
-                title="Sign out"
-              >
-                {isLoggingOut ? (
-                  <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <LogOut className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-                    <span>Logout</span>
-                  </>
-                )}
-              </button>
-            </div>
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-red-50 border border-red-200 text-red-500 rounded-lg transition-all duration-200 text-sm font-medium disabled:opacity-50"
+            >
+              {isLoggingOut ? (
+                <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </>
+              )}
+            </button>
           ) : (
-            /* Collapsed State - Ultra Minimal */
-            <div className="flex flex-col items-center space-y-3">
-              {/* Store Icon */}
-              <div className="relative group">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-sm">
-                  <Store className="w-5 h-5 text-white" />
-                </div>
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-teal-500 border-2 border-white">
-                  <div className="w-full h-full flex items-center justify-center">
-                    <span className="text-[8px] font-bold text-white">
-                      {user?.role?.charAt(0) || "V"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Logout Button - Icon Only */}
+            <div className="flex justify-center">
               <button
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="p-2.5 hover:bg-red-50 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
-                title="Sign out"
+                className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                title="Logout"
               >
                 {isLoggingOut ? (
-                  <div className="w-5 h-5 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <LogOut className="w-5 h-5 text-red-500 group-hover:scale-110 transition-transform" />
+                  <LogOut className="w-5 h-5 text-red-400 hover:text-red-600" />
                 )}
               </button>
             </div>

@@ -1,7 +1,33 @@
 import React, { useEffect } from "react";
-import { CheckCircle2, Circle, AlertCircle } from "lucide-react";
 import { useRightSidebar } from "@/app/vendor-dashboard/rightbar/RightSidebar";
 
+/* ─── Step icon map ──────────────────────────────────────────────────────── */
+const STEP_ICONS: Record<string, string> = {
+  "basic-info":        "✦",
+  "media":             "◈",
+  "attributes":        "⬡",
+  "variants":          "⊞",
+  "description":       "≡",
+  "shipping-warranty": "⬆",
+  "review":            "◎",
+};
+
+/*
+ * accent  — text & icon color (dark shade of the ramp)
+ * glow    — border color (mid shade)
+ * bg      — card background (lightest tint)
+ */
+const STEP_COLORS: Record<string, { accent: string; glow: string; bg: string }> = {
+  "basic-info":        { accent: "#1D4ED8", glow: "#93C5FD",  bg: "#EFF6FF" },
+  "media":             { accent: "#0F766E", glow: "#5EEAD4",  bg: "#F0FDFA" },
+  "attributes":        { accent: "#B45309", glow: "#FCD34D",  bg: "#FFFBEB" },
+  "variants":          { accent: "#15803D", glow: "#86EFAC",  bg: "#F0FDF4" },
+  "description":       { accent: "#6D28D9", glow: "#C4B5FD",  bg: "#F5F3FF" },
+  "shipping-warranty": { accent: "#0369A1", glow: "#7DD3FC",  bg: "#F0F9FF" },
+  "review":            { accent: "#9D174D", glow: "#F9A8D4",  bg: "#FDF2F8" },
+};
+
+/* ─── Props ──────────────────────────────────────────────────────────────── */
 interface ProductCreationWizardProps {
   formData: {
     name: string;
@@ -18,68 +44,41 @@ interface ProductCreationWizardProps {
   };
 }
 
+/* ─── Component ──────────────────────────────────────────────────────────── */
 export const ProductCreationWizard: React.FC<ProductCreationWizardProps> = ({
   formData,
 }) => {
   const { wizardSteps, updateAllSteps } = useRightSidebar();
 
-  // Update completion status based on form data
+  /* ── Step completion logic ── */
   useEffect(() => {
-    const completionStatus: Partial<Record<string, boolean>> = {};
+    const s: Partial<Record<string, boolean>> = {};
 
-    // 1. Basic Info - name and leaf category selected
-    completionStatus["basic-info"] = !!(
+    s["basic-info"] = !!(
       formData.name.trim() &&
       formData.categoryId &&
       formData.isLeafCategory
     );
 
-    // 2. Media - at least one image
-    completionStatus["media"] = formData.images.length > 0;
+    s["media"] = formData.images.length > 0;
 
-    // 3. Attributes - FIXED: Only complete if leaf category selected AND all required attributes filled
     if (formData.isLeafCategory && formData.categoryId) {
-      // If there are required attributes, check if they're all filled
-      if (formData.requiredAttributes.length > 0) {
-        const requiredAttrsFilled = formData.requiredAttributes.every((reqAttr) =>
-          formData.attributes.some((attr) => attr.attributeId === reqAttr.id)
-        );
-        completionStatus["attributes"] = requiredAttrsFilled;
-      } else {
-        // No required attributes, but still need leaf category
-        completionStatus["attributes"] = true;
-      }
+      s["attributes"] =
+        formData.requiredAttributes.length === 0
+          ? true
+          : formData.requiredAttributes.every((r) =>
+              formData.attributes.some((a) => a.attributeId === r.id)
+            );
     } else {
-      // Not a leaf category yet, can't be complete
-      completionStatus["attributes"] = false;
+      s["attributes"] = false;
     }
 
-    // 4. Variants - at least one variant with valid data
-    const hasValidVariant = formData.variants.some(
-      (v) => v.sku && v.price && v.price > 0
-    );
-    completionStatus["variants"] = hasValidVariant;
+    s["variants"]    = formData.variants.some((v) => v.sku && v.price && v.price > 0);
+    s["description"] = formData.description.trim().length > 0;
+    s["shipping-warranty"] = true;
+    s["review"] = !!(s["basic-info"] && s["media"] && s["attributes"] && s["variants"]);
 
-    // 5. Description - optional, mark as complete only if has actual content
-    completionStatus["description"] = formData.description.trim().length > 0;
-
-    // 6. Shipping & Warranty - optional, mark as complete if either field is filled
-    // If both fields are empty, still consider it complete since it's optional
-    const hasShippingWarrantyData = 
-      formData.shippingWarranty?.warrantyType || 
-      formData.shippingWarranty?.warrantyDetails;
-    completionStatus["shipping-warranty"] = true; // Always complete since it's optional
-
-    // 7. Review - all required steps completed
-    // Note: shipping-warranty is not required, so don't include it in required steps check
-    const allRequiredComplete = 
-      completionStatus["basic-info"] &&
-      completionStatus["media"] &&
-      completionStatus["attributes"] &&
-      completionStatus["variants"];
-    completionStatus["review"] = allRequiredComplete;
-
-    updateAllSteps(completionStatus);
+    updateAllSteps(s);
   }, [
     formData.name,
     formData.categoryId,
@@ -93,128 +92,277 @@ export const ProductCreationWizard: React.FC<ProductCreationWizardProps> = ({
     updateAllSteps,
   ]);
 
+  /* ── Step detail lines ── */
+  const getDetails = (stepId: string): { text: string; ok: boolean }[] => {
+    switch (stepId) {
+      case "basic-info":
+        return [
+          {
+            text: formData.name
+              ? `"${formData.name.slice(0, 20)}${formData.name.length > 20 ? "…" : ""}"`
+              : "Product name",
+            ok: !!formData.name,
+          },
+          {
+            text:
+              formData.categoryId && formData.isLeafCategory
+                ? "Leaf category selected"
+                : "Leaf category required",
+            ok: !!(formData.categoryId && formData.isLeafCategory),
+          },
+        ];
+      case "media":
+        return [
+          {
+            text: `${formData.images.length}/10 images uploaded`,
+            ok: formData.images.length > 0,
+          },
+          {
+            text: formData.videoUrl ? "Video added" : "No video (optional)",
+            ok: !!formData.videoUrl,
+          },
+        ];
+      case "attributes":
+        if (!formData.isLeafCategory)
+          return [{ text: "Select a leaf category first", ok: false }];
+        if (formData.requiredAttributes.length === 0)
+          return [{ text: "No required attributes", ok: true }];
+        {
+          const filled = formData.attributes.filter((a) =>
+            formData.requiredAttributes.some((r) => r.id === a.attributeId)
+          ).length;
+          return [
+            {
+              text: `${filled}/${formData.requiredAttributes.length} required filled`,
+              ok: filled === formData.requiredAttributes.length,
+            },
+          ];
+        }
+      case "variants":
+        return [
+          {
+            text: `${formData.variants.length} variant${formData.variants.length !== 1 ? "s" : ""} added`,
+            ok: formData.variants.length > 0,
+          },
+        ];
+      case "description":
+        return [
+          {
+            text: formData.description
+              ? `${formData.description.length} characters`
+              : "Not added yet (optional)",
+            ok: !!formData.description,
+          },
+        ];
+      case "shipping-warranty":
+        return [
+          {
+            text: formData.shippingWarranty?.warrantyType
+              ? `${formData.shippingWarranty.warrantyType}`
+              : "Warranty (optional)",
+            ok: !!formData.shippingWarranty?.warrantyType,
+          },
+        ];
+      case "review": {
+        const allReq = wizardSteps
+          .filter((s) => s.required && s.id !== "review")
+          .every((s) => s.completed);
+        return [
+          { text: allReq ? "All required steps done" : "Complete required steps", ok: allReq },
+        ];
+      }
+      default:
+        return [];
+    }
+  };
+
   return (
-    <div className="space-y-3">
-      {wizardSteps.map((step, index) => {
-        const isCompleted = step.completed;
-        const isRequired = step.required;
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {wizardSteps.map((step, idx) => {
+        const done    = step.completed;
+        const colors  = STEP_COLORS[step.id] || STEP_COLORS["basic-info"];
+        const icon    = STEP_ICONS[step.id] || "◇";
+        const details = getDetails(step.id);
 
         return (
           <div
             key={step.id}
-            className={`p-3 rounded-lg border-2 transition-all ${
-              isCompleted
-                ? "bg-green-50 border-green-200"
-                : isRequired
-                ? "bg-white border-gray-200 hover:border-blue-200"
-                : "bg-gray-50 border-gray-100"
-            }`}
+            style={{
+              background: done ? colors.bg : "#F8FAFC",
+              border: done
+                ? `0.5px solid ${colors.glow}`
+                : "0.5px solid #E2E8F0",
+              borderRadius: 12,
+              padding: "10px 12px",
+              transition: "all 0.3s cubic-bezier(.4,0,.2,1)",
+              cursor: "default",
+              position: "relative",
+              overflow: "hidden",
+            }}
           >
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 mt-0.5">
-                {isCompleted ? (
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                ) : isRequired ? (
-                  <AlertCircle className="w-5 h-5 text-amber-500" />
+            {/* Done top accent line */}
+            {done && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 2,
+                  background: `linear-gradient(90deg, transparent, ${colors.glow}, transparent)`,
+                  opacity: 0.8,
+                }}
+              />
+            )}
+
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+              {/* Icon bubble */}
+              <div
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 9,
+                  background: done ? colors.bg : "#F1F5F9",
+                  border: `0.5px solid ${done ? colors.glow : "#CBD5E1"}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  fontSize: 13,
+                  color: done ? colors.accent : "#94A3B8",
+                  transition: "all 0.3s",
+                }}
+              >
+                {done ? (
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                    <path
+                      d="M2 6.5L5.5 10L11 3"
+                      stroke={colors.accent}
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 ) : (
-                  <Circle className="w-5 h-5 text-gray-400" />
+                  <span style={{ fontSize: 11, opacity: 0.5 }}>{icon}</span>
                 )}
               </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <h4 className={`font-medium text-sm ${
-                      isCompleted ? "text-green-900" : "text-gray-900"
-                    }`}>
-                      {step.title}
-                    </h4>
-                    {isRequired && !isCompleted && (
-                      <p className="text-xs text-amber-600 mt-0.5">Required</p>
-                    )}
-                    {!isRequired && (
-                      <p className="text-xs text-gray-500 mt-0.5">Optional</p>
-                    )}
-                  </div>
-                  <span className="text-xs font-medium text-gray-400">
-                    {index + 1}/{wizardSteps.length}
+              {/* Content */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 6,
+                    marginBottom: 2,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: done ? 700 : 500,
+                      color: done ? colors.accent : "#64748B",
+                      letterSpacing: "-0.1px",
+                      transition: "color 0.3s",
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {step.title}
                   </span>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+                    {/* Step number badge */}
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        color: done ? colors.accent : "#94A3B8",
+                        background: done ? colors.bg : "#F1F5F9",
+                        border: `0.5px solid ${done ? colors.glow : "#CBD5E1"}`,
+                        padding: "1px 6px",
+                        borderRadius: 20,
+                        letterSpacing: "0.04em",
+                        transition: "all 0.3s",
+                      }}
+                    >
+                      {idx + 1}/{wizardSteps.length}
+                    </span>
+
+                    {/* Required / Optional / Done pill */}
+                    <span
+                      style={{
+                        fontSize: 8.5,
+                        fontWeight: 700,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        padding: "1px 6px",
+                        borderRadius: 20,
+                        color: done
+                          ? "#059669"
+                          : step.required
+                          ? "#B45309"
+                          : "#64748B",
+                        background: done
+                          ? "#D1FAE5"
+                          : step.required
+                          ? "#FEF3C7"
+                          : "#F1F5F9",
+                        border: done
+                          ? "0.5px solid #6EE7B7"
+                          : step.required
+                          ? "0.5px solid #FCD34D"
+                          : "0.5px solid #CBD5E1",
+                        transition: "all 0.3s",
+                      }}
+                    >
+                      {done ? "Done" : step.required ? "Req" : "Opt"}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Step-specific details */}
-                {step.id === "basic-info" && (
-                  <div className="mt-2 text-xs text-gray-600 space-y-1">
-                    <p className={formData.name ? "text-green-600" : ""}>
-                      • Product name {formData.name ? "✓" : ""}
-                    </p>
-                    <p className={formData.categoryId && formData.isLeafCategory ? "text-green-600" : ""}>
-                      • Leaf category {formData.categoryId && formData.isLeafCategory ? "✓" : ""}
-                    </p>
-                  </div>
-                )}
-
-                {step.id === "media" && (
-                  <div className="mt-2 text-xs text-gray-600">
-                    <p className={formData.images.length > 0 ? "text-green-600" : ""}>
-                      • Images: {formData.images.length}/10 {formData.images.length > 0 ? "✓" : ""}
-                    </p>
-                  </div>
-                )}
-
-                {step.id === "attributes" && (
-                  <div className="mt-2 text-xs text-gray-600 space-y-1">
-                    {!formData.isLeafCategory ? (
-                      <p className="text-amber-600">• Select a leaf category first</p>
-                    ) : formData.requiredAttributes.length === 0 ? (
-                      <p className="text-green-600">• No required attributes ✓</p>
-                    ) : (
-                      <p className={
-                        formData.attributes.filter(a => 
-                          formData.requiredAttributes.some(r => r.id === a.attributeId)
-                        ).length === formData.requiredAttributes.length ? "text-green-600" : ""
-                      }>
-                        • Required: {formData.attributes.filter(a => 
-                          formData.requiredAttributes.some(r => r.id === a.attributeId)
-                        ).length}/{formData.requiredAttributes.length}
-                        {formData.attributes.filter(a => 
-                          formData.requiredAttributes.some(r => r.id === a.attributeId)
-                        ).length === formData.requiredAttributes.length ? " ✓" : ""}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {step.id === "variants" && (
-                  <div className="mt-2 text-xs text-gray-600">
-                    <p className={formData.variants.length > 0 ? "text-green-600" : ""}>
-                      • Variants: {formData.variants.length} {formData.variants.length > 0 ? "✓" : ""}
-                    </p>
-                  </div>
-                )}
-
-                {step.id === "description" && (
-                  <div className="mt-2 text-xs text-gray-600">
-                    <p className={formData.description ? "text-green-600" : "text-gray-500"}>
-                      • {formData.description ? `${formData.description.length} characters ✓` : "Not added yet"}
-                    </p>
-                  </div>
-                )}
-
-                {step.id === "shipping-warranty" && (
-                  <div className="mt-2 text-xs text-gray-600 space-y-1">
-                    <p className={formData.shippingWarranty?.warrantyType ? "text-green-600" : "text-gray-500"}>
-                      • Warranty type {formData.shippingWarranty?.warrantyType ? "✓" : "(Optional)"}
-                    </p>
-                    <p className={formData.shippingWarranty?.warrantyDetails ? "text-green-600" : "text-gray-500"}>
-                      • Warranty details {formData.shippingWarranty?.warrantyDetails ? "✓" : "(Optional)"}
-                    </p>
-                  </div>
-                )}
+                {/* Detail lines */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 4 }}>
+                  {details.map((d, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        fontSize: 10.5,
+                        color: d.ok ? colors.accent : "#94A3B8",
+                        opacity: d.ok ? 1 : 0.7,
+                        transition: "all 0.3s",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 4,
+                          height: 4,
+                          borderRadius: "50%",
+                          background: d.ok ? colors.accent : "#CBD5E1",
+                          flexShrink: 0,
+                          transition: "background 0.3s",
+                        }}
+                      />
+                      {d.text}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         );
       })}
+
+      <style>{`
+        @keyframes fade-in-up {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 };

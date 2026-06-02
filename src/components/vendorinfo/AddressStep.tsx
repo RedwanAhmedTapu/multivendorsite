@@ -1,25 +1,23 @@
-// components/vendor/steps/AddressStep.tsx - UPDATED VERSION
+// components/vendor/steps/AddressStep.tsx
 import React, { useEffect, useState } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { RootState } from '@/store/store';
-import { 
-  useGetDivisionsQuery, 
-  useGetDistrictsQuery, 
+import {
+  useGetDivisionsQuery,
+  useGetDistrictsQuery,
   useGetThanasQuery,
-  Location
+  Location,
 } from '@/features/locationApi';
 import {
   useCreateOrUpdateBulkWarehousesMutation,
   useGetWarehousesByVendorQuery,
   WarehouseType,
   BulkWarehouseRequest,
-  Warehouse
 } from '@/features/warehouseApi';
 
 interface AddressFormData {
-  // Warehouse/Pickup fields
   detailsAddress: string;
   city: string;
   zone: string;
@@ -28,8 +26,6 @@ interface AddressFormData {
   warehouseName?: string;
   warehouseEmail?: string;
   warehousePhone?: string;
-  
-  // Return address fields
   sameAsWarehouse?: boolean;
   returnAddress?: string;
   returnCity?: string;
@@ -50,69 +46,209 @@ interface AddressStepProps {
   onClearError: (field: string) => void;
 }
 
-const ChevronDownIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+/* ── Small SVG helpers ── */
+const ChevronIcon = ({ open }: { open: boolean }) => (
+  <svg
+    className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+  >
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
   </svg>
 );
 
-const EditIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const EditIcon = () => (
+  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
   </svg>
 );
 
-const AddressStep: React.FC<AddressStepProps> = ({ 
-  form, 
+const SpinnerIcon = () => (
+  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+  </svg>
+);
+
+/* ── Shared input style ── */
+const inputCls = (hasError?: boolean) =>
+  `w-full px-4 py-3 rounded-xl border-2 text-sm text-slate-900 font-medium placeholder-slate-300 focus:outline-none transition-all ${
+    hasError
+      ? 'border-red-300 bg-red-50 focus:border-red-400'
+      : 'border-slate-200 focus:border-blue-500'
+  }`;
+
+/* ── Location cascading dropdown ── */
+interface LocationDropdownProps {
+  label: string;
+  required?: boolean;
+  display: string;
+  open: boolean;
+  onToggle: () => void;
+  divisions: Location[];
+  districts: Location[];
+  thanas: Location[];
+  returnDistricts?: Location[];
+  returnThanas?: Location[];
+  selectedDivisionId: string;
+  selectedDistrictId: string;
+  selectedThanaId: string;
+  onDivisionClick: (id: string) => void;
+  onDistrictClick: (id: string) => void;
+  onThanaClick: (divId: string, disId: string, thanaId: string) => void;
+  loading?: boolean;
+  isReturn?: boolean;
+  returnDivisionId?: string;
+  returnDistrictId?: string;
+}
+
+const LocationDropdown: React.FC<LocationDropdownProps> = ({
+  label, required, display, open, onToggle,
+  divisions, districts, thanas,
+  returnDistricts = [], returnThanas = [],
+  selectedDivisionId, selectedDistrictId, selectedThanaId,
+  onDivisionClick, onDistrictClick, onThanaClick,
+  loading, isReturn,
+  returnDivisionId, returnDistrictId,
+}) => {
+  const activeDivId = isReturn ? (returnDivisionId || '') : selectedDivisionId;
+  const activeDisId = isReturn ? (returnDistrictId || '') : selectedDistrictId;
+  const activeDistricts = isReturn ? returnDistricts : districts;
+  const activeThanas = isReturn ? returnThanas : thanas;
+
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-xs font-black uppercase tracking-widest text-slate-500">
+        {label} {required && <span className="text-red-500 normal-case">*</span>}
+      </label>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={onToggle}
+          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all focus:outline-none ${
+            open ? 'border-blue-500 bg-white' : 'border-slate-200 hover:border-slate-300'
+          }`}
+          style={{ backgroundColor: open ? '#fff' : '#faf8ff' }}
+        >
+          <span className={selectedThanaId || (isReturn && returnDivisionId) ? 'text-slate-900' : 'text-slate-400'}>
+            {display}
+          </span>
+          <ChevronIcon open={open} />
+        </button>
+
+        {open && (
+          <div className="absolute z-50 left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden max-h-72 overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-slate-500 text-sm">
+                <SpinnerIcon /> Loading locations…
+              </div>
+            ) : divisions.length === 0 ? (
+              <div className="py-6 text-center text-sm text-slate-400">No locations available</div>
+            ) : (
+              divisions.map((div) => (
+                <div key={div.id}>
+                  {/* Division */}
+                  <button
+                    type="button"
+                    onClick={() => onDivisionClick(div.id)}
+                    className={`w-full flex items-center justify-between px-4 py-3 text-left text-sm font-bold border-b border-slate-100 transition-colors ${
+                      activeDivId === div.id ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {div.name}
+                    {activeDivId === div.id && (
+                      <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    )}
+                  </button>
+
+                  {/* Districts */}
+                  {activeDivId === div.id && activeDistricts.map((dis) => (
+                    <div key={dis.id}>
+                      <button
+                        type="button"
+                        onClick={() => onDistrictClick(dis.id)}
+                        className={`w-full flex items-center justify-between pl-8 pr-4 py-2.5 text-left text-sm border-b border-slate-100 transition-colors ${
+                          activeDisId === dis.id ? 'bg-blue-50/60 text-blue-600 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {dis.name}
+                        {activeDisId === dis.id && (
+                          <svg className="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        )}
+                      </button>
+
+                      {/* Thanas */}
+                      {activeDisId === dis.id && activeThanas.map((thana) => (
+                        <button
+                          key={thana.id}
+                          type="button"
+                          onClick={() => onThanaClick(div.id, dis.id, thana.id)}
+                          className={`w-full pl-14 pr-4 py-2 text-left text-[13px] transition-colors ${
+                            selectedThanaId === thana.id ? 'bg-blue-600 text-white font-semibold' : 'text-slate-500 hover:bg-blue-50 hover:text-blue-600'
+                          }`}
+                        >
+                          {thana.name}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ── Info row for table view ── */
+const InfoRow = ({ label, value }: { label: string; value?: string }) => (
+  <div>
+    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">{label}</p>
+    <p className="text-sm font-semibold text-slate-900">{value || '—'}</p>
+  </div>
+);
+
+/* ════════════════════════════════════════════════
+   MAIN COMPONENT
+════════════════════════════════════════════════ */
+const AddressStep: React.FC<AddressStepProps> = ({
+  form,
   warehouseId,
   onSuccess,
   isSubmitting: externalIsSubmitting,
   onBack,
   showBackButton = true,
-  onClearError
+  onClearError,
 }) => {
   const { register, handleSubmit, formState: { errors, isValid }, watch, setValue, getValues, trigger } = form;
-  
-  // Get vendorId from Redux store
   const vendorId = useSelector((state: RootState) => state.auth.user?.vendorId);
-  
   const watchedFields = watch();
-  
-  // Edit mode states
+
   const [isEditMode, setIsEditMode] = useState(false);
-  
-  // State management for warehouse location
-  const [selectedDivisionId, setSelectedDivisionId] = useState<string>('');
-  const [selectedDistrictId, setSelectedDistrictId] = useState<string>('');
-  const [selectedThanaId, setSelectedThanaId] = useState<string>('');
-  const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
-  
-  // State management for return location
-  const [returnDivisionId, setReturnDivisionId] = useState<string>('');
-  const [returnDistrictId, setReturnDistrictId] = useState<string>('');
-  const [returnThanaId, setReturnThanaId] = useState<string>('');
-  const [isReturnLocationDropdownOpen, setIsReturnLocationDropdownOpen] = useState(false);
-  
-  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Fetch locations from API
+  // Warehouse location state
+  const [selectedDivisionId, setSelectedDivisionId] = useState('');
+  const [selectedDistrictId, setSelectedDistrictId] = useState('');
+  const [selectedThanaId, setSelectedThanaId] = useState('');
+  const [locationOpen, setLocationOpen] = useState(false);
+
+  // Return location state
+  const [returnDivisionId, setReturnDivisionId] = useState('');
+  const [returnDistrictId, setReturnDistrictId] = useState('');
+  const [returnThanaId, setReturnThanaId] = useState('');
+  const [returnLocationOpen, setReturnLocationOpen] = useState(false);
+
   const { data: divisionsData, isLoading: divisionsLoading } = useGetDivisionsQuery();
-  const { data: districtsData, isLoading: districtsLoading } = useGetDistrictsQuery(selectedDivisionId, {
-    skip: !selectedDivisionId
-  });
-  const { data: thanasData, isLoading: thanasLoading } = useGetThanasQuery(selectedDistrictId, {
-    skip: !selectedDistrictId
-  });
-  
-  // Return location queries
-  const { data: returnDistrictsData } = useGetDistrictsQuery(returnDivisionId, {
-    skip: !returnDivisionId
-  });
-  const { data: returnThanasData } = useGetThanasQuery(returnDistrictId, {
-    skip: !returnDistrictId
-  });
+  const { data: districtsData } = useGetDistrictsQuery(selectedDivisionId, { skip: !selectedDivisionId });
+  const { data: thanasData } = useGetThanasQuery(selectedDistrictId, { skip: !selectedDistrictId });
+  const { data: returnDistrictsData } = useGetDistrictsQuery(returnDivisionId, { skip: !returnDivisionId });
+  const { data: returnThanasData } = useGetThanasQuery(returnDistrictId, { skip: !returnDistrictId });
 
-  // RTK Query hooks for warehouse - USE BULK MUTATION
   const [createOrUpdateBulkWarehouses, { isLoading: isSaving }] = useCreateOrUpdateBulkWarehousesMutation();
   const { data: warehousesData, isLoading: isLoadingWarehouses } = useGetWarehousesByVendorQuery(
     { vendorId: vendorId || '' },
@@ -124,66 +260,37 @@ const AddressStep: React.FC<AddressStepProps> = ({
   const divisions: Location[] = divisionsData?.data || [];
   const districts: Location[] = districtsData?.data || [];
   const thanas: Location[] = thanasData?.data || [];
-  
   const returnDistricts: Location[] = returnDistrictsData?.data || [];
   const returnThanas: Location[] = returnThanasData?.data || [];
 
-  // Get warehouse and return warehouse
-  const pickupWarehouse = warehousesData?.data?.find(w => w.type === WarehouseType.PICKUP);
-  const dropoffWarehouse = warehousesData?.data?.find(w => w.type === WarehouseType.DROPOFF);
-  
-  // Check if warehouses exist
+  const pickupWarehouse = warehousesData?.data?.find((w: any) => w.type === WarehouseType.PICKUP);
+  const dropoffWarehouse = warehousesData?.data?.find((w: any) => w.type === WarehouseType.DROPOFF);
   const hasExistingData = !isLoadingWarehouses && (pickupWarehouse || dropoffWarehouse);
 
-  useEffect(() => {
-    onClearError('submit');
-  }, [watchedFields, onClearError]);
+  useEffect(() => { onClearError('submit'); }, [watchedFields, onClearError]);
 
-  // Check if vendorId is available
-  useEffect(() => {
-    if (!vendorId) {
-      console.error('❌ VendorId is not available in Redux store');
-    } else {
-      console.log('✅ VendorId found:', vendorId);
-    }
-  }, [vendorId]);
-
-  // Load existing warehouse address data when editing
   useEffect(() => {
     if (isEditMode && pickupWarehouse) {
-      console.log('🔄 Loading warehouse data for editing:', pickupWarehouse);
-      
-      // Populate pickup warehouse data - ALL FIELDS
       setValue('detailsAddress', pickupWarehouse.address || '');
       setValue('warehouseName', pickupWarehouse.name || '');
       setValue('warehouseEmail', pickupWarehouse.email || '');
       setValue('warehousePhone', pickupWarehouse.phone || '');
-      
-      // For location, we'll set the thana ID and display
-      // The actual hierarchy will be reconstructed when user opens the dropdown
       if (pickupWarehouse.locationId) {
         setSelectedThanaId(pickupWarehouse.locationId);
-        
-        // If location object has the full address string, use it for display
         if (pickupWarehouse.location) {
-          // Set form values for hidden fields
           setValue('city', pickupWarehouse.location.city || '');
           setValue('zone', pickupWarehouse.location.state || '');
           setValue('area', pickupWarehouse.location.name || '');
         }
       }
-      
-      // Populate return warehouse data if exists - ALL FIELDS  
       if (dropoffWarehouse) {
         setValue('sameAsWarehouse', false);
         setValue('returnAddress', dropoffWarehouse.address || '');
         setValue('returnName', dropoffWarehouse.name || '');
         setValue('returnEmail', dropoffWarehouse.email || '');
         setValue('returnPhone', dropoffWarehouse.phone || '');
-        
         if (dropoffWarehouse.locationId) {
           setReturnThanaId(dropoffWarehouse.locationId);
-          
           if (dropoffWarehouse.location) {
             setValue('returnCity', dropoffWarehouse.location.city || '');
             setValue('returnZone', dropoffWarehouse.location.state || '');
@@ -196,124 +303,70 @@ const AddressStep: React.FC<AddressStepProps> = ({
     }
   }, [isEditMode, pickupWarehouse, dropoffWarehouse, setValue]);
 
-  // Get formatted location display
   const getLocationDisplay = () => {
-    const parts: string[] = [];
-    
-    // If in edit mode and we have form values, use those for display
-    const values = getValues();
-    
-    if (values.area && values.zone && values.city) {
-      return `${values.area} / ${values.zone} / ${values.city}`;
-    }
-    
-    // Otherwise, build from selected IDs
-    if (selectedThanaId) {
-      const thana = thanas.find(t => t.id === selectedThanaId);
-      if (thana) parts.push(thana.name);
-    }
-    
-    if (selectedDistrictId) {
-      const district = districts.find(d => d.id === selectedDistrictId);
-      if (district) parts.push(district.name);
-    }
-    
-    if (selectedDivisionId) {
-      const division = divisions.find(d => d.id === selectedDivisionId);
-      if (division) parts.push(division.name);
-    }
-    
-    return parts.length > 0 ? parts.join(' / ') : 'Please Select';
+    const v = getValues();
+    if (v.area && v.zone && v.city) return `${v.area} / ${v.zone} / ${v.city}`;
+    const parts = [];
+    if (selectedThanaId) { const t = thanas.find(x => x.id === selectedThanaId); if (t) parts.push(t.name); }
+    if (selectedDistrictId) { const d = districts.find(x => x.id === selectedDistrictId); if (d) parts.push(d.name); }
+    if (selectedDivisionId) { const d = divisions.find(x => x.id === selectedDivisionId); if (d) parts.push(d.name); }
+    return parts.length ? parts.join(' / ') : 'Select area, district, division';
   };
 
-  // Get formatted return location display
   const getReturnLocationDisplay = () => {
-    const parts: string[] = [];
-    
-    // If in edit mode and we have form values, use those for display
-    const values = getValues();
-    
-    if (values.returnArea && values.returnZone && values.returnCity) {
-      return `${values.returnArea} / ${values.returnZone} / ${values.returnCity}`;
-    }
-    
-    // Otherwise, build from selected IDs
-    if (returnThanaId) {
-      const thana = returnThanas.find(t => t.id === returnThanaId);
-      if (thana) parts.push(thana.name);
-    }
-    
-    if (returnDistrictId) {
-      const district = returnDistricts.find(d => d.id === returnDistrictId);
-      if (district) parts.push(district.name);
-    }
-    
-    if (returnDivisionId) {
-      const division = divisions.find(d => d.id === returnDivisionId);
-      if (division) parts.push(division.name);
-    }
-    
-    return parts.length > 0 ? parts.join(' / ') : 'Please Select';
+    const v = getValues();
+    if (v.returnArea && v.returnZone && v.returnCity) return `${v.returnArea} / ${v.returnZone} / ${v.returnCity}`;
+    const parts = [];
+    if (returnThanaId) { const t = returnThanas.find(x => x.id === returnThanaId); if (t) parts.push(t.name); }
+    if (returnDistrictId) { const d = returnDistricts.find(x => x.id === returnDistrictId); if (d) parts.push(d.name); }
+    if (returnDivisionId) { const d = divisions.find(x => x.id === returnDivisionId); if (d) parts.push(d.name); }
+    return parts.length ? parts.join(' / ') : 'Select area, district, division';
   };
 
-  // Handle location selection from dropdown
-  const handleLocationSelect = (divisionId: string, districtId: string, thanaId: string) => {
-    setSelectedDivisionId(divisionId);
-    setSelectedDistrictId(districtId);
-    setSelectedThanaId(thanaId);
-    
-    const division = divisions.find(d => d.id === divisionId);
-    const district = districts.find(d => d.id === districtId);
+  const handleLocationSelect = (divId: string, disId: string, thanaId: string) => {
+    setSelectedDivisionId(divId); setSelectedDistrictId(disId); setSelectedThanaId(thanaId);
+    const div = divisions.find(d => d.id === divId);
+    const dis = districts.find(d => d.id === disId);
     const thana = thanas.find(t => t.id === thanaId);
-    
-    if (division) setValue('city', division.name);
-    if (district) setValue('zone', district.name);
+    if (div) setValue('city', div.name);
+    if (dis) setValue('zone', dis.name);
     if (thana) setValue('area', thana.name);
-    
-    setIsLocationDropdownOpen(false);
+    setLocationOpen(false);
   };
 
-  // Handle return location selection
-  const handleReturnLocationSelect = (divisionId: string, districtId: string, thanaId: string) => {
-    setReturnDivisionId(divisionId);
-    setReturnDistrictId(districtId);
-    setReturnThanaId(thanaId);
-    
-    const division = divisions.find(d => d.id === divisionId);
-    const district = returnDistricts.find(d => d.id === districtId);
+  const handleReturnLocationSelect = (divId: string, disId: string, thanaId: string) => {
+    setReturnDivisionId(divId); setReturnDistrictId(disId); setReturnThanaId(thanaId);
+    const div = divisions.find(d => d.id === divId);
+    const dis = returnDistricts.find(d => d.id === disId);
     const thana = returnThanas.find(t => t.id === thanaId);
-    
-    if (division) setValue('returnCity', division.name);
-    if (district) setValue('returnZone', district.name);
+    if (div) setValue('returnCity', div.name);
+    if (dis) setValue('returnZone', dis.name);
     if (thana) setValue('returnArea', thana.name);
-    
-    setIsReturnLocationDropdownOpen(false);
+    setReturnLocationOpen(false);
+  };
+
+  const resetLocationState = () => {
+    setSelectedDivisionId(''); setSelectedDistrictId(''); setSelectedThanaId('');
+    setReturnDivisionId(''); setReturnDistrictId(''); setReturnThanaId('');
+    setValue('detailsAddress', ''); setValue('warehouseName', ''); setValue('warehouseEmail', ''); setValue('warehousePhone', '');
+    setValue('returnAddress', ''); setValue('returnName', ''); setValue('returnEmail', ''); setValue('returnPhone', '');
   };
 
   const isFormValid = () => {
-    const values = getValues();
-    const warehouseValid = values.detailsAddress && values.city && values.zone && values.area;
-    const returnValid = values.sameAsWarehouse || (values.returnAddress && values.returnCity && values.returnZone && values.returnArea);
-    return warehouseValid && returnValid && isValid;
+    const v = getValues();
+    const wValid = v.detailsAddress && v.city && v.zone && v.area;
+    const rValid = v.sameAsWarehouse || (v.returnAddress && v.returnCity && v.returnZone && v.returnArea);
+    return !!(wValid && rValid && isValid);
   };
 
-  // Handle form submission with BULK warehouse creation/update
   const handleFormSubmit = async (data: AddressFormData) => {
-    const isFormValid = await trigger();
-    if (!isFormValid || !selectedThanaId) {
-      toast.error('Please complete all required address fields');
-      return;
-    }
-
-    if (!vendorId) {
-      toast.error('Vendor ID is missing. Please log in again.');
-      return;
-    }
+    const valid = await trigger();
+    if (!valid || !selectedThanaId) { toast.error('Please complete all required address fields'); return; }
+    if (!vendorId) { toast.error('Vendor ID is missing. Please log in again.'); return; }
 
     try {
-      // Prepare bulk warehouse data with ALL fields
       const bulkData: BulkWarehouseRequest = {
-        vendorId: vendorId,
+        vendorId,
         pickupWarehouse: {
           locationId: selectedThanaId,
           address: data.detailsAddress,
@@ -323,700 +376,351 @@ const AddressStep: React.FC<AddressStepProps> = ({
         },
       };
 
-      // Add return warehouse data with ALL fields
       if (data.sameAsWarehouse) {
-        bulkData.returnWarehouse = {
-          locationId: selectedThanaId,
-          address: data.detailsAddress,
-          name: data.warehouseName,
-          email: data.warehouseEmail,
-          phone: data.warehousePhone,
-          sameAsPickup: true,
-        };
+        bulkData.returnWarehouse = { locationId: selectedThanaId, address: data.detailsAddress, name: data.warehouseName, email: data.warehouseEmail, phone: data.warehousePhone, sameAsPickup: true };
       } else if (returnThanaId && data.returnAddress) {
-        bulkData.returnWarehouse = {
-          locationId: returnThanaId,
-          address: data.returnAddress,
-          name: data.returnName,
-          email: data.returnEmail,
-          phone: data.returnPhone,
-          sameAsPickup: false,
-        };
+        bulkData.returnWarehouse = { locationId: returnThanaId, address: data.returnAddress, name: data.returnName, email: data.returnEmail, phone: data.returnPhone, sameAsPickup: false };
       }
 
-      console.log('📦 Saving bulk warehouses:', bulkData);
-      
-      // Show loading toast
-      const loadingToast = toast.loading(isEditMode ? 'Updating addresses...' : 'Saving addresses...');
-      
+      const loadingToast = toast.loading(isEditMode ? 'Updating addresses…' : 'Saving addresses…');
       const result = await createOrUpdateBulkWarehouses(bulkData).unwrap();
-
-      // Dismiss loading toast
       toast.dismiss(loadingToast);
 
       if (result.success) {
-        console.log('✅ Warehouses saved successfully:', result.data);
-        
-        // Reset edit mode
         setIsEditMode(false);
-        
-        // Clear form fields
-        setValue('detailsAddress', '');
-        setValue('warehouseName', '');
-        setValue('warehouseEmail', '');
-        setValue('warehousePhone', '');
-        setValue('returnAddress', '');
-        setValue('returnName', '');
-        setValue('returnEmail', '');
-        setValue('returnPhone', '');
-        setSelectedDivisionId('');
-        setSelectedDistrictId('');
-        setSelectedThanaId('');
-        setReturnDivisionId('');
-        setReturnDistrictId('');
-        setReturnThanaId('');
-        
-        // Show success toast
-        toast.success(
-          isEditMode 
-            ? 'Addresses updated successfully!' 
-            : 'Addresses saved successfully!',
-          {
-            description: 'Your warehouse and return addresses have been saved.',
-            duration: 4000,
-          }
-        );
-        
-        // Call onSuccess callback
-        if (onSuccess && result.data.pickupWarehouse) {
-          onSuccess(result.data.pickupWarehouse.id, result.data.pickupWarehouse.locationId);
-        }
+        resetLocationState();
+        toast.success(isEditMode ? 'Addresses updated!' : 'Addresses saved!', { description: 'Warehouse and return addresses have been saved.', duration: 4000 });
+        if (onSuccess && result.data.pickupWarehouse) onSuccess(result.data.pickupWarehouse.id, result.data.pickupWarehouse.locationId);
       }
     } catch (error: any) {
-      console.error('❌ Error saving warehouse addresses:', error);
-      
-      // Show error toast with details
-      toast.error(
-        'Failed to save addresses',
-        {
-          description: error?.data?.message || 'Please try again or contact support if the problem persists.',
-          duration: 5000,
-        }
-      );
+      toast.error('Failed to save addresses', { description: error?.data?.message || 'Please try again.', duration: 5000 });
     }
   };
 
-  // Handle edit mode
-  const handleEditAddresses = () => {
-    setIsEditMode(true);
-  };
+  const handleCancelEdit = () => { setIsEditMode(false); resetLocationState(); };
 
-  // Handle cancel edit
-  const handleCancelEdit = () => {
-    setIsEditMode(false);
-    
-    // Reset all form fields
-    setValue('detailsAddress', '');
-    setValue('warehouseName', '');
-    setValue('warehouseEmail', '');
-    setValue('warehousePhone', '');
-    setValue('returnAddress', '');
-    setValue('returnName', '');
-    setValue('returnEmail', '');
-    setValue('returnPhone', '');
-    setSelectedDivisionId('');
-    setSelectedDistrictId('');
-    setSelectedThanaId('');
-    setReturnDivisionId('');
-    setReturnDistrictId('');
-    setReturnThanaId('');
-  };
+  /* ── Section card wrapper ── */
+  const SectionCard = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100" style={{ backgroundColor: '#f2f3ff' }}>
+        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">{icon}</div>
+        <h3 className="text-sm font-black uppercase tracking-wider text-slate-700">{title}</h3>
+      </div>
+      <div className="p-6 space-y-5">{children}</div>
+    </div>
+  );
 
-  // If data exists and not in edit mode, show table view
+  /* ─── VIEW MODE (existing data) ─── */
   if (hasExistingData && !isEditMode) {
+    const warehouseLocation = pickupWarehouse?.location
+      ? [pickupWarehouse.location.name, pickupWarehouse.location.state, pickupWarehouse.location.city].filter(Boolean).join(', ')
+      : '';
+    const returnLocation = dropoffWarehouse?.location
+      ? [dropoffWarehouse.location.name, dropoffWarehouse.location.state, dropoffWarehouse.location.city].filter(Boolean).join(', ')
+      : '';
+
     return (
-      <div className="space-y-8 max-w-4xl mx-auto p-6">
-        {/* Warehouse Address Table */}
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-800">Warehouse Address</h2>
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Warehouse card */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100" style={{ backgroundColor: '#f2f3ff' }}>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <span className="text-sm font-black uppercase tracking-wider text-slate-700">Warehouse Address</span>
+            </div>
+            <button
+              onClick={() => setIsEditMode(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+            >
+              <EditIcon /> Modify
+            </button>
           </div>
-          
+
           {pickupWarehouse ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Name</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Address</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Phone</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Email</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-gray-200 hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {pickupWarehouse.name || pickupWarehouse.vendor?.name || 'Ecomm'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {pickupWarehouse.address && (
-                        <>
-                          <div className="font-medium text-gray-900">{pickupWarehouse.address}</div>
-                          {pickupWarehouse.location && (
-                            <div className="text-gray-500 mt-1">
-                              {[
-                                pickupWarehouse.location.name,
-                                pickupWarehouse.location.state,
-                                pickupWarehouse.location.city
-                              ].filter(Boolean).join(', ') || pickupWarehouse.location.city}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {pickupWarehouse.phone || pickupWarehouse.vendor?.phone || '1951959919'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {pickupWarehouse.email || pickupWarehouse.vendor?.email || 'redwan25880@gmail.com'}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <button
-                        onClick={handleEditAddresses}
-                        className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
-                      >
-                        <EditIcon className="w-4 h-4" />
-                        Modify
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-6">
+              <InfoRow label="Name" value={pickupWarehouse.name || pickupWarehouse.vendor?.name} />
+              <InfoRow label="Phone" value={pickupWarehouse.phone || pickupWarehouse.vendor?.phone} />
+              <InfoRow label="Email" value={pickupWarehouse.email || pickupWarehouse.vendor?.email} />
+              <div className="md:col-span-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Address</p>
+                <p className="text-sm font-semibold text-slate-900">{pickupWarehouse.address}</p>
+                {warehouseLocation && <p className="text-xs text-slate-500 mt-0.5">{warehouseLocation}</p>}
+              </div>
             </div>
           ) : (
-            <div className="px-6 py-8 text-center text-gray-500">
-              <p>No warehouse address found</p>
-              <button
-                onClick={() => setIsEditMode(true)}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Add Warehouse Address
+            <div className="p-8 text-center">
+              <p className="text-slate-400 text-sm mb-4">No warehouse address found</p>
+              <button onClick={() => setIsEditMode(true)} className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-colors">
+                Add Address
               </button>
             </div>
           )}
         </div>
 
-        {/* Return Address Table */}
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-800">Return Address</h2>
+        {/* Return address card */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100" style={{ backgroundColor: '#f2f3ff' }}>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-rose-500 flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+              </div>
+              <span className="text-sm font-black uppercase tracking-wider text-slate-700">Return Address</span>
+            </div>
+            {dropoffWarehouse && (
+              <button
+                onClick={() => setIsEditMode(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+              >
+                <EditIcon /> Modify
+              </button>
+            )}
           </div>
-          
+
           {dropoffWarehouse ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Name</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Address</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Phone</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Email</th>
-                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-600">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-gray-200 hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {dropoffWarehouse.name || dropoffWarehouse.vendor?.name || 'Ecomm'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {dropoffWarehouse.address && (
-                        <>
-                          <div className="font-medium text-gray-900">{dropoffWarehouse.address}</div>
-                          {dropoffWarehouse.location && (
-                            <div className="text-gray-500 mt-1">
-                              {[
-                                dropoffWarehouse.location.name,
-                                dropoffWarehouse.location.state,
-                                dropoffWarehouse.location.city
-                              ].filter(Boolean).join(', ') || dropoffWarehouse.location.city}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {dropoffWarehouse.phone || dropoffWarehouse.vendor?.phone || '1951959919'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {dropoffWarehouse.email || dropoffWarehouse.vendor?.email || 'redwan25880@gmail.com'}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <button
-                        onClick={handleEditAddresses}
-                        className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
-                      >
-                        <EditIcon className="w-4 h-4" />
-                        Modify
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-6">
+              <InfoRow label="Name" value={dropoffWarehouse.name || dropoffWarehouse.vendor?.name} />
+              <InfoRow label="Phone" value={dropoffWarehouse.phone || dropoffWarehouse.vendor?.phone} />
+              <InfoRow label="Email" value={dropoffWarehouse.email || dropoffWarehouse.vendor?.email} />
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Address</p>
+                <p className="text-sm font-semibold text-slate-900">{dropoffWarehouse.address}</p>
+                {returnLocation && <p className="text-xs text-slate-500 mt-0.5">{returnLocation}</p>}
+              </div>
             </div>
           ) : (
-            <div className="px-6 py-8 text-center text-gray-500">
-              <p>Same as Warehouse Address</p>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Same as warehouse address
+              </div>
             </div>
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-between pt-6">
+        {/* Navigation */}
+        <div className="flex justify-between pt-2">
           {showBackButton ? (
-            <button
-              type="button"
-              onClick={onBack}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all font-medium"
-            >
+            <button type="button" onClick={onBack} className="px-6 py-3 border-2 border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 transition-all">
               Back
             </button>
-          ) : (
-            <div></div>
-          )}
+          ) : <div />}
           <button
             type="button"
-            onClick={() => onSuccess && onSuccess(pickupWarehouse?.id || '', pickupWarehouse?.locationId || '')}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+            onClick={() => onSuccess?.(pickupWarehouse?.id || '', pickupWarehouse?.locationId || '')}
+            className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:scale-[1.02] transition-all"
           >
             Continue
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
           </button>
         </div>
       </div>
     );
   }
 
-  // Show form view for adding/editing - SAME AS BEFORE BUT WITH UPDATED SUBMIT
+  /* ─── FORM MODE ─── */
+  const sameAsWarehouse = watch('sameAsWarehouse');
+
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-8 max-w-2xl mx-auto p-6">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="max-w-3xl mx-auto space-y-6">
+
       {!vendorId && (
-        <div className="bg-red-50 border border-red-300 rounded-lg p-4">
-          <p className="text-red-800 font-semibold">⚠️ Vendor ID not found. Please log in again.</p>
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold">
+          <svg className="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          Vendor ID not found. Please log in again.
         </div>
       )}
 
       {isLoadingWarehouses && (
-        <div className="text-center py-4">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="text-sm text-gray-600 mt-2">Loading warehouse data...</p>
+        <div className="flex items-center justify-center gap-2 py-6 text-slate-500 text-sm">
+          <SpinnerIcon /> Loading warehouse data…
         </div>
       )}
 
-      {/* Warehouse Address Section */}
-      <div className="bg-gray-50 rounded-lg p-6 space-y-6">
-        <h2 className="text-xl font-semibold text-gray-800">Warehouse Address</h2>
-        
-        {/* Name, Email, Phone Row */}
+      {/* ── Warehouse Section ── */}
+      <SectionCard
+        title="Warehouse / Pickup Address"
+        icon={
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+        }
+      >
+        {/* Name / Email / Phone */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="warehouseName" className="block text-sm font-medium text-gray-700 mb-2">
-              Warehouse Name
-            </label>
-            <input
-              id="warehouseName"
-              type="text"
-              {...register('warehouseName')}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 transition-all bg-white"
-              placeholder="Enter name"
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="warehouseEmail" className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              id="warehouseEmail"
-              type="email"
-              {...register('warehouseEmail', {
-                pattern: {
-                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: 'Invalid email address'
-                }
-              })}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 transition-all ${
-                errors.warehouseEmail ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
-              }`}
-              placeholder="Enter email"
-            />
-            {errors.warehouseEmail && (
-              <p className="mt-1 text-sm text-red-600">{errors.warehouseEmail.message}</p>
-            )}
-          </div>
-          
-          <div>
-            <label htmlFor="warehousePhone" className="block text-sm font-medium text-gray-700 mb-2">
-              Phone
-            </label>
-            <input
-              id="warehousePhone"
-              type="tel"
-              {...register('warehousePhone', {
-                pattern: {
-                  value: /^[0-9]{10,15}$/,
-                  message: 'Invalid phone number (10-15 digits)'
-                }
-              })}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 transition-all ${
-                errors.warehousePhone ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
-              }`}
-              placeholder="Enter phone"
-            />
-            {errors.warehousePhone && (
-              <p className="mt-1 text-sm text-red-600">{errors.warehousePhone.message}</p>
-            )}
-          </div>
+          {[
+            { id: 'warehouseName', label: 'Warehouse Name', type: 'text', placeholder: 'Enter name', reg: register('warehouseName') },
+            { id: 'warehouseEmail', label: 'Email', type: 'email', placeholder: 'Enter email', reg: register('warehouseEmail', { pattern: { value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, message: 'Invalid email' } }) },
+            { id: 'warehousePhone', label: 'Phone', type: 'tel', placeholder: 'Enter phone', reg: register('warehousePhone', { pattern: { value: /^[0-9]{10,15}$/, message: 'Invalid phone (10-15 digits)' } }) },
+          ].map(({ id, label, type, placeholder, reg }) => (
+            <div key={id} className="space-y-1.5">
+              <label htmlFor={id} className="block text-xs font-black uppercase tracking-widest text-slate-500">{label}</label>
+              <input id={id} type={type} {...reg} className={inputCls((errors as any)[id])} placeholder={placeholder} style={{ backgroundColor: '#faf8ff' }} />
+              {(errors as any)[id] && <p className="text-xs text-red-500 font-semibold">{(errors as any)[id]?.message}</p>}
+            </div>
+          ))}
         </div>
-        
-        {/* Address Details Input */}
-        <div>
-          <label htmlFor="detailsAddress" className="block text-sm font-medium text-gray-700 mb-2">
-            <span className="text-red-500">*</span> Address Details: Number, Street, Landmark, etc.
+
+        {/* Address */}
+        <div className="space-y-1.5">
+          <label htmlFor="detailsAddress" className="block text-xs font-black uppercase tracking-widest text-slate-500">
+            Street Address <span className="text-red-500 normal-case">*</span>
           </label>
           <input
             id="detailsAddress"
             type="text"
-            {...register('detailsAddress', { 
-              required: 'Address details are required',
-              minLength: { 
-                value: 10, 
-                message: 'Please provide a detailed address (minimum 10 characters)' 
-              }
-            })}
-            className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 transition-all ${
-              errors.detailsAddress ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
-            }`}
-            placeholder="Enter detailed address"
+            {...register('detailsAddress', { required: 'Address is required', minLength: { value: 10, message: 'Minimum 10 characters' } })}
+            className={inputCls(!!errors.detailsAddress)}
+            placeholder="Building number, street, landmark…"
+            style={{ backgroundColor: '#faf8ff' }}
           />
-          {errors.detailsAddress && (
-            <p className="mt-1 text-sm text-red-600">{errors.detailsAddress.message}</p>
-          )}
+          {errors.detailsAddress && <p className="text-xs text-red-500 font-semibold">{errors.detailsAddress.message}</p>}
         </div>
 
-        {/* Region/City/District Dropdown - SAME AS BEFORE */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <span className="text-red-500">*</span> Region/City/District
-          </label>
+        {/* Location dropdown */}
+        <LocationDropdown
+          label="Region / District / Area"
+          required
+          display={getLocationDisplay()}
+          open={locationOpen}
+          onToggle={() => setLocationOpen(p => !p)}
+          divisions={divisions}
+          districts={districts}
+          thanas={thanas}
+          selectedDivisionId={selectedDivisionId}
+          selectedDistrictId={selectedDistrictId}
+          selectedThanaId={selectedThanaId}
+          onDivisionClick={(id) => { setSelectedDivisionId(id === selectedDivisionId ? '' : id); setSelectedDistrictId(''); }}
+          onDistrictClick={(id) => { setSelectedDistrictId(id === selectedDistrictId ? '' : id); }}
+          onThanaClick={handleLocationSelect}
+          loading={divisionsLoading}
+        />
+      </SectionCard>
+
+      {/* ── Return Section ── */}
+      <SectionCard
+        title="Return Address"
+        icon={
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+          </svg>
+        }
+      >
+        {/* Same as warehouse toggle */}
+        <label className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 cursor-pointer hover:border-blue-300 transition-colors" style={{ backgroundColor: '#faf8ff' }}>
           <div className="relative">
-            <button
-              type="button"
-              onClick={() => setIsLocationDropdownOpen(!isLocationDropdownOpen)}
-              className={`w-full px-4 py-3 border rounded-lg text-left focus:outline-none focus:ring-1 focus:ring-gray-400 transition-all flex items-center justify-between ${
-                errors.area ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
-              }`}
-            >
-              <span className={selectedThanaId ? 'text-gray-900' : 'text-gray-500'}>
-                {getLocationDisplay()}
-              </span>
-              <ChevronDownIcon className={`w-5 h-5 text-gray-400 transition-transform ${
-                isLocationDropdownOpen ? 'rotate-180' : ''
-              }`} />
-            </button>
-
-            {/* Dropdown Menu - SAME AS BEFORE */}
-            {isLocationDropdownOpen && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto">
-                {divisionsLoading ? (
-                  <div className="p-8 text-center">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <p className="text-sm text-gray-600 mt-2">Loading locations...</p>
-                  </div>
-                ) : (
-                  <div>
-                    {divisions.map((division) => (
-                      <div key={division.id}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (selectedDivisionId === division.id) {
-                              setSelectedDivisionId('');
-                              setSelectedDistrictId('');
-                            } else {
-                              setSelectedDivisionId(division.id);
-                              setSelectedDistrictId('');
-                            }
-                          }}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-100 font-medium text-gray-700 border-b border-gray-200"
-                        >
-                          {division.name}
-                        </button>
-                        
-                        {selectedDivisionId === division.id && districts.map((district) => (
-                          <div key={district.id} className="bg-gray-50">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (selectedDistrictId === district.id) {
-                                  setSelectedDistrictId('');
-                                } else {
-                                  setSelectedDistrictId(district.id);
-                                }
-                              }}
-                              className="w-full px-8 py-2 text-left hover:bg-gray-200 text-gray-700 text-sm border-b border-gray-200"
-                            >
-                              {district.name}
-                            </button>
-                            
-                            {selectedDistrictId === district.id && thanas.map((thana) => (
-                              <button
-                                key={thana.id}
-                                type="button"
-                                onClick={() => handleLocationSelect(division.id, district.id, thana.id)}
-                                className="w-full px-12 py-2 text-left hover:bg-blue-50 text-gray-600 text-sm"
-                              >
-                                {thana.name}
-                              </button>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            <input type="checkbox" {...register('sameAsWarehouse')} className="sr-only peer" />
+            <div className="w-11 h-6 rounded-full bg-slate-200 peer-checked:bg-blue-600 transition-colors" />
+            <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
           </div>
-          {errors.area && (
-            <p className="mt-1 text-sm text-red-600">Please select a complete location</p>
-          )}
-        </div>
-      </div>
+          <div>
+            <p className="text-sm font-bold text-slate-800">Same as Warehouse Address</p>
+            <p className="text-xs text-slate-500 mt-0.5">Return shipments go to the warehouse location</p>
+          </div>
+        </label>
 
-      {/* Return Address Section - SAME AS BEFORE */}
-      <div className="bg-gray-50 rounded-lg p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-800">Return Address</h2>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <div className="relative">
-              <input
-                type="checkbox"
-                {...register('sameAsWarehouse')}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-blue-600 transition-colors"></div>
-              <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
-            </div>
-            <span className="text-sm text-gray-600">Same as Warehouse Address</span>
-          </label>
-        </div>
-
-        {!watch('sameAsWarehouse') && (
-          <>
-            {/* Name, Email, Phone Row for Return Address */}
+        {!sameAsWarehouse && (
+          <div className="space-y-5 pt-2">
+            {/* Return name / email / phone */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label htmlFor="returnName" className="block text-sm font-medium text-gray-700 mb-2">
-                  Return Warehouse Name
-                </label>
-                <input
-                  id="returnName"
-                  type="text"
-                  {...register('returnName')}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 transition-all bg-white"
-                  placeholder="Enter name"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="returnEmail" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email
-                </label>
-                <input
-                  id="returnEmail"
-                  type="email"
-                  {...register('returnEmail', {
-                    pattern: {
-                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                      message: 'Invalid email address'
-                    }
-                  })}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 transition-all ${
-                    errors.returnEmail ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
-                  }`}
-                  placeholder="Enter email"
-                />
-                {errors.returnEmail && (
-                  <p className="mt-1 text-sm text-red-600">{errors.returnEmail.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <label htmlFor="returnPhone" className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone
-                </label>
-                <input
-                  id="returnPhone"
-                  type="tel"
-                  {...register('returnPhone', {
-                    pattern: {
-                      value: /^[0-9]{10,15}$/,
-                      message: 'Invalid phone number (10-15 digits)'
-                    }
-                  })}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 transition-all ${
-                    errors.returnPhone ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
-                  }`}
-                  placeholder="Enter phone"
-                />
-                {errors.returnPhone && (
-                  <p className="mt-1 text-sm text-red-600">{errors.returnPhone.message}</p>
-                )}
-              </div>
+              {[
+                { id: 'returnName', label: 'Return Name', type: 'text', placeholder: 'Enter name', reg: register('returnName') },
+                { id: 'returnEmail', label: 'Email', type: 'email', placeholder: 'Enter email', reg: register('returnEmail', { pattern: { value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i, message: 'Invalid email' } }) },
+                { id: 'returnPhone', label: 'Phone', type: 'tel', placeholder: 'Enter phone', reg: register('returnPhone', { pattern: { value: /^[0-9]{10,15}$/, message: 'Invalid phone (10-15 digits)' } }) },
+              ].map(({ id, label, type, placeholder, reg }) => (
+                <div key={id} className="space-y-1.5">
+                  <label htmlFor={id} className="block text-xs font-black uppercase tracking-widest text-slate-500">{label}</label>
+                  <input id={id} type={type} {...reg} className={inputCls((errors as any)[id])} placeholder={placeholder} style={{ backgroundColor: '#faf8ff' }} />
+                  {(errors as any)[id] && <p className="text-xs text-red-500 font-semibold">{(errors as any)[id]?.message}</p>}
+                </div>
+              ))}
             </div>
-            
-            <div>
-              <label htmlFor="returnAddress" className="block text-sm font-medium text-gray-700 mb-2">
-                <span className="text-red-500">*</span> Address Details: Number, Street, Landmark, etc.
+
+            {/* Return address */}
+            <div className="space-y-1.5">
+              <label htmlFor="returnAddress" className="block text-xs font-black uppercase tracking-widest text-slate-500">
+                Street Address <span className="text-red-500 normal-case">*</span>
               </label>
               <input
                 id="returnAddress"
                 type="text"
-                {...register('returnAddress', { 
-                  required: watch('sameAsWarehouse') ? false : 'Return address is required',
-                })}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400 transition-all ${
-                  errors.returnAddress ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
-                }`}
-                placeholder="Enter return address"
+                {...register('returnAddress', { required: sameAsWarehouse ? false : 'Return address is required' })}
+                className={inputCls(!!errors.returnAddress)}
+                placeholder="Building number, street, landmark…"
+                style={{ backgroundColor: '#faf8ff' }}
               />
-              {errors.returnAddress && (
-                <p className="mt-1 text-sm text-red-600">{errors.returnAddress.message}</p>
-              )}
+              {errors.returnAddress && <p className="text-xs text-red-500 font-semibold">{errors.returnAddress.message}</p>}
             </div>
 
-            {/* Return Location Dropdown - SIMILAR TO WAREHOUSE */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <span className="text-red-500">*</span> Region/City/District
-              </label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsReturnLocationDropdownOpen(!isReturnLocationDropdownOpen)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-left bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 transition-all flex items-center justify-between"
-                >
-                  <span className={returnThanaId ? 'text-gray-900' : 'text-gray-500'}>
-                    {getReturnLocationDisplay()}
-                  </span>
-                  <ChevronDownIcon className={`w-5 h-5 text-gray-400 transition-transform ${
-                    isReturnLocationDropdownOpen ? 'rotate-180' : ''
-                  }`} />
-                </button>
-
-                {isReturnLocationDropdownOpen && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto">
-                    <div>
-                      {divisions.map((division) => (
-                        <div key={division.id}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (returnDivisionId === division.id) {
-                                setReturnDivisionId('');
-                                setReturnDistrictId('');
-                              } else {
-                                setReturnDivisionId(division.id);
-                                setReturnDistrictId('');
-                              }
-                            }}
-                            className="w-full px-4 py-3 text-left hover:bg-gray-100 font-medium text-gray-700 border-b border-gray-200"
-                          >
-                            {division.name}
-                          </button>
-                          
-                          {returnDivisionId === division.id && returnDistricts.map((district) => (
-                            <div key={district.id} className="bg-gray-50">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (returnDistrictId === district.id) {
-                                    setReturnDistrictId('');
-                                  } else {
-                                    setReturnDistrictId(district.id);
-                                  }
-                                }}
-                                className="w-full px-8 py-2 text-left hover:bg-gray-200 text-gray-700 text-sm border-b border-gray-200"
-                              >
-                                {district.name}
-                              </button>
-                              
-                              {returnDistrictId === district.id && returnThanas.map((thana) => (
-                                <button
-                                  key={thana.id}
-                                  type="button"
-                                  onClick={() => handleReturnLocationSelect(division.id, district.id, thana.id)}
-                                  className="w-full px-12 py-2 text-left hover:bg-blue-50 text-gray-600 text-sm"
-                                >
-                                  {thana.name}
-                                </button>
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
+            {/* Return location dropdown */}
+            <LocationDropdown
+              label="Region / District / Area"
+              required
+              display={getReturnLocationDisplay()}
+              open={returnLocationOpen}
+              onToggle={() => setReturnLocationOpen(p => !p)}
+              divisions={divisions}
+              districts={returnDistricts}
+              thanas={returnThanas}
+              selectedDivisionId={selectedDivisionId}
+              selectedDistrictId={selectedDistrictId}
+              selectedThanaId={returnThanaId}
+              onDivisionClick={(id) => { setReturnDivisionId(id === returnDivisionId ? '' : id); setReturnDistrictId(''); }}
+              onDistrictClick={(id) => { setReturnDistrictId(id === returnDistrictId ? '' : id); }}
+              onThanaClick={handleReturnLocationSelect}
+              loading={divisionsLoading}
+              isReturn
+              returnDivisionId={returnDivisionId}
+              returnDistrictId={returnDistrictId}
+            />
+          </div>
         )}
-      </div>
+      </SectionCard>
 
-      {/* Hidden inputs */}
+      {/* Hidden fields */}
       <input type="hidden" {...register('city', { required: true })} />
       <input type="hidden" {...register('zone', { required: true })} />
       <input type="hidden" {...register('area', { required: true })} />
       <input type="hidden" {...register('warehouseType', { value: WarehouseType.PICKUP })} />
 
-      {/* Action Buttons */}
-      <div className="flex justify-between pt-6">
+      {/* Navigation */}
+      <div className="flex justify-between pt-2">
         <div className="flex gap-3">
           {showBackButton && !isEditMode && (
-            <button
-              type="button"
-              onClick={onBack}
-              disabled={isSubmitting}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
-            >
+            <button type="button" onClick={onBack} disabled={isSubmitting} className="px-6 py-3 border-2 border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 disabled:opacity-50 transition-all">
               Back
             </button>
           )}
           {isEditMode && (
-            <button
-              type="button"
-              onClick={handleCancelEdit}
-              disabled={isSubmitting}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
-            >
+            <button type="button" onClick={handleCancelEdit} disabled={isSubmitting} className="px-6 py-3 border-2 border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 disabled:opacity-50 transition-all">
               Cancel
             </button>
           )}
         </div>
+
         <button
           type="submit"
           disabled={isSubmitting || !isFormValid() || !vendorId}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-all font-medium"
+          className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all"
         >
-          {isSubmitting && (
-            <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          {isSubmitting && <SpinnerIcon />}
+          {isSubmitting ? 'Saving…' : isEditMode ? 'Update Addresses' : 'Save & Continue'}
+          {!isSubmitting && (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
           )}
-          {isSubmitting ? 'Saving...' : (isEditMode ? 'Update Both Addresses' : 'Save & Continue')}
         </button>
       </div>
     </form>

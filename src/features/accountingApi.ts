@@ -101,6 +101,63 @@ export interface CreateAccountingPeriodRequest {
 }
 
 // ============================================
+// NEW: PURCHASE-RELATED REQUEST TYPES
+// ============================================
+
+export interface PurchaseCreatedWebhookRequest {
+  purchaseOrderId: string;
+  purchaseNo: string;
+  supplierId: string;
+  supplierName: string;
+  inventoryAmount: string | number;
+  vatAmount: string | number;
+  totalAmount: string | number;
+  warehouseId: string;
+  vendorId: string;
+}
+
+export interface PurchasePaymentWebhookRequest {
+  purchaseOrderId: string;
+  purchaseNo: string;
+  supplierId: string;
+  supplierName: string;
+  amount: string | number;
+  bankCoaId: string;
+  paymentMethod: string;
+  reference?: string;
+  vendorId: string;
+  purchasePaymentId: string;
+}
+
+export type StockMovementType =
+  | "ADJUSTMENT"
+  | "DAMAGE"
+  | "TRANSFER"
+  | "SELL_DAMAGE"
+  | "PURCHASE_RECEIVE"
+  | "SALE_DEDUCT"
+  | "RETURN";
+
+export interface StockMovementWebhookRequest {
+  movementType: StockMovementType;
+  variantId: string;
+  variantName: string;
+  vendorId: string;
+  stockMovementId: string;
+  warehouseId?: string;
+  quantity: number;
+  avgCost?: string | number;
+  reason?: string;
+  // Transfer-specific
+  fromWarehouseId?: string;
+  toWarehouseId?: string;
+  logisticsCost?: string | number;
+  bankCoaId?: string;
+  // Sell damage-specific
+  saleAmount?: string | number;
+}
+
+// ============================================
 // RESPONSE TYPES
 // ============================================
 
@@ -167,6 +224,10 @@ export interface Voucher {
   postedBy?: string;
   lockedBy?: string;
   lockedAt?: string;
+  // Cancel fields (matches schema additions)
+  cancelledBy?: string;
+  cancelledAt?: string;
+  cancelReason?: string;
   createdBy: string;
   updatedBy?: string;
   createdAt: string;
@@ -307,6 +368,19 @@ export interface CommissionRecord {
   voucherId?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// NEW: Purchase voucher response — two vouchers created together
+export interface PurchaseVoucherResponse {
+  purchaseVoucher: Voucher;
+  paymentVoucher?: Voucher; // only present when paidAmount > 0
+}
+
+// NEW: Stock movement voucher response
+export interface StockMovementVoucherResponse {
+  voucher: Voucher;
+  movementType: StockMovementType;
+  stockMovementId: string;
 }
 
 export interface PaginatedResponse<T> {
@@ -478,6 +552,7 @@ export const accountingApi = createApi({
       }),
       invalidatesTags: ["Vouchers", "Ledger", "Reports"],
     }),
+
     cancelVoucher: builder.mutation<
       ApiResponse<Voucher>,
       { id: string; data: { reason: string } }
@@ -528,6 +603,67 @@ export const accountingApi = createApi({
         body,
       }),
       invalidatesTags: ["Vouchers", "Ledger", "Reports"],
+    }),
+
+    // ============================================
+    // NEW: PURCHASE WEBHOOKS
+    // ============================================
+
+    // Fires when a PurchaseOrder is confirmed — creates the PURCHASE voucher
+    // (Inventory DR / VAT Input DR / AP Supplier CR)
+    purchaseCreatedWebhook: builder.mutation<
+      ApiResponse<PurchaseVoucherResponse>,
+      PurchaseCreatedWebhookRequest
+    >({
+      query: (body) => ({
+        url: "/accounting/webhooks/purchase-created",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [
+        "Vouchers",
+        "Ledger",
+        "Reports",
+        "ChartOfAccounts",
+        "Statistics",
+      ],
+    }),
+
+    // Fires when a PurchasePayment row is saved — creates the PAYMENT voucher
+    // (AP Supplier DR / Bank CR)
+    purchasePaymentWebhook: builder.mutation<
+      ApiResponse<Voucher>,
+      PurchasePaymentWebhookRequest
+    >({
+      query: (body) => ({
+        url: "/accounting/webhooks/purchase-payment",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Vouchers", "Ledger", "Reports", "VendorPayables"],
+    }),
+
+    // ============================================
+    // NEW: STOCK MOVEMENT WEBHOOK
+    // ============================================
+
+    // Single endpoint for all stock movement types.
+    // The server dispatches to the correct voucher method
+    // based on movementType:
+    //   ADJUSTMENT   → STOCK_ADJUSTMENT  (Adj Expense DR / Inventory CR)
+    //   DAMAGE       → DAMAGE_RECORDED   (Damage Expense DR / Inventory CR)
+    //   TRANSFER     → STOCK_TRANSFER    (Transfer Expense DR / Bank CR)
+    //   SELL_DAMAGE  → DAMAGE_STOCK_SOLD (Bank DR / Sale Income CR)
+    stockMovementWebhook: builder.mutation<
+      ApiResponse<StockMovementVoucherResponse>,
+      StockMovementWebhookRequest
+    >({
+      query: (body) => ({
+        url: "/accounting/webhooks/stock-movement",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Vouchers", "Ledger", "Reports", "Statistics"],
     }),
 
     // ============================================
@@ -836,6 +972,13 @@ export const {
   useTriggerAutoVoucherMutation,
   useOrderConfirmedWebhookMutation,
   usePaymentReceivedWebhookMutation,
+
+  // Purchase Webhooks (NEW)
+  usePurchaseCreatedWebhookMutation,
+  usePurchasePaymentWebhookMutation,
+
+  // Stock Movement Webhook (NEW)
+  useStockMovementWebhookMutation,
 
   // Reports
   useGetTrialBalanceQuery,
