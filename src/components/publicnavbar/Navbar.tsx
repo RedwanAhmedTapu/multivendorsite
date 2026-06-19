@@ -243,7 +243,7 @@ export default function Navbar(): JSX.Element {
     pathname.includes("admin-dashboard") || pathname.includes("vendor-dashboard") ||
     pathname.includes("user-dashboard") || pathname.includes("register") ||
     pathname.includes("reset-password") || pathname.includes("login") ||
-    pathname.includes("accounting") || pathname.includes("vendor-store-decoration")
+    pathname.includes("accounting") || pathname.includes("vendor-store-decoration")||pathname.includes("store-editor")
   ) return <></>;
 
   if (isVendorAuth) {

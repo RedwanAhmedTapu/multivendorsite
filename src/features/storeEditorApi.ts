@@ -1,17 +1,173 @@
-// features/storeEditorApi.ts
 import { createApi } from "@reduxjs/toolkit/query/react";
 import baseQueryWithReauth from "./baseQueryWithReauth";
 
-// --------- Request Types ---------
-export interface CreateStoreLayoutRequest {
-  isDefault?: boolean;
+// ─────────────────────────────────────────────
+// ENUMS  (mirror Prisma schema exactly)
+// ─────────────────────────────────────────────
+
+export enum DecorationStatus {
+  DRAFT     = "DRAFT",
+  PUBLISHED = "PUBLISHED",
+  ARCHIVED  = "ARCHIVED",
+  SCHEDULED = "SCHEDULED",
+}
+
+export enum ComponentType {
+  STORE_BANNER       = "STORE_BANNER",
+  CATEGORY_SLIDER    = "CATEGORY_SLIDER",
+  CATEGORY_GRID      = "CATEGORY_GRID",
+  BANNER             = "BANNER",
+  PRODUCT_CAROUSEL   = "PRODUCT_CAROUSEL",
+  PRODUCT_GRID       = "PRODUCT_GRID",
+  FEATURED_PRODUCTS  = "FEATURED_PRODUCTS",
+  COUNTDOWN_TIMER    = "COUNTDOWN_TIMER",
+  VOUCHER_PROMOTION  = "VOUCHER_PROMOTION",
+}
+
+export enum BackgroundType {
+  SOLID            = "SOLID",
+  LINEAR_GRADIENT  = "LINEAR_GRADIENT",
+  RADIAL_GRADIENT  = "RADIAL_GRADIENT",
+  IMAGE            = "IMAGE",
+}
+
+export enum CategoryLayout {
+  SLIDER = "SLIDER",
+  GRID   = "GRID",
+  LIST   = "LIST",
+}
+
+export enum BannerType {
+  SINGLE_BANNER          = "SINGLE_BANNER",
+  DOUBLE_BANNER          = "DOUBLE_BANNER",
+  THREE_BANNER           = "THREE_BANNER",
+  FOUR_BANNER            = "FOUR_BANNER",
+  FIVE_BANNER            = "FIVE_BANNER",
+  SLIDER_BANNER          = "SLIDER_BANNER",
+  SLIDER_WITH_LEFT_BANNER = "SLIDER_WITH_LEFT_BANNER",
+}
+
+export enum BannerLayout {
+  HORIZONTAL = "HORIZONTAL",
+  VERTICAL   = "VERTICAL",
+  GRID       = "GRID",
+  MASONRY    = "MASONRY",
+}
+
+export enum TimerPosition {
+  TOP_LEFT      = "TOP_LEFT",
+  TOP_RIGHT     = "TOP_RIGHT",
+  TOP_CENTER    = "TOP_CENTER",
+  BOTTOM_LEFT   = "BOTTOM_LEFT",
+  BOTTOM_RIGHT  = "BOTTOM_RIGHT",
+  BOTTOM_CENTER = "BOTTOM_CENTER",
+  CENTER        = "CENTER",
+  OVERLAY_TOP   = "OVERLAY_TOP",
+  OVERLAY_BOTTOM = "OVERLAY_BOTTOM",
+}
+
+// ─────────────────────────────────────────────
+// SHARED / NESTED TYPES
+// ─────────────────────────────────────────────
+
+export interface BannerImage {
+  url: string;
+  link?: string;
+  alt?: string;
+}
+
+/**
+ * Promoted scalar columns live as typed fields.
+ * Everything else (voucher details, countdown config,
+ * timer position, banner images array, etc.) goes into `settings`.
+ */
+export interface ComponentConfigInput {
+  // Promoted scalars
+  bannerImage?: string;
+  bannerBackgroundType?: BackgroundType;
+  bannerBackgroundColor?: string;
+  categoryLayout?: CategoryLayout;
+  productsPerRow?: number;
+  categoriesPerRow?: number;
+  autoSlide?: boolean;
+  slideInterval?: number;
+  countdownEndDate?: string;   // ISO string → backend converts to Date
+  showProductPrice?: boolean;
+  showProductRating?: boolean;
+  showAddToCart?: boolean;
+  showCategoryCount?: boolean;
+  // Styling
+  customCSS?: string;
+  padding?: string;
+  margin?: string;
+  borderRadius?: string;
+  boxShadow?: string;
+  // Flexible bag for type-specific fields
+  settings?: {
+    // Banner
+    bannerType?: BannerType;
+    bannerLayout?: BannerLayout;
+    bannerHeight?: string;
+    bannerImages?: BannerImage[];
+    // Countdown
+    countdownBannerImage?: string;
+    timerPosition?: TimerPosition;
+    showDays?: boolean;
+    showHours?: boolean;
+    showMinutes?: boolean;
+    showSeconds?: boolean;
+    countdownTitle?: string;
+    countdownBackgroundColor?: string;
+    // Voucher
+    voucherBannerImage?: string;
+    voucherCode?: string;
+    voucherTitle?: string;
+    voucherDescription?: string;
+    voucherBackgroundColor?: string;
+    voucherTextColor?: string;
+    minOrderAmount?: number;
+    discountAmount?: number;
+    discountPercentage?: number;
+    voucherValidFrom?: string;
+    voucherValidTo?: string;
+    showVoucherCode?: boolean;
+    useDefaultDesign?: boolean;
+    // Store banner toggles (less-queried ones)
+    showChatButton?: boolean;
+    showRating?: boolean;
+    showVerifiedBadge?: boolean;
+    showFollowers?: boolean;
+    showLogo?: boolean;
+    showStoreName?: boolean;
+    [key: string]: unknown;
+  };
+}
+
+// ─────────────────────────────────────────────
+// REQUEST TYPES
+// ─────────────────────────────────────────────
+
+export interface CreateDecorationRequest {
+  name: string;
   thumbnail?: string;
+  isDefault?: boolean;
+}
+
+export interface UpdateDecorationRequest {
+  name?: string;
+  thumbnail?: string;
+  status?: DecorationStatus;
+  publishedAt?: string;
+}
+
+export interface DuplicateDecorationRequest {
+  name: string;
 }
 
 export interface CreateComponentRequest {
-  layoutId: string;
   type: ComponentType;
   sortOrder: number;
+  isVisible?: boolean;
   config?: ComponentConfigInput;
   productIds?: string[];
   categoryIds?: string[];
@@ -19,14 +175,19 @@ export interface CreateComponentRequest {
 
 export interface UpdateComponentRequest {
   sortOrder?: number;
+  isVisible?: boolean;
   config?: ComponentConfigInput;
 }
 
-export interface UpdateComponentProductsRequest {
+export interface ReorderComponentsRequest {
+  orderedIds: string[];
+}
+
+export interface SetComponentProductsRequest {
   productIds: string[];
 }
 
-export interface UpdateComponentCategoriesRequest {
+export interface SetComponentCategoriesRequest {
   categoryIds: string[];
 }
 
@@ -45,205 +206,117 @@ export interface UpdateBannerCustomizationRequest {
 
 export interface ApplyTemplateRequest {
   templateId: string;
+  name?: string;
 }
 
-export interface ComponentConfigInput {
-  // Store Banner
-  bannerImage?: string;
-  bannerBackgroundType?: BackgroundType;
-  bannerBackgroundColor?: string;
-  showChatButton?: boolean;
-  showRating?: boolean;
-  showVerifiedBadge?: boolean;
-  showFollowers?: boolean;
-  showLogo?: boolean;
-  showStoreName?: boolean;
-  
-  // Category Component
-  categoryLayout?: CategoryLayout;
-  categoriesPerRow?: number;
-  showCategoryCount?: boolean;
-  categorySlideInterval?: number;
-  
-  // Product Component
-  productsPerRow?: number;
-  showProductPrice?: boolean;
-  showProductRating?: boolean;
-  showAddToCart?: boolean;
-  autoSlide?: boolean;
-  slideInterval?: number;
-  
-  // Banner Component
-  bannerType?: BannerType;
-  bannerLayout?: BannerLayout;
-  bannerHeight?: string;
-  bannerImages?: Array<{
-    url: string;
-    link?: string;
-    alt?: string;
-  }>;
-  
-  // Countdown Component
-  countdownBannerImage?: string;
-  countdownEndDate?: string;
-  timerPosition?: TimerPosition;
-  showDays?: boolean;
-  showHours?: boolean;
-  showMinutes?: boolean;
-  showSeconds?: boolean;
-  countdownTitle?: string;
-  countdownBackgroundColor?: string;
-  
-  // Voucher Component
-  voucherBannerImage?: string;
-  voucherCode?: string;
-  voucherTitle?: string;
-  voucherDescription?: string;
-  voucherBackgroundColor?: string;
-  voucherTextColor?: string;
-  minOrderAmount?: number;
-  discountAmount?: number;
-  discountPercentage?: number;
-  voucherValidFrom?: string;
-  voucherValidTo?: string;
-  showVoucherCode?: boolean;
-  useDefaultDesign?: boolean;
-  
-  // Styling
-  customCSS?: string;
-  padding?: string;
-  margin?: string;
-  borderRadius?: string;
-  boxShadow?: string;
-}
+// ─────────────────────────────────────────────
+// RESPONSE TYPES
+// ─────────────────────────────────────────────
 
-// --------- Response Types ---------
-export interface StoreLayout {
+export interface ProductSummary {
   id: string;
-  vendorId: string;
-  isDefault: boolean;
-  thumbnail?: string;
-  createdAt: string;
-  updatedAt: string;
-  components: StoreLayoutComponent[];
-  vendor?: VendorInfo;
+  name: string;
+  slug: string;
+  images: { url: string }[];
+  variants: { price: number; specialPrice?: number; sku: string }[];
 }
 
-export interface VendorInfo {
+export interface CategorySummary {
   id: string;
-  storeName: string;
-  avatar?: string;
-  verificationStatus: string;
-  performance?: {
-    avgRating: number;
-    totalOrders: number;
-  };
-  followers: Array<{ id: string; userId: string; followedAt: string }>;
-  bannerCustomization?: BannerCustomization;
+  name: string;
+  slug: string;
+  image?: string;
 }
 
-export interface StoreLayoutComponent {
-  id: string;
-  layoutId: string;
-  type: ComponentType;
-  sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
-  config?: ComponentConfig;
-  products: ComponentProduct[];
-  categories: ComponentCategory[];
-}
-
-export interface ComponentConfig {
-  id: string;
-  componentId: string;
-  
-  // Store Banner
-  bannerImage?: string;
-  bannerBackgroundType?: BackgroundType;
-  bannerBackgroundColor?: string;
-  showChatButton: boolean;
-  showRating: boolean;
-  showVerifiedBadge: boolean;
-  showFollowers: boolean;
-  showLogo: boolean;
-  showStoreName: boolean;
-  
-  // Category Component
-  categoryLayout?: CategoryLayout;
-  categoriesPerRow?: number;
-  showCategoryCount: boolean;
-  categorySlideInterval?: number;
-  
-  // Product Component
-  productsPerRow?: number;
-  showProductPrice: boolean;
-  showProductRating: boolean;
-  showAddToCart: boolean;
-  autoSlide: boolean;
-  slideInterval?: number;
-  
-  // Banner Component
-  bannerType?: BannerType;
-  bannerLayout?: BannerLayout;
-  bannerHeight?: string;
-  bannerImages?: any;
-  
-  // Countdown Component
-  countdownBannerImage?: string;
-  countdownEndDate?: string;
-  timerPosition?: TimerPosition;
-  showDays: boolean;
-  showHours: boolean;
-  showMinutes: boolean;
-  showSeconds: boolean;
-  countdownTitle?: string;
-  countdownBackgroundColor?: string;
-  
-  // Voucher Component
-  voucherBannerImage?: string;
-  voucherCode?: string;
-  voucherTitle?: string;
-  voucherDescription?: string;
-  voucherBackgroundColor?: string;
-  voucherTextColor?: string;
-  minOrderAmount?: number;
-  discountAmount?: number;
-  discountPercentage?: number;
-  voucherValidFrom?: string;
-  voucherValidTo?: string;
-  showVoucherCode: boolean;
-  useDefaultDesign: boolean;
-  
-  // Styling
-  customCSS?: string;
-  padding?: string;
-  margin?: string;
-  borderRadius?: string;
-  boxShadow?: string;
-  
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ComponentProduct {
+export interface DecorationComponentProduct {
   id: string;
   componentId: string;
   productId: string;
   sortOrder: number;
   isFeatured: boolean;
   createdAt: string;
-  product: Product;
+  product: ProductSummary;
 }
 
-export interface ComponentCategory {
+export interface DecorationComponentCategory {
   id: string;
   componentId: string;
   categoryId: string;
   sortOrder: number;
   isFeatured: boolean;
   createdAt: string;
-  category: Category;
+  category: CategorySummary;
+}
+
+export interface DecorationComponentConfig {
+  id: string;
+  componentId: string;
+  bannerImage?: string;
+  bannerBackgroundType?: BackgroundType;
+  bannerBackgroundColor?: string;
+  categoryLayout?: CategoryLayout;
+  productsPerRow?: number;
+  categoriesPerRow?: number;
+  autoSlide: boolean;
+  slideInterval?: number;
+  countdownEndDate?: string;
+  showProductPrice: boolean;
+  showProductRating: boolean;
+  showAddToCart: boolean;
+  showCategoryCount: boolean;
+  customCSS?: string;
+  padding?: string;
+  margin?: string;
+  borderRadius?: string;
+  boxShadow?: string;
+  settings?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DecorationComponent {
+  id: string;
+  decorationId: string;
+  type: ComponentType;
+  sortOrder: number;
+  isVisible: boolean;
+  createdAt: string;
+  updatedAt: string;
+  config?: DecorationComponentConfig;
+  products: DecorationComponentProduct[];
+  categories: DecorationComponentCategory[];
+}
+
+/** Full decoration — returned by getDecoration and getStorefront */
+export interface StoreDecoration {
+  id: string;
+  vendorId: string;
+  name: string;
+  slug: string;
+  status: DecorationStatus;
+  isDefault: boolean;
+  thumbnail?: string;
+  version: number;
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  components: DecorationComponent[];
+}
+
+/** Lightweight decoration — returned by listDecorations */
+export interface StoreDecorationSummary {
+  id: string;
+  vendorId: string;
+  name: string;
+  slug: string;
+  status: DecorationStatus;
+  isDefault: boolean;
+  thumbnail?: string;
+  version: number;
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  _count: { components: number };
 }
 
 export interface BannerCustomization {
@@ -261,7 +334,6 @@ export interface BannerCustomization {
   textColor: string;
   createdAt: string;
   updatedAt: string;
-  vendor?: VendorInfo;
 }
 
 export interface LayoutTemplate {
@@ -269,70 +341,10 @@ export interface LayoutTemplate {
   name: string;
   thumbnail?: string;
   category?: string;
-  structure: any;
   isPremium: boolean;
   usageCount: number;
   rating?: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Product {
-  id: string;
-  name: string;
-  description?: string;
-  slug: string;
-  vendorId: string;
-  categoryId: string;
-  approvalStatus: ProductApprovalStatus;
-  images: ProductImage[];
-  variants: ProductVariant[];
-  createdAt: string;
-  updatedAt: string;
-  category: {
-    id: string;
-    name: string;
-    slug: string;
-  };
-}
-
-export interface ProductImage {
-  id: string;
-  url: string;
-  altText?: string;
-  sortOrder?: number;
-}
-
-export interface ProductVariant {
-  id: string;
-  name?: string;
-  sku: string;
-  price: number;
-  stock: number;
-  weight?: number;
-}
-
-export interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  image?: string;
-  parentId?: string;
-  createdAt: string;
-  updatedAt: string;
-  parent?: Category;
-  children?: Category[];
-}
-
-export interface PaginatedResponse<T> {
-  success: boolean;
-  data: T[];
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
+  // `structure` intentionally omitted from list — fetched only on apply
 }
 
 export interface ApiResponse<T> {
@@ -341,279 +353,278 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
-// --------- Enums ---------
-export enum ComponentType {
-  STORE_BANNER = "STORE_BANNER",
-  CATEGORY_SLIDER = "CATEGORY_SLIDER",
-  CATEGORY_GRID = "CATEGORY_GRID",
-  BANNER = "BANNER",
-  PRODUCT_CAROUSEL = "PRODUCT_CAROUSEL",
-  PRODUCT_GRID = "PRODUCT_GRID",
-  FEATURED_PRODUCTS = "FEATURED_PRODUCTS",
-  COUNTDOWN_TIMER = "COUNTDOWN_TIMER",
-  VOUCHER_PROMOTION = "VOUCHER_PROMOTION"
-}
+// ─────────────────────────────────────────────
+// API
+// ─────────────────────────────────────────────
 
-export enum BackgroundType {
-  SOLID = "SOLID",
-  LINEAR_GRADIENT = "LINEAR_GRADIENT",
-  RADIAL_GRADIENT = "RADIAL_GRADIENT",
-  IMAGE = "IMAGE"
-}
+const BASE = "store-decoration";
 
-export enum CategoryLayout {
-  SLIDER = "SLIDER",
-  GRID = "GRID",
-  LIST = "LIST"
-}
-
-export enum BannerType {
-  SINGLE_BANNER = "SINGLE_BANNER",
-  DOUBLE_BANNER = "DOUBLE_BANNER",
-  THREE_BANNER = "THREE_BANNER",
-  FOUR_BANNER = "FOUR_BANNER",
-  FIVE_BANNER = "FIVE_BANNER",
-  SLIDER_BANNER = "SLIDER_BANNER",
-  SLIDER_WITH_LEFT_BANNER = "SLIDER_WITH_LEFT_BANNER"
-}
-
-export enum BannerLayout {
-  HORIZONTAL = "HORIZONTAL",
-  VERTICAL = "VERTICAL",
-  GRID = "GRID",
-  MASONRY = "MASONRY"
-}
-
-export enum TimerPosition {
-  TOP_LEFT = "TOP_LEFT",
-  TOP_RIGHT = "TOP_RIGHT",
-  TOP_CENTER = "TOP_CENTER",
-  BOTTOM_LEFT = "BOTTOM_LEFT",
-  BOTTOM_RIGHT = "BOTTOM_RIGHT",
-  BOTTOM_CENTER = "BOTTOM_CENTER",
-  CENTER = "CENTER",
-  OVERLAY_TOP = "OVERLAY_TOP",
-  OVERLAY_BOTTOM = "OVERLAY_BOTTOM"
-}
-
-export enum ProductApprovalStatus {
-  PENDING = "PENDING",
-  ACTIVE = "ACTIVE",
-  REJECTED = "REJECTED"
-}
-
-// --------- Store Editor API ---------
-export const storeEditorApi = createApi({
-  reducerPath: "storeEditorApi",
+export const storeDecorationApi = createApi({
+  reducerPath: "storeDecorationApi",
   baseQuery: baseQueryWithReauth,
   tagTypes: [
-    "StoreLayout",
-    "StoreLayoutComponent",
+    "Decoration",
+    "DecorationComponent",
     "BannerCustomization",
-    "LayoutTemplate"
+    "LayoutTemplate",
   ],
   endpoints: (builder) => ({
-    // ========== Store Layout Endpoints ==========
-    
-    // Get all vendor layouts
-    getVendorLayouts: builder.query<ApiResponse<StoreLayout[]>, void>({
-      query: () => "/store-editor/layouts",
+
+    // ── Decoration CRUD ──────────────────────
+
+    /** GET /store-decoration — lightweight gallery list */
+    listDecorations: builder.query<ApiResponse<StoreDecorationSummary[]>, void>({
+      query: () => BASE,
       providesTags: (result) =>
         result?.data
           ? [
-              ...result.data.map(({ id }) => ({
-                type: "StoreLayout" as const,
-                id,
-              })),
-              "StoreLayout",
+              ...result.data.map(({ id }) => ({ type: "Decoration" as const, id })),
+              { type: "Decoration", id: "LIST" },
             ]
-          : ["StoreLayout"],
+          : [{ type: "Decoration", id: "LIST" }],
     }),
 
-    // Get specific layout by ID
-    getStoreLayout: builder.query<ApiResponse<StoreLayout>, string>({
-      query: (layoutId) => `/store-editor/layouts/${layoutId}`,
-      providesTags: (result, error, id) => [{ type: "StoreLayout", id }],
+    /** GET /store-decoration/:id — full decoration for the builder */
+    getDecoration: builder.query<ApiResponse<StoreDecoration>, string>({
+      query: (id) => `${BASE}/${id}`,
+      providesTags: (_, __, id) => [{ type: "Decoration", id }],
     }),
 
-    // Create new layout
-    createStoreLayout: builder.mutation<ApiResponse<StoreLayout>, CreateStoreLayoutRequest>({
-      query: (body) => ({
-        url: "/store-editor/layouts",
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: ["StoreLayout"],
+    /** GET /store-decoration/storefront/:vendorId — public, no auth */
+    getStorefront: builder.query<ApiResponse<StoreDecoration>, string>({
+      query: (vendorId) => `${BASE}/storefront/${vendorId}`,
+      providesTags: (_, __, vendorId) => [{ type: "Decoration", id: `storefront-${vendorId}` }],
     }),
 
-    // Set default layout
-    setDefaultLayout: builder.mutation<ApiResponse<StoreLayout>, string>({
-      query: (layoutId) => ({
-        url: "/store-editor/layouts/default",
-        method: "PUT",
-        body: { layoutId },
-      }),
-      invalidatesTags: ["StoreLayout"],
+    /** POST /store-decoration */
+    createDecoration: builder.mutation<ApiResponse<StoreDecorationSummary>, CreateDecorationRequest>({
+      query: (body) => ({ url: BASE, method: "POST", body }),
+      invalidatesTags: [{ type: "Decoration", id: "LIST" }],
     }),
 
-    // Delete layout
-    deleteStoreLayout: builder.mutation<ApiResponse<null>, string>({
-      query: (layoutId) => ({
-        url: `/store-editor/layouts/${layoutId}`,
-        method: "DELETE",
-      }),
-      invalidatesTags: ["StoreLayout"],
-    }),
-
-    // ========== Component Endpoints ==========
-
-    // Add component to layout
-    addComponent: builder.mutation<ApiResponse<StoreLayoutComponent>, CreateComponentRequest>({
-      query: (body) => ({
-        url: "/store-editor/components",
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: (result, error, { layoutId }) => [
-        { type: "StoreLayout", id: layoutId },
-        "StoreLayoutComponent",
+    /** PATCH /store-decoration/:id */
+    updateDecoration: builder.mutation<
+      ApiResponse<StoreDecorationSummary>,
+      { id: string; data: UpdateDecorationRequest }
+    >({
+      query: ({ id, data }) => ({ url: `${BASE}/${id}`, method: "PATCH", body: data }),
+      invalidatesTags: (_, __, { id }) => [
+        { type: "Decoration", id },
+        { type: "Decoration", id: "LIST" },
       ],
     }),
 
-    // Update component
+    /** DELETE /store-decoration/:id */
+    deleteDecoration: builder.mutation<ApiResponse<{ message: string }>, string>({
+      query: (id) => ({ url: `${BASE}/${id}`, method: "DELETE" }),
+      invalidatesTags: (_, __, id) => [
+        { type: "Decoration", id },
+        { type: "Decoration", id: "LIST" },
+      ],
+    }),
+
+    /** POST /store-decoration/:id/publish */
+    publishDecoration: builder.mutation<ApiResponse<StoreDecorationSummary>, string>({
+      query: (id) => ({ url: `${BASE}/${id}/publish`, method: "POST" }),
+      invalidatesTags: (_, __, id) => [
+        { type: "Decoration", id },
+        { type: "Decoration", id: "LIST" },
+      ],
+    }),
+
+    /** POST /store-decoration/:id/archive */
+    archiveDecoration: builder.mutation<ApiResponse<StoreDecorationSummary>, string>({
+      query: (id) => ({ url: `${BASE}/${id}/archive`, method: "POST" }),
+      invalidatesTags: (_, __, id) => [
+        { type: "Decoration", id },
+        { type: "Decoration", id: "LIST" },
+      ],
+    }),
+
+    /** POST /store-decoration/:id/duplicate */
+    duplicateDecoration: builder.mutation<
+      ApiResponse<StoreDecorationSummary>,
+      { id: string; data: DuplicateDecorationRequest }
+    >({
+      query: ({ id, data }) => ({ url: `${BASE}/${id}/duplicate`, method: "POST", body: data }),
+      invalidatesTags: [{ type: "Decoration", id: "LIST" }],
+    }),
+
+    // ── Component mutations ──────────────────
+
+    /** POST /store-decoration/:decorationId/components */
+    addComponent: builder.mutation<
+      ApiResponse<DecorationComponent>,
+      { decorationId: string; data: CreateComponentRequest }
+    >({
+      query: ({ decorationId, data }) => ({
+        url: `${BASE}/${decorationId}/components`,
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: (_, __, { decorationId }) => [
+        { type: "Decoration", id: decorationId },
+      ],
+    }),
+
+    /** PATCH /store-decoration/:decorationId/components/:componentId */
     updateComponent: builder.mutation<
-      ApiResponse<StoreLayoutComponent>,
-      { componentId: string; data: UpdateComponentRequest }
+      ApiResponse<DecorationComponent>,
+      { decorationId: string; componentId: string; data: UpdateComponentRequest }
     >({
-      query: ({ componentId, data }) => ({
-        url: `/store-editor/components/${componentId}`,
-        method: "PUT",
+      query: ({ decorationId, componentId, data }) => ({
+        url: `${BASE}/${decorationId}/components/${componentId}`,
+        method: "PATCH",
         body: data,
       }),
-      invalidatesTags: (result, error, { componentId }) => [
-        { type: "StoreLayoutComponent", id: componentId },
-        "StoreLayout",
+      invalidatesTags: (_, __, { decorationId }) => [
+        { type: "Decoration", id: decorationId },
       ],
     }),
 
-    // Delete component
-    deleteComponent: builder.mutation<ApiResponse<null>, string>({
-      query: (componentId) => ({
-        url: `/store-editor/components/${componentId}`,
+    /** DELETE /store-decoration/:decorationId/components/:componentId */
+    deleteComponent: builder.mutation<
+      ApiResponse<{ message: string }>,
+      { decorationId: string; componentId: string }
+    >({
+      query: ({ decorationId, componentId }) => ({
+        url: `${BASE}/${decorationId}/components/${componentId}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["StoreLayoutComponent", "StoreLayout"],
-    }),
-
-    // Update component products
-    updateComponentProducts: builder.mutation<
-      ApiResponse<StoreLayoutComponent>,
-      { componentId: string; data: UpdateComponentProductsRequest }
-    >({
-      query: ({ componentId, data }) => ({
-        url: `/store-editor/components/${componentId}/products`,
-        method: "PUT",
-        body: data,
-      }),
-      invalidatesTags: (result, error, { componentId }) => [
-        { type: "StoreLayoutComponent", id: componentId },
-        "StoreLayout",
+      invalidatesTags: (_, __, { decorationId }) => [
+        { type: "Decoration", id: decorationId },
       ],
     }),
 
-    // Update component categories
-    updateComponentCategories: builder.mutation<
-      ApiResponse<StoreLayoutComponent>,
-      { componentId: string; data: UpdateComponentCategoriesRequest }
+    /** PUT /store-decoration/:decorationId/components/reorder */
+    reorderComponents: builder.mutation<
+      ApiResponse<{ message: string }>,
+      { decorationId: string; orderedIds: string[] }
     >({
-      query: ({ componentId, data }) => ({
-        url: `/store-editor/components/${componentId}/categories`,
+      query: ({ decorationId, orderedIds }) => ({
+        url: `${BASE}/${decorationId}/components/reorder`,
         method: "PUT",
-        body: data,
+        body: { orderedIds },
       }),
-      invalidatesTags: (result, error, { componentId }) => [
-        { type: "StoreLayoutComponent", id: componentId },
-        "StoreLayout",
+      // Optimistic update — reorder is UI-driven so invalidate to sync
+      invalidatesTags: (_, __, { decorationId }) => [
+        { type: "Decoration", id: decorationId },
       ],
     }),
 
-    // ========== Banner Customization Endpoints ==========
+    /** PUT /store-decoration/:decorationId/components/:componentId/products */
+    setComponentProducts: builder.mutation<
+      ApiResponse<DecorationComponent>,
+      { decorationId: string; componentId: string; productIds: string[] }
+    >({
+      query: ({ decorationId, componentId, productIds }) => ({
+        url: `${BASE}/${decorationId}/components/${componentId}/products`,
+        method: "PUT",
+        body: { productIds },
+      }),
+      invalidatesTags: (_, __, { decorationId }) => [
+        { type: "Decoration", id: decorationId },
+      ],
+    }),
 
-    // Get banner customization
-    getBannerCustomization: builder.query<ApiResponse<BannerCustomization>, void>({
-      query: () => "/store-editor/banner-customization",
+    /** PUT /store-decoration/:decorationId/components/:componentId/categories */
+    setComponentCategories: builder.mutation<
+      ApiResponse<DecorationComponent>,
+      { decorationId: string; componentId: string; categoryIds: string[] }
+    >({
+      query: ({ decorationId, componentId, categoryIds }) => ({
+        url: `${BASE}/${decorationId}/components/${componentId}/categories`,
+        method: "PUT",
+        body: { categoryIds },
+      }),
+      invalidatesTags: (_, __, { decorationId }) => [
+        { type: "Decoration", id: decorationId },
+      ],
+    }),
+
+    // ── Banner Customization ─────────────────
+
+    /** GET /store-decoration/banner-customization */
+    getBannerCustomization: builder.query<ApiResponse<BannerCustomization | null>, void>({
+      query: () => `${BASE}/banner-customization`,
       providesTags: ["BannerCustomization"],
     }),
 
-    // Update banner customization
-    updateBannerCustomization: builder.mutation<
+    /** PUT /store-decoration/banner-customization */
+    upsertBannerCustomization: builder.mutation<
       ApiResponse<BannerCustomization>,
       UpdateBannerCustomizationRequest
     >({
       query: (body) => ({
-        url: "/store-editor/banner-customization",
+        url: `${BASE}/banner-customization`,
         method: "PUT",
         body,
       }),
       invalidatesTags: ["BannerCustomization"],
     }),
 
-    // ========== Template Endpoints ==========
+    // ── Templates ───────────────────────────
 
-    // Get layout templates
+    /** GET /store-decoration/templates?category=xyz */
     getLayoutTemplates: builder.query<
       ApiResponse<LayoutTemplate[]>,
       { category?: string } | void
     >({
       query: (params) => {
-        const searchParams = new URLSearchParams();
-        if (params?.category) {
-          searchParams.append("category", params.category);
-        }
-        return `/store-editor/templates${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
+        const qs = params?.category ? `?category=${params.category}` : "";
+        return `${BASE}/templates${qs}`;
       },
       providesTags: ["LayoutTemplate"],
     }),
 
-    // Apply template
-    applyTemplate: builder.mutation<ApiResponse<StoreLayout>, ApplyTemplateRequest>({
+    /** POST /store-decoration/templates/apply */
+    applyTemplate: builder.mutation<ApiResponse<StoreDecoration>, ApplyTemplateRequest>({
       query: (body) => ({
-        url: "/store-editor/templates/apply",
+        url: `${BASE}/templates/apply`,
         method: "POST",
         body,
       }),
-      invalidatesTags: ["StoreLayout"],
+      invalidatesTags: [{ type: "Decoration", id: "LIST" }],
     }),
-
-
   }),
 });
 
-// ========== Export Hooks ==========
-export const {
-  // Store Layout Hooks
-  useGetVendorLayoutsQuery,
-  useLazyGetVendorLayoutsQuery,
-  useGetStoreLayoutQuery,
-  useLazyGetStoreLayoutQuery,
-  useCreateStoreLayoutMutation,
-  useSetDefaultLayoutMutation,
-  useDeleteStoreLayoutMutation,
+// ─────────────────────────────────────────────
+// EXPORTED HOOKS
+// ─────────────────────────────────────────────
 
-  // Component Hooks
+export const {
+  // Decoration queries
+  useListDecorationsQuery,
+  useLazyListDecorationsQuery,
+  useGetDecorationQuery,
+  useLazyGetDecorationQuery,
+  useGetStorefrontQuery,
+  useLazyGetStorefrontQuery,
+
+  // Decoration mutations
+  useCreateDecorationMutation,
+  useUpdateDecorationMutation,
+  useDeleteDecorationMutation,
+  usePublishDecorationMutation,
+  useArchiveDecorationMutation,
+  useDuplicateDecorationMutation,
+
+  // Component mutations
   useAddComponentMutation,
   useUpdateComponentMutation,
   useDeleteComponentMutation,
-  useUpdateComponentProductsMutation,
-  useUpdateComponentCategoriesMutation,
+  useReorderComponentsMutation,
+  useSetComponentProductsMutation,
+  useSetComponentCategoriesMutation,
 
-  // Banner Customization Hooks
+  // Banner customization
   useGetBannerCustomizationQuery,
   useLazyGetBannerCustomizationQuery,
-  useUpdateBannerCustomizationMutation,
+  useUpsertBannerCustomizationMutation,
 
-  // Template Hooks
+  // Templates
   useGetLayoutTemplatesQuery,
   useLazyGetLayoutTemplatesQuery,
   useApplyTemplateMutation,
-} = storeEditorApi;
+} = storeDecorationApi;

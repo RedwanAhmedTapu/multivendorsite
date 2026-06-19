@@ -1,280 +1,431 @@
 "use client";
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { useGenerateTemplateMutation } from '@/features/productApi';
-import CategoryTreeSelector from '../product/vendor/productform/CategoryTreeSelector';
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { useGenerateTemplateMutation } from "@/features/productApi";
+import CategoryTreeSelector from "../product/vendor/productform/CategoryTreeSelector";
+
+interface CategoryAttribute {
+  isRequired: boolean;
+  type: string;
+  name: string;
+}
+
+const STOCK_NOTE =
+  "Stock quantities are not part of this template. " +
+  "After uploading products, add inventory through Purchase Orders → Receive Items.";
 
 const BulkProductTemplate: React.FC = () => {
   const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [isLeafCategory, setIsLeafCategory] = useState<boolean>(false);
-  const [selectedPath, setSelectedPath] = useState<string>('');
+  const [isLeafCategory, setIsLeafCategory] = useState(false);
+  const [selectedPath, setSelectedPath] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
-  const [categoryAttributes, setCategoryAttributes] = useState<any[]>([]);
-  
+  const [generateDone, setGenerateDone] = useState(false);
+  const [categoryAttributes, setCategoryAttributes] = useState<CategoryAttribute[]>([]);
+
   const [generateTemplate, { isLoading, error }] = useGenerateTemplateMutation();
 
   const handleCategorySelect = (
     id: string,
     path: string,
     isLeaf: boolean,
-    attributes: any[]
+    attributes: CategoryAttribute[]
   ) => {
     setCategoryId(id);
     setIsLeafCategory(isLeaf);
     setSelectedPath(path);
-    setCategoryAttributes(attributes || []);
+    setCategoryAttributes(attributes ?? []);
+    setGenerateDone(false);
   };
 
   const handleGenerate = async () => {
     if (!categoryId || !isLeafCategory) {
-      alert('⚠️ Please select a leaf category');
+      alert("⚠️ Please select a leaf category first.");
       return;
     }
-    
     try {
       await generateTemplate(categoryId).unwrap();
-      alert('✅ Template generated successfully');
+      setGenerateDone(true);
     } catch (err) {
-      console.error('Error generating template:', err);
-      alert('❌ Failed to generate template. Please try again.');
+      console.error("Generate error:", err);
+      alert("❌ Failed to generate template. Please try again.");
     }
   };
 
   const handleDownload = async () => {
     if (!categoryId || !isLeafCategory) {
-      alert('⚠️ Please select a leaf category');
+      alert("⚠️ Please select a leaf category first.");
       return;
     }
-    
     setIsDownloading(true);
-    
     try {
-      // Note: You might need to adjust the URL based on your API setup
-      // If using the API slice, you could also use the downloadTemplate query hook
-      const response = await fetch(`http://localhost:5000/api/bulkproduct-templates/download/${categoryId}`);
-      
+      const response = await fetch(
+        `http://localhost:5000/api/bulkproduct-templates/download/${categoryId}`
+      );
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Failed to download template' }));
-        throw new Error(errorData.message || 'Failed to download template');
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message ?? "Download failed");
       }
-      
-      // Get filename from Content-Disposition header or use default
-      const contentDisposition = response.headers.get('Content-Disposition');
-      const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
-      const filename = filenameMatch ? filenameMatch[1] : `template_${categoryId}.xlsx`;
-      
-      // Create blob and download
+
+      const contentDisposition = response.headers.get("Content-Disposition");
+      const match = contentDisposition?.match(/filename="(.+)"/);
+      const filename = match ? match[1] : `template_${categoryId}.xlsx`;
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
-      
-      // Cleanup
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
-      alert('✅ Template downloaded successfully');
-      
     } catch (err: any) {
-      console.error('Error downloading template:', err);
-      alert(`❌ ${err.message || 'Failed to download template. Please try again.'}`);
+      console.error("Download error:", err);
+      alert(`❌ ${err.message ?? "Download failed. Please try again."}`);
     } finally {
       setIsDownloading(false);
     }
   };
 
-  // Calculate attribute statistics
-  const requiredAttributesCount = categoryAttributes.filter(attr => attr.isRequired).length;
-  const optionalAttributesCount = categoryAttributes.length - requiredAttributesCount;
+  const handleGenerateAndDownload = async () => {
+    await handleGenerate();
+    await handleDownload();
+  };
+
+  const requiredCount = categoryAttributes.filter((a) => a.isRequired).length;
+  const optionalCount = categoryAttributes.length - requiredCount;
+  const variantAttrCount = categoryAttributes.filter(
+    (a) => a.type === "SELECT"
+  ).length;
 
   return (
-    <Card className='w-full mx-auto shadow-none border-none md:p-6'>
-      <CardHeader>
-        <CardTitle className="text-2xl font-bold">Generate Bulk Product Template</CardTitle>
-        <p className="text-sm text-gray-600 mt-1">
-          Create an Excel template for bulk product upload based on category attributes
-        </p>
-      </CardHeader>
-      <CardContent className='space-y-6'>
-        {/* Category Selection */}
-        <div className="space-y-3">
-          <h3 className="text-lg font-semibold">Step 1: Select Category</h3>
+    <div className="w-full max-w-4xl mx-auto space-y-5 py-6 px-4">
+     
+      {/* ── Stock notice banner ─────────────────────────────────── */}
+      <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+        <svg
+          className="mt-0.5 h-4 w-4 shrink-0 text-amber-500"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 9v3m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+          />
+        </svg>
+        <p className="text-xs text-amber-800 leading-relaxed">{STOCK_NOTE}</p>
+      </div>
+
+      {/* ── Step 1: Select category ─────────────────────────────── */}
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <StepBadge step={1} />
+            <CardTitle className="text-base font-semibold text-gray-800">
+              Select a Leaf Category
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
           <CategoryTreeSelector onSelect={handleCategorySelect} />
-        </div>
-        
-        {/* Selected Category Info */}
-        {categoryId && (
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h4 className="font-semibold text-blue-800">Selected Category</h4>
-                <p className="text-sm text-blue-700">{selectedPath}</p>
+        </CardContent>
+      </Card>
+
+      {/* ── Selected category info ──────────────────────────────── */}
+      {categoryId && (
+        <Card
+          className={`shadow-sm border ${
+            isLeafCategory ? "border-emerald-200 bg-emerald-50/40" : "border-yellow-200 bg-yellow-50/40"
+          }`}
+        >
+          <CardContent className="pt-4 pb-4 space-y-3">
+            {/* Path + leaf badge */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">
+                  Selected Category
+                </p>
+                <p className="text-sm font-semibold text-gray-800 break-words">
+                  {selectedPath}
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                {isLeafCategory ? (
-                  <span className='text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium'>
-                    ✓ Leaf Category
-                  </span>
-                ) : (
-                  <span className='text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-medium'>
-                    ⚠ Has Subcategories
-                  </span>
-                )}
-              </div>
+              {isLeafCategory ? (
+                <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                  <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Leaf Category
+                </span>
+              ) : (
+                <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-700">
+                  <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Has Sub-categories
+                </span>
+              )}
             </div>
-            
-            {/* Attribute Summary */}
+
+            {/* Non-leaf warning */}
+            {!isLeafCategory && (
+              <p className="text-xs text-yellow-700">
+                Please navigate deeper and select a leaf category (one with no
+                further sub-categories) to generate a template.
+              </p>
+            )}
+
+            {/* Attribute stats — only for leaf */}
             {isLeafCategory && categoryAttributes.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-blue-200">
-                <h5 className="text-sm font-medium text-blue-800 mb-2">Attributes Summary</h5>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white p-3 rounded border">
-                    <p className="text-xs text-gray-500">Total Attributes</p>
-                    <p className="text-lg font-bold">{categoryAttributes.length}</p>
-                  </div>
-                  <div className="bg-white p-3 rounded border">
-                    <p className="text-xs text-gray-500">Required</p>
-                    <p className="text-lg font-bold text-red-600">{requiredAttributesCount}</p>
-                  </div>
-                  <div className="bg-white p-3 rounded border">
-                    <p className="text-xs text-gray-500">Optional</p>
-                    <p className="text-lg font-bold text-blue-600">{optionalAttributesCount}</p>
-                  </div>
-                  <div className="bg-white p-3 rounded border">
-                    <p className="text-xs text-gray-500">Types</p>
-                    <p className="text-sm font-medium">
-                      {Array.from(new Set(categoryAttributes.map(a => a.type))).join(', ')}
-                    </p>
-                  </div>
-                </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                <StatTile label="Total Attributes" value={categoryAttributes.length} color="gray" />
+                <StatTile label="Required" value={requiredCount} color="red" />
+                <StatTile label="Optional" value={optionalCount} color="blue" />
+                <StatTile
+                  label="Variant Attrs 🔄"
+                  value={variantAttrCount}
+                  color="purple"
+                />
               </div>
             )}
-          </div>
-        )}
-        
-        {/* Action Buttons */}
-        {categoryId && isLeafCategory && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Step 2: Generate & Download Template</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Button
+
+            {isLeafCategory && categoryAttributes.length === 0 && (
+              <p className="text-xs text-gray-500 italic">
+                No category attributes defined. The template will contain only
+                core product and variant fields.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Step 2: Generate & Download ─────────────────────────── */}
+      {categoryId && isLeafCategory && (
+        <Card className="shadow-sm border-gray-200">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <StepBadge step={2} />
+              <CardTitle className="text-base font-semibold text-gray-800">
+                Generate &amp; Download Template
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Individual action buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Generate */}
+              <div className="space-y-1.5">
+                <button
                   onClick={handleGenerate}
                   disabled={isLoading}
-                  className="w-full h-12"
-                  variant={isLoading ? "secondary" : "default"}
+                  className={`
+                    w-full h-11 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2
+                    ${
+                      isLoading
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : generateDone
+                        ? "bg-emerald-50 border border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                        : "bg-gray-900 text-white hover:bg-gray-700 active:scale-[0.98]"
+                    }
+                  `}
                 >
                   {isLoading ? (
                     <>
-                      <span className="animate-spin mr-2">⏳</span>
-                      Generating Template...
+                      <Spinner />
+                      Generating…
+                    </>
+                  ) : generateDone ? (
+                    <>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      Generated
                     </>
                   ) : (
-                    'Step 1: Generate Template'
+                    <>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      1. Generate Template
+                    </>
                   )}
-                </Button>
-                <p className="text-xs text-gray-500 text-center">
-                  Generate the Excel template structure
+                </button>
+                <p className="text-xs text-gray-400 text-center">
+                  Builds the Excel file on the server
                 </p>
               </div>
-              
-              <div className="space-y-2">
-                <Button
+
+              {/* Download */}
+              <div className="space-y-1.5">
+                <button
                   onClick={handleDownload}
                   disabled={isDownloading}
-                  className="w-full h-12 bg-green-600 hover:bg-green-700"
-                  variant={isDownloading ? "secondary" : "default"}
+                  className={`
+                    w-full h-11 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2
+                    ${
+                      isDownloading
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-emerald-600 text-white hover:bg-emerald-500 active:scale-[0.98]"
+                    }
+                  `}
                 >
                   {isDownloading ? (
                     <>
-                      <span className="animate-spin mr-2">⏳</span>
-                      Downloading...
+                      <Spinner />
+                      Downloading…
                     </>
                   ) : (
-                    'Step 2: Download Template'
+                    <>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      2. Download .xlsx
+                    </>
                   )}
-                </Button>
-                <p className="text-xs text-gray-500 text-center">
-                  Download the generated Excel file
+                </button>
+                <p className="text-xs text-gray-400 text-center">
+                  Saves the file to your device
                 </p>
               </div>
             </div>
-            
-            {/* Combined Button (Alternative) */}
-            <div className="pt-4 border-t">
-              <Button
-                onClick={async () => {
-                  await handleGenerate();
-                  await handleDownload();
-                }}
-                disabled={isLoading || isDownloading}
-                className="w-full h-12 bg-purple-600 hover:bg-purple-700"
-              >
-                {isLoading || isDownloading ? (
-                  <>
-                    <span className="animate-spin mr-2">⏳</span>
-                    Processing...
-                  </>
-                ) : (
-                  'Generate & Download Template'
-                )}
-              </Button>
-              <p className="text-xs text-gray-500 text-center mt-1">
-                One-click generate and download
-              </p>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-gray-400">or</span>
+              <div className="flex-1 h-px bg-gray-200" />
             </div>
-          </div>
-        )}
-        
-        {/* Warning for non-leaf categories */}
-        {categoryId && !isLeafCategory && (
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-start gap-3">
-              <span className="text-yellow-600 text-xl mt-0.5">⚠️</span>
-              <div>
-                <h4 className="font-medium text-yellow-800">Non-Leaf Category Selected</h4>
-                <p className="text-sm text-yellow-700 mt-1">
-                  You have selected "{selectedPath}" which is not a leaf category. 
-                  Please select a leaf category (one without subcategories) to generate a template.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Instructions */}
-        {!categoryId && (
-          <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <h4 className="font-medium text-gray-800 mb-2">How to Generate Bulk Template</h4>
-            <ol className="text-sm text-gray-600 space-y-1 list-decimal pl-5">
-              <li>Select a leaf category from the tree above</li>
-              <li>The template will include columns for all category attributes</li>
-              <li>Click "Generate Template" to create the Excel structure</li>
-              <li>Click "Download Template" to get the Excel file</li>
-              <li>Fill in the template with your product data</li>
-              <li>Use the bulk upload feature to import the filled template</li>
-            </ol>
-          </div>
-        )}
-        
-        {/* Error Display */}
-        {error && (
-          <div className='p-4 bg-red-50 border border-red-200 rounded-lg'>
-            <h4 className="font-medium text-red-800 mb-1">Error Generating Template</h4>
-            <p className='text-sm text-red-700'>
-              {(error as any).data?.message || 'Failed to generate template. Please try again.'}
-            </p>
-            <p className="text-xs text-red-600 mt-2">
-              Tip: Make sure you have selected a valid leaf category with attributes defined.
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+
+            {/* One-click button */}
+            <button
+              onClick={handleGenerateAndDownload}
+              disabled={isLoading || isDownloading}
+              className={`
+                w-full h-11 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2
+                ${
+                  isLoading || isDownloading
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-indigo-600 text-white hover:bg-indigo-500 active:scale-[0.98]"
+                }
+              `}
+            >
+              {isLoading || isDownloading ? (
+                <>
+                  <Spinner />
+                  Processing…
+                </>
+              ) : (
+                <>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Generate &amp; Download in One Click
+                </>
+              )}
+            </button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Empty state instructions ────────────────────────────── */}
+      {!categoryId && (
+        <Card className="shadow-sm border-dashed border-gray-300 bg-gray-50/50">
+          <CardContent className="pt-5 pb-5">
+            <h4 className="text-sm font-semibold text-gray-700 mb-3">
+              How it works
+            </h4>
+           <ol className="space-y-2 text-sm text-gray-600 list-none">
+  {[
+    "Select a leaf category from the tree above.",
+    'Click "Generate & Download" to get the Excel template.', // Fixed line
+    "Fill in the template — product info, variant attributes, pricing.",
+    "Leave stock quantities blank — add stock via Purchase Orders later.",
+    "Upload the filled template using the Bulk Upload feature.",
+  ].map((text, i) => (
+    <li key={i} className="flex items-start gap-2.5">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-600">
+        {i + 1}
+      </span>
+      <span>{text}</span>
+    </li>
+  ))}
+</ol>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── API error ───────────────────────────────────────────── */}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 space-y-1">
+          <p className="text-sm font-semibold text-red-800">
+            Template Generation Failed
+          </p>
+          <p className="text-xs text-red-700">
+            {(error as any)?.data?.message ??
+              "An unexpected error occurred. Please try again."}
+          </p>
+          <p className="text-xs text-red-500">
+            Tip: Ensure the selected category has attributes defined.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+const StepBadge: React.FC<{ step: number }> = ({ step }) => (
+  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-xs font-bold text-white">
+    {step}
+  </span>
+);
+
+const Spinner: React.FC = () => (
+  <svg
+    className="h-4 w-4 animate-spin"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+    />
+  </svg>
+);
+
+const StatTile: React.FC<{
+  label: string;
+  value: number;
+  color: "gray" | "red" | "blue" | "purple";
+}> = ({ label, value, color }) => {
+  const colorMap = {
+    gray: "text-gray-800",
+    red: "text-red-600",
+    blue: "text-blue-600",
+    purple: "text-purple-600",
+  };
+
+  return (
+    <div className="rounded-md border border-gray-200 bg-white px-3 py-2.5 text-center">
+      <p className="text-xs text-gray-400 truncate">{label}</p>
+      <p className={`text-xl font-bold ${colorMap[color]}`}>{value}</p>
+    </div>
   );
 };
 

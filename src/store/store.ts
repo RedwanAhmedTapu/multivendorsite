@@ -22,7 +22,7 @@ import { userOrderApi } from "@/features/userorderApi";
 import { adminOrderApi } from "@/features/adminOrderApi";
 import { vendorOrderApi } from "@/features/vendorOrderApi";
 import { employeeApi } from "@/features/employeeApi";
-import { storeEditorApi } from "@/features/storeEditorApi";
+import { storeDecorationApi } from "@/features/storeEditorApi";
 import { faqApi } from "@/features/faqApi";
 import { themeApi } from "@/features/themeApi";
 import { locationApi } from "@/features/locationApi";
@@ -35,6 +35,7 @@ import { footerSettingsApi } from "@/features/footerSettingsApi";
 import { supplierApi } from "@/features/supplierApi";
 import { purchaseOrderApi } from "@/features/purchaseOrderApi";
 import { stockApi } from "@/features/stockApi";
+import {orderChargeApi} from "@/features/orderChargeapi";
 
 // --------------------
 // All API imports in one array for easier management
@@ -57,7 +58,7 @@ const apiMiddlewares = [
   vendorOrderApi.middleware,
   employeeApi.middleware,
   locationApi.middleware,
-  storeEditorApi.middleware,
+  storeDecorationApi.middleware,
   faqApi.middleware,
   themeApi.middleware,
   courierApi.middleware,
@@ -69,6 +70,7 @@ const apiMiddlewares = [
   supplierApi.middleware,
   purchaseOrderApi.middleware,
   stockApi.middleware,
+  orderChargeApi.middleware,
 ];
 
 const apiReducers = {
@@ -90,7 +92,7 @@ const apiReducers = {
   [adminOrderApi.reducerPath]: adminOrderApi.reducer,
   [vendorOrderApi.reducerPath]: vendorOrderApi.reducer,
   [employeeApi.reducerPath]: employeeApi.reducer,
-  [storeEditorApi.reducerPath]: storeEditorApi.reducer,
+  [storeDecorationApi.reducerPath]: storeDecorationApi.reducer,
   [locationApi.reducerPath]: locationApi.reducer,
   [faqApi.reducerPath]: faqApi.reducer,
   [themeApi.reducerPath]: themeApi.reducer,
@@ -102,7 +104,8 @@ const apiReducers = {
   [footerSettingsApi.reducerPath]: footerSettingsApi.reducer,
   [supplierApi.reducerPath]: supplierApi.reducer,
   [purchaseOrderApi.reducerPath]: purchaseOrderApi.reducer,
-  [stockApi.reducerPath]: stockApi.reducer,   
+  [stockApi.reducerPath]: stockApi.reducer,
+  [orderChargeApi.reducerPath]: orderChargeApi.reducer,
 };
 
 // --------------------
