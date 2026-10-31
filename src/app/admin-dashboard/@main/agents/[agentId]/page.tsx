@@ -33,6 +33,8 @@ const ALLOWED: Record<string, Action[]> = {
   DEACTIVATED: [],
 };
 
+const LINK_SOURCE_LABEL: Record<string, string> = { REFERRAL_CODE: "Referral link", ADMIN_ASSIGNED: "Admin assigned", AGENT_INVITE: "Agent invite" };
+
 export default function AdminAgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const { data, isLoading, error } = useGetAdminAgentQuery(agentId, { skip: !agentId });
@@ -245,7 +247,7 @@ export default function AdminAgentDetailPage() {
                         <p className="text-xs text-slate-400">{l.vendor.status}</p>
                       </td>
                       <td className={tdCls}>
-                        <Pill tone="violet">{l.source}</Pill>
+                        <Pill tone={l.source === "REFERRAL_CODE" ? "green" : "violet"}>{LINK_SOURCE_LABEL[l.source] ?? l.source}</Pill>
                       </td>
                       <td className={`${tdCls} whitespace-nowrap`}>{fmtDate(l.startedAt)}</td>
                       <td className={`${tdCls} whitespace-nowrap`}>{l.endedAt ? fmtDate(l.endedAt) : "—"}</td>

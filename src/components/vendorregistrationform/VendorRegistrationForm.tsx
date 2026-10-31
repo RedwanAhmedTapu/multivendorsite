@@ -20,6 +20,24 @@ const VendorRegisterForm: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Agent referral link (/vendor-register?ref=REF-…): kept for this tab so a
+  // reload during OTP entry doesn't lose it; the backend ignores invalid codes.
+  const [agentRef, setAgentRef] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const fromUrl = new URLSearchParams(window.location.search).get("ref")?.trim();
+      if (fromUrl && /^ref-[a-z0-9]{4,16}$/i.test(fromUrl)) {
+        sessionStorage.setItem("finixmart:agentRef", fromUrl.toUpperCase());
+        setAgentRef(fromUrl.toUpperCase());
+      } else {
+        setAgentRef(sessionStorage.getItem("finixmart:agentRef"));
+      }
+    } catch {
+      // storage unavailable: the referral is simply not sent
+    }
+  }, []);
+  const refBody = agentRef ? { agentRef } : {};
+
   const [register, { isLoading: registering }] = useRegisterMutation();
   const [verifyOtp, { isLoading: verifyingOtp }] = useVerifyOtpMutation();
   const router = useRouter();
@@ -67,7 +85,7 @@ const VendorRegisterForm: React.FC = () => {
     }
 
     try {
-      await register({ phone, password, role: "VENDOR" }).unwrap();
+      await register({ phone, password, role: "VENDOR", ...refBody }).unwrap();
       setOtpSent(true);
       setTimer(OTP_EXPIRY_SECONDS);
       toast.success("OTP sent to your phone");
@@ -83,7 +101,7 @@ const VendorRegisterForm: React.FC = () => {
     }
 
     try {
-      await verifyOtp({ phone, otp, password, role: "VENDOR" }).unwrap();
+      await verifyOtp({ phone, otp, password, role: "VENDOR", ...refBody }).unwrap();
       setVerified(true);
       toast.success("Vendor account created successfully!");
     } catch (err: any) {
@@ -93,7 +111,7 @@ const VendorRegisterForm: React.FC = () => {
 
   const handleResendOtp = async () => {
     try {
-      await register({ phone, password, role: "VENDOR" }).unwrap();
+      await register({ phone, password, role: "VENDOR", ...refBody }).unwrap();
       setTimer(OTP_EXPIRY_SECONDS);
       setOtp("");
       toast.success("New OTP sent to your phone");
