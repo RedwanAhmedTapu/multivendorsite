@@ -42,7 +42,8 @@ const SOURCE_LABEL: Record<RateSource, string> = {
 // Proposed starting order for a first-time setup: the business rule
 // "vendor > agent > level > global". It is only a form starting point —
 // nothing is saved until the admin presses Save.
-const PROPOSED_PRECEDENCE: RateSource[] = ["VENDOR", "AGENT", "LEVEL", "GLOBAL"];
+// Decided 2026-11-01 (plan §8 C2): vendor > agent > category > level > global. Still editable.
+const PROPOSED_PRECEDENCE: RateSource[] = ["VENDOR", "AGENT", "CATEGORY", "LEVEL", "GLOBAL"];
 const METHODS: Array<{ value: PayoutMethod; label: string }> = [
   { value: "BKASH", label: "bKash" },
   { value: "NAGAD", label: "Nagad" },
