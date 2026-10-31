@@ -35,7 +35,7 @@ export type AgentSettingsResponse = {
 
 export type AuditEntry = {
   id: string;
-  entity: "SETTING" | "LEVEL" | "OVERRIDE" | "BONUS_RULE" | "AGENT" | "VENDOR_LINK";
+  entity: "SETTING" | "LEVEL" | "OVERRIDE" | "BONUS_RULE" | "AGENT" | "VENDOR_LINK" | "WITHDRAWAL" | "COMMISSION";
   entityId: string;
   action: string;
   oldValue: unknown;
@@ -145,7 +145,7 @@ const qs = (p: Record<string, string | number | undefined | null>) => {
 };
 
 const api = apiSlice.enhanceEndpoints({
-  addTagTypes: ["AgentSettings", "AgentAudit", "AgentLevels", "AgentOverrides", "AgentBonusRules", "AgentAdmin", "AgentCommissions"],
+  addTagTypes: ["AgentSettings", "AgentAudit", "AgentLevels", "AgentOverrides", "AgentBonusRules", "AgentAdmin", "AgentCommissions", "AgentWithdrawals"],
 });
 
 export const agentAdminApi = api.injectEndpoints({
@@ -285,6 +285,30 @@ export const agentAdminApi = api.injectEndpoints({
       query: (p) => ({ url: `/admin/agents/commissions/export${qs(p)}`, responseHandler: (r: Response) => r.text() }),
       keepUnusedDataFor: 0,
     }),
+    // withdrawals and accrual re-run (Phase 7)
+    listAgentWithdrawals: b.query<AdminWithdrawalList, { status?: AdminWithdrawalStatus; agentId?: string; page?: number; limit?: number }>({
+      query: (p) => `/admin/agents/withdrawals${qs(p)}`,
+      transformResponse: unwrap<AdminWithdrawalList>,
+      providesTags: ["AgentWithdrawals"],
+    }),
+    getAgentWithdrawal: b.query<AdminWithdrawalDetail, string>({
+      query: (id) => `/admin/agents/withdrawals/${id}`,
+      transformResponse: unwrap<AdminWithdrawalDetail>,
+      providesTags: ["AgentWithdrawals"],
+    }),
+    agentWithdrawalAction: b.mutation<
+      AdminWithdrawalRow,
+      { id: string; action: "approve" } | { id: string; action: "reject"; reason: string } | { id: string; action: "mark-paid"; transactionRef: string; note?: string }
+    >({
+      query: ({ id, action, ...body }) => ({ url: `/admin/agents/withdrawals/${id}/${action}`, method: "POST", body }),
+      transformResponse: unwrap<AdminWithdrawalRow>,
+      invalidatesTags: ["AgentWithdrawals", "AgentAudit"],
+    }),
+    rerunAgentAccrual: b.mutation<AccrualRerunResult, string>({
+      query: (deliveryId) => ({ url: `/admin/agents/deliveries/${encodeURIComponent(deliveryId)}/accrue`, method: "POST" }),
+      transformResponse: unwrap<AccrualRerunResult>,
+      invalidatesTags: ["AgentCommissions", "AgentAudit"],
+    }),
   }),
   overrideExisting: false,
 });
@@ -317,6 +341,10 @@ export const {
   useLookupAgentsQuery,
   useListAgentCommissionsQuery,
   useLazyExportAgentCommissionsQuery,
+  useListAgentWithdrawalsQuery,
+  useGetAgentWithdrawalQuery,
+  useAgentWithdrawalActionMutation,
+  useRerunAgentAccrualMutation,
 } = agentAdminApi;
 
 // ── commissions (Phase 6) — money as ৳ decimal strings ─────────────────────
@@ -358,6 +386,42 @@ export type AdminCommissionList = {
   limit: number;
   totals: { earned: string; reversed: string; net: string };
 };
+
+// ── withdrawals (Phase 7) ─────────────────────────────────────────────────
+export type AdminWithdrawalStatus = "REQUESTED" | "APPROVED" | "REJECTED" | "PAID" | "CANCELLED";
+export type AdminWithdrawalRow = {
+  id: string;
+  ref: string;
+  amount: string;
+  fee: string;
+  netAmount: string;
+  status: AdminWithdrawalStatus;
+  autoApproved: boolean;
+  method: { type: PayoutMethod | null; label: string; accountName: string | null; accountNumberMasked: string; bankName: string | null };
+  rejectReason: string | null;
+  transactionRef: string | null;
+  reviewedAt: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  agent?: { id: string; name: string; agentCode: string | null; status: AgentStatus | null };
+};
+export type AdminWithdrawalList = {
+  items: AdminWithdrawalRow[];
+  total: number;
+  page: number;
+  limit: number;
+  summary: Partial<Record<AdminWithdrawalStatus, { count: number; amount: string }>>;
+};
+export type AdminWithdrawalDetail = Omit<AdminWithdrawalRow, "method" | "agent"> & {
+  method: AdminWithdrawalRow["method"] & { accountNumber: string | null; branch: string | null; routingNumber: string | null };
+  agent: { id: string; name: string; agentCode: string; status: AgentStatus; email: string; phone: string | null } | null;
+  wallet: { available: string; onHold: string; pendingClearance: string } | null;
+  ledger: Array<{ id: string; type: string; amount: string; balanceAfter: string; createdAt: string }>;
+  settingsSnapshot: Record<string, unknown>;
+};
+export type AccrualRerunResult =
+  | { deliveryId: string; status: "DONE"; created: number; existing: number }
+  | { deliveryId: string; status: "SKIPPED"; reason: string; detail?: string };
 
 /** Message from an RTK Query error (the backend sends { message, code, details }). */
 export function apiErrorMessage(error: unknown, fallback = "Something went wrong"): string {

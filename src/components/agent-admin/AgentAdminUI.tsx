@@ -28,6 +28,7 @@ const TABS = [
   { href: "/admin-dashboard/agents/overrides", label: "Rate overrides" },
   { href: "/admin-dashboard/agents/bonus-rules", label: "Bonus rules" },
   { href: "/admin-dashboard/agents/commissions", label: "Commissions" },
+  { href: "/admin-dashboard/agents/withdrawals", label: "Withdrawals" },
   { href: "/admin-dashboard/agents/audit", label: "Audit log" },
 ];
 

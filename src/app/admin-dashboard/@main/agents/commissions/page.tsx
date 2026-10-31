@@ -5,13 +5,14 @@
 // net of reversals. The base is FinixMart's own commission on the line.
 
 import { useEffect, useState } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, RefreshCw } from "lucide-react";
 import {
   apiErrorMessage,
   useLazyExportAgentCommissionsQuery,
   useListAgentCommissionsQuery,
   useLookupAgentVendorsQuery,
   useLookupAgentsQuery,
+  useRerunAgentAccrualMutation,
   type AdminCommissionQuery,
   type AdminCommissionStatus,
 } from "@/features/agentAdminApi";
@@ -145,6 +146,8 @@ export default function AgentCommissionsPage() {
         </div>
       )}
 
+      <RerunAccrualPanel />
+
       <Panel>
         {isError ? (
           <p className="p-6 text-sm text-red-600">{apiErrorMessage(error)}</p>
@@ -219,5 +222,47 @@ export default function AgentCommissionsPage() {
         )}
       </Panel>
     </div>
+  );
+}
+
+/**
+ * Re-run the commission accrual for one delivered consignment (Phase 7).
+ * Idempotent: lines already accrued for that delivery are skipped.
+ */
+function RerunAccrualPanel() {
+  const [deliveryId, setDeliveryId] = useState("");
+  const [rerun, state] = useRerunAgentAccrualMutation();
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function onRun() {
+    setMessage(null);
+    try {
+      const r = await rerun(deliveryId.trim()).unwrap();
+      setMessage(
+        r.status === "DONE"
+          ? { ok: true, text: r.created ? `${r.created} commission line(s) created; ${r.existing} already existed.` : `Nothing new: all ${r.existing} line(s) were already accrued.` }
+          : { ok: false, text: `Skipped (${r.reason.toLowerCase().replace(/_/g, " ")})${r.detail ? `: ${r.detail}` : ""}` },
+      );
+    } catch (err) {
+      setMessage({ ok: false, text: apiErrorMessage(err, "The re-run failed") });
+    }
+  }
+
+  return (
+    <Panel className="mb-4" title="Re-run accrual for a delivery" subtitle="If a delivered consignment earned no commission (for example settings were missing then), run the accrual again. Lines already accrued are never duplicated.">
+      <div className="flex flex-wrap items-center gap-2 p-4">
+        <input
+          className={`${inputCls()} max-w-sm font-mono`}
+          placeholder="Courier delivery ID"
+          value={deliveryId}
+          onChange={(e) => setDeliveryId(e.target.value)}
+          aria-label="Courier delivery ID"
+        />
+        <Btn variant="outline" onClick={onRun} loading={state.isLoading} disabled={deliveryId.trim().length < 3}>
+          <RefreshCw className="size-4" /> Re-run
+        </Btn>
+        {message && <p className={`w-full text-xs ${message.ok ? "text-emerald-700" : "text-red-600"}`}>{message.text}</p>}
+      </div>
+    </Panel>
   );
 }
