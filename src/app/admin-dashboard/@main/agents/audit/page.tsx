@@ -13,8 +13,13 @@ const ENTITIES: Array<{ value: string; label: string }> = [
   { value: "BONUS_RULE", label: "Bonus rules" },
   { value: "AGENT", label: "Agents" },
   { value: "VENDOR_LINK", label: "Vendor links" },
+  { value: "WITHDRAWAL", label: "Withdrawals" },
+  { value: "COMMISSION", label: "Accrual re-runs" },
+  { value: "BONUS_AWARD", label: "Bonus awards" },
+  { value: "WALLET", label: "Wallet adjustments" },
+  { value: "TRAINING", label: "Training" },
 ];
-const ACTION_TONE: Record<string, Tone> = { CREATE: "green", UPDATE: "blue", DELETE: "red", DEACTIVATE: "amber", ACTIVATE: "green", STATUS: "violet" };
+const ACTION_TONE: Record<string, Tone> = { CREATE: "green", UPDATE: "blue", DELETE: "red", DEACTIVATE: "amber", ACTIVATE: "green", STATUS: "violet", RERUN: "slate" };
 
 const show = (v: unknown) => (v === null || v === undefined ? "—" : typeof v === "string" ? v : JSON.stringify(v, null, 2));
 

@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Medal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Medal, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import {
   apiErrorMessage,
   apiFieldErrors,
   useCreateAgentLevelMutation,
+  useEvaluateAgentLevelsMutation,
   useDeleteAgentLevelMutation,
   useListAgentLevelsQuery,
   useUpdateAgentLevelMutation,
@@ -128,9 +129,12 @@ export default function AgentLevelsPage() {
         title="Agent levels"
         subtitle="Define the tiers, their thresholds, commission rate and level bonus. Thresholds must not decrease as the rank rises."
         actions={
-          <Btn onClick={openCreate}>
-            <Plus className="size-4" /> New level
-          </Btn>
+          <>
+            <EvaluateNow />
+            <Btn onClick={openCreate}>
+              <Plus className="size-4" /> New level
+            </Btn>
+          </>
         }
       />
       <Panel>
@@ -242,5 +246,27 @@ export default function AgentLevelsPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+/**
+ * Phase 9: run the automatic level evaluation now (it also runs once a month).
+ * Upgrade only — no agent is ever moved down; level bonuses are paid once.
+ */
+function EvaluateNow() {
+  const [evaluate, state] = useEvaluateAgentLevelsMutation();
+  async function run() {
+    if (!window.confirm("Evaluate every active agent now? Agents who meet a higher level's thresholds are upgraded (never downgraded) and its level bonus is credited once.")) return;
+    try {
+      const r = await evaluate({}).unwrap();
+      if ("evaluated" in r) toast.success(`${r.evaluated} agent(s) evaluated, ${r.upgraded} upgraded${r.failed ? `, ${r.failed} failed` : ""}`);
+    } catch (err) {
+      toast.error((err as { data?: { message?: string } })?.data?.message ?? "Evaluation failed");
+    }
+  }
+  return (
+    <Btn variant="outline" onClick={run} loading={state.isLoading}>
+      <Play className="size-4" /> Run evaluation now
+    </Btn>
   );
 }

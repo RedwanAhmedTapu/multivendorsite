@@ -22,20 +22,24 @@ export type AgentSettingsValues = {
   enabledPayoutMethods: PayoutMethod[] | null;
   autoApproveWithdrawalLimit: string | null;
   registrationRequiresApproval: boolean | null;
+  performanceWeights: PerformanceWeights | null;
+  vendorAlertRules: VendorAlertRules | null;
 };
+export type PerformanceWeights = { vendorActivity: number; sales: number; growth: number; satisfaction: number };
+export type VendorAlertRules = { inactivityDays: number; lowRatingMax: number; lowStockUnits: number; growthPercent: number; lookbackDays: number };
 export type SettingKey = keyof AgentSettingsValues;
 
 export type AgentSettingsResponse = {
   values: AgentSettingsValues;
   missing: SettingKey[];
   meta: Partial<Record<SettingKey, { updatedAt: string; updatedById: string | null }>>;
-  definitions: Array<{ key: SettingKey; group: "commission" | "withdrawal" | "registration"; label: string; description: string; kind: string }>;
+  definitions: Array<{ key: SettingKey; group: "commission" | "withdrawal" | "registration" | "performance" | "alerts"; label: string; description: string; kind: string }>;
   changed?: SettingKey[];
 };
 
 export type AuditEntry = {
   id: string;
-  entity: "SETTING" | "LEVEL" | "OVERRIDE" | "BONUS_RULE" | "AGENT" | "VENDOR_LINK" | "WITHDRAWAL" | "COMMISSION";
+  entity: "SETTING" | "LEVEL" | "OVERRIDE" | "BONUS_RULE" | "AGENT" | "VENDOR_LINK" | "WITHDRAWAL" | "COMMISSION" | "TRAINING" | "WALLET" | "BONUS_AWARD";
   entityId: string;
   action: string;
   oldValue: unknown;
@@ -145,7 +149,7 @@ const qs = (p: Record<string, string | number | undefined | null>) => {
 };
 
 const api = apiSlice.enhanceEndpoints({
-  addTagTypes: ["AgentSettings", "AgentAudit", "AgentLevels", "AgentOverrides", "AgentBonusRules", "AgentAdmin", "AgentCommissions", "AgentWithdrawals"],
+  addTagTypes: ["AgentSettings", "AgentAudit", "AgentLevels", "AgentOverrides", "AgentBonusRules", "AgentAdmin", "AgentCommissions", "AgentWithdrawals", "AgentTraining", "AgentWallet"],
 });
 
 export const agentAdminApi = api.injectEndpoints({
@@ -309,6 +313,41 @@ export const agentAdminApi = api.injectEndpoints({
       transformResponse: unwrap<AccrualRerunResult>,
       invalidatesTags: ["AgentCommissions", "AgentAudit"],
     }),
+    // growth (Phase 9), wallet adjustment, payable report
+    evaluateAgentLevels: b.mutation<LevelEvaluationResult, { agentId?: string }>({
+      query: (body) => ({ url: "/admin/agents/levels/evaluate", method: "POST", body }),
+      transformResponse: unwrap<LevelEvaluationResult>,
+      invalidatesTags: ["AgentAdmin", "AgentLevels", "AgentAudit", "AgentWallet"],
+    }),
+    listAgentTraining: b.query<TrainingList, { category?: string; q?: string; page?: number; limit?: number }>({
+      query: (p) => `/admin/agents/training${qs(p)}`,
+      transformResponse: unwrap<TrainingList>,
+      providesTags: ["AgentTraining"],
+    }),
+    saveAgentTraining: b.mutation<TrainingResource, { id?: string; body: TrainingInput }>({
+      query: ({ id, body }) => ({ url: id ? `/admin/agents/training/${id}` : "/admin/agents/training", method: id ? "PATCH" : "POST", body }),
+      transformResponse: unwrap<TrainingResource>,
+      invalidatesTags: ["AgentTraining", "AgentAudit"],
+    }),
+    deleteAgentTraining: b.mutation<unknown, string>({
+      query: (id) => ({ url: `/admin/agents/training/${id}`, method: "DELETE" }),
+      invalidatesTags: ["AgentTraining", "AgentAudit"],
+    }),
+    getAdminAgentWallet: b.query<AdminAgentWallet, string>({
+      query: (id) => `/admin/agents/${id}/wallet`,
+      transformResponse: unwrap<AdminAgentWallet>,
+      providesTags: ["AgentWallet"],
+    }),
+    adjustAgentWallet: b.mutation<{ replayed: boolean }, { id: string; clientRequestId: string; amount: string; reason: string }>({
+      query: ({ id, ...body }) => ({ url: `/admin/agents/${id}/wallet/adjustments`, method: "POST", body }),
+      transformResponse: unwrap<{ replayed: boolean }>,
+      invalidatesTags: ["AgentWallet", "AgentAudit"],
+    }),
+    agentPayableReport: b.query<PayableReport, { page?: number; limit?: number }>({
+      query: (p) => `/admin/agents/reports/payable${qs(p)}`,
+      transformResponse: unwrap<PayableReport>,
+      providesTags: ["AgentWallet"],
+    }),
   }),
   overrideExisting: false,
 });
@@ -345,6 +384,13 @@ export const {
   useGetAgentWithdrawalQuery,
   useAgentWithdrawalActionMutation,
   useRerunAgentAccrualMutation,
+  useEvaluateAgentLevelsMutation,
+  useListAgentTrainingQuery,
+  useSaveAgentTrainingMutation,
+  useDeleteAgentTrainingMutation,
+  useGetAdminAgentWalletQuery,
+  useAdjustAgentWalletMutation,
+  useAgentPayableReportQuery,
 } = agentAdminApi;
 
 // ── commissions (Phase 6) — money as ৳ decimal strings ─────────────────────
@@ -422,6 +468,44 @@ export type AdminWithdrawalDetail = Omit<AdminWithdrawalRow, "method" | "agent">
 export type AccrualRerunResult =
   | { deliveryId: string; status: "DONE"; created: number; existing: number }
   | { deliveryId: string; status: "SKIPPED"; reason: string; detail?: string };
+
+// ── growth (Phase 9) and wallet tools ─────────────────────────────────────
+export type LevelEvaluationResult =
+  | { evaluated: number; upgraded: number; failed: number; upgrades: Array<{ agentId: string; to: string }> }
+  | { status: "UPGRADED" | "UNCHANGED"; agentId: string; reason?: string; to?: { id: string; name: string } };
+export type TrainingResource = {
+  id: string;
+  category: string;
+  title: string;
+  summary: string | null;
+  body: string | null;
+  url: string | null;
+  coverImage: string | null;
+  isFeatured: boolean;
+  isPublished: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type TrainingInput = Partial<Omit<TrainingResource, "id" | "createdAt" | "updatedAt">>;
+export type TrainingList = { items: TrainingResource[]; total: number; page: number; limit: number; categories: Array<{ category: string; count: number }> };
+export type AdminAgentWallet = {
+  available: string;
+  pendingClearance: string;
+  onHold: string;
+  totalEarned: string;
+  totalWithdrawn: string;
+  negative: boolean;
+  agentStatus: AgentStatus;
+  ledger: Array<{ id: string; type: string; amount: string; balanceAfter: string; refType: string; note: string | null; createdById: string | null; createdAt: string }>;
+};
+export type PayableReport = {
+  totals: { availableToWithdraw: string; onHold: string; pendingClearance: string; totalOwed: string; negativeBalances: string };
+  items: Array<{ agentId: string; name: string; agentCode: string | null; status: AgentStatus | null; available: string; onHold: string; pendingClearance: string; totalWithdrawn: string; updatedAt: string }>;
+  total: number;
+  page: number;
+  limit: number;
+  asOf: string;
+};
 
 /** Message from an RTK Query error (the backend sends { message, code, details }). */
 export function apiErrorMessage(error: unknown, fallback = "Something went wrong"): string {

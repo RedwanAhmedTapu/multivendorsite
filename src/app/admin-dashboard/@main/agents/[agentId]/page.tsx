@@ -8,7 +8,9 @@ import { ArrowLeft, Link2, Search, Store, Unlink } from "lucide-react";
 import {
   apiErrorMessage,
   apiFieldErrors,
+  useAdjustAgentWalletMutation,
   useAgentStatusActionMutation,
+  useGetAdminAgentWalletQuery,
   useAssignAgentVendorMutation,
   useEndAgentVendorLinkMutation,
   useGetAdminAgentQuery,
@@ -17,7 +19,7 @@ import {
   useLookupAgentVendorsQuery,
   useUpdateAdminAgentMutation,
 } from "@/features/agentAdminApi";
-import { AgentAdminHeader, Btn, Empty, FieldRow, Modal, Panel, Pill, STATUS_TONE, fmtDate, fmtDateTime, inputCls, tdCls, thCls } from "@/components/agent-admin/AgentAdminUI";
+import { AgentAdminHeader, Btn, Empty, FieldRow, Modal, Panel, Pill, STATUS_TONE, bdt, fmtDate, fmtDateTime, inputCls, tdCls, thCls } from "@/components/agent-admin/AgentAdminUI";
 
 type Action = "approve" | "suspend" | "reactivate" | "deactivate";
 const ACTION_META: Record<Action, { label: string; needsReason: boolean; variant: "success" | "danger" | "outline"; text: string }> = {
@@ -280,6 +282,8 @@ export default function AdminAgentDetailPage() {
       </div>
 
       <div className="mt-6">
+        <WalletPanel agentId={agentId} />
+
         <Panel title="Recent changes" subtitle="Status, profile and level changes for this agent.">
           {!history?.items.length ? (
             <Empty title="No changes recorded" />
@@ -386,5 +390,140 @@ export default function AdminAgentDetailPage() {
         )}
       </Modal>
     </div>
+  );
+}
+
+const newRequestId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`);
+
+/**
+ * Wallet and manual adjustment (Phase 8–9 extras). A signed ৳ amount with a
+ * mandatory reason, written to the ledger and the audit log; the request id
+ * makes a double click harmless. Use a negative amount to record money paid
+ * out of band (e.g. settling a deactivated agent's balance).
+ */
+function WalletPanel({ agentId }: { agentId: string }) {
+  const { data: w, isError, error } = useGetAdminAgentWalletQuery(agentId, { skip: !agentId });
+  const [adjust, adjusting] = useAdjustAgentWalletMutation();
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [requestId, setRequestId] = useState(newRequestId);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  async function onSubmit() {
+    setErrors({});
+    try {
+      await adjust({ id: agentId, clientRequestId: requestId, amount: amount.trim(), reason: reason.trim() }).unwrap();
+      toast.success("Wallet adjusted");
+      setOpen(false);
+      setAmount("");
+      setReason("");
+      setRequestId(newRequestId());
+    } catch (err) {
+      setErrors(apiFieldErrors(err));
+      toast.error(apiErrorMessage(err, "Adjustment failed"));
+    }
+  }
+
+  return (
+    <Panel
+      title="Wallet"
+      subtitle="Balances in ৳ and the latest ledger entries. Adjustments are written to the ledger and audited."
+      actions={
+        <Btn variant="outline" onClick={() => setOpen(true)} disabled={!w}>
+          Adjust balance
+        </Btn>
+      }
+    >
+      {isError ? (
+        <p className="p-5 text-sm text-red-600">{apiErrorMessage(error)}</p>
+      ) : !w ? (
+        <p className="p-5 text-sm text-slate-400">Loading…</p>
+      ) : (
+        <>
+          <dl className="grid grid-cols-2 gap-3 p-5 text-sm sm:grid-cols-5">
+            {[
+              ["Available", w.available],
+              ["Pending clearance", w.pendingClearance],
+              ["On hold", w.onHold],
+              ["Total earned", w.totalEarned],
+              ["Total withdrawn", w.totalWithdrawn],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-[11px] font-bold uppercase text-slate-400">{label}</dt>
+                <dd className={`font-bold tabular-nums ${Number(value) < 0 ? "text-red-600" : "text-slate-800"}`}>{bdt(value)}</dd>
+              </div>
+            ))}
+          </dl>
+          {w.ledger.length > 0 && (
+            <div className="overflow-x-auto border-t border-slate-100">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className={thCls}>Date</th>
+                    <th className={thCls}>Type</th>
+                    <th className={thCls}>Note</th>
+                    <th className={`${thCls} text-right`}>Amount</th>
+                    <th className={`${thCls} text-right`}>Balance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {w.ledger.map((l) => (
+                    <tr key={l.id}>
+                      <td className={`${tdCls} whitespace-nowrap text-xs`}>{fmtDateTime(l.createdAt)}</td>
+                      <td className={tdCls}>
+                        <Pill tone={Number(l.amount) > 0 ? "green" : "red"}>{l.type.toLowerCase().replace(/_/g, " ")}</Pill>
+                      </td>
+                      <td className={`${tdCls} max-w-xs truncate text-xs text-slate-500`}>{l.note ?? "—"}</td>
+                      <td className={`${tdCls} text-right tabular-nums`}>{bdt(l.amount)}</td>
+                      <td className={`${tdCls} text-right tabular-nums text-slate-500`}>{bdt(l.balanceAfter)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Adjust wallet balance"
+        footer={
+          <>
+            <Btn variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Btn>
+            <Btn onClick={onSubmit} loading={adjusting.isLoading} disabled={!amount.trim() || reason.trim().length < 5}>
+              Record adjustment
+            </Btn>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <FieldRow label="Amount (৳)" error={errors.amount} hint="Positive adds to the balance; negative deducts (e.g. -1500 for a payout made outside FinixMart)." htmlFor="adj-amount">
+            <input
+              id="adj-amount"
+              className={inputCls(!!errors.amount)}
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setRequestId(newRequestId());
+              }}
+              placeholder="e.g. -1500.00"
+            />
+          </FieldRow>
+          <FieldRow label="Reason (required, audited)" error={errors.reason} htmlFor="adj-reason">
+            <textarea id="adj-reason" className={`${inputCls(!!errors.reason)} h-20 py-2`} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
+          </FieldRow>
+          {amount.trim() && !Number.isNaN(Number(amount)) && w && (
+            <p className="text-xs text-slate-500">
+              New available balance: <b>{bdt(String(Number(w.available) + Number(amount)))}</b>
+            </p>
+          )}
+        </div>
+      </Modal>
+    </Panel>
   );
 }

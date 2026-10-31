@@ -11,7 +11,9 @@ import {
   useUpdateAgentSettingsMutation,
   type AgentSettingsValues,
   type PayoutMethod,
+  type PerformanceWeights,
   type RateSource,
+  type VendorAlertRules,
   type SettingKey,
 } from "@/features/agentAdminApi";
 import { AgentAdminHeader, Btn, FieldRow, Panel, Pill, bdt, fmtDateTime, inputCls } from "@/components/agent-admin/AgentAdminUI";
@@ -29,7 +31,26 @@ type Form = {
   enabledPayoutMethods: PayoutMethod[];
   autoApproveWithdrawalLimit: string;
   registrationRequiresApproval: boolean;
+  weights: Record<WeightKey, string>;
+  alerts: Record<AlertKey, string>;
 };
+
+type WeightKey = keyof PerformanceWeights;
+type AlertKey = keyof VendorAlertRules;
+const WEIGHTS: Array<{ key: WeightKey; label: string; hint: string }> = [
+  { key: "vendorActivity", label: "Vendor activity", hint: "Share of the agent's vendors with new orders" },
+  { key: "sales", label: "Sales", hint: "Delivered sales compared with other agents" },
+  { key: "growth", label: "Growth", hint: "Sales growth compared with other agents" },
+  { key: "satisfaction", label: "Customer satisfaction", hint: "Average review rating on the agent's vendors" },
+];
+const ALERTS: Array<{ key: AlertKey; label: string; hint: string; unit: string }> = [
+  { key: "inactivityDays", label: "Inactive after", hint: "No new order for this many days (1–365).", unit: "days" },
+  { key: "lowRatingMax", label: "Low rating at or below", hint: "Reviews with this many stars or fewer (1–5).", unit: "★" },
+  { key: "lowStockUnits", label: "Low stock at or below", hint: "Units left on an active product variant.", unit: "units" },
+  { key: "growthPercent", label: "Sales change of", hint: "Orders up or down by at least this % (1–1000).", unit: "%" },
+  { key: "lookbackDays", label: "Look-back window", hint: "Window for reviews and the growth comparison (1–90).", unit: "days" },
+];
+const intOrUndefined = (v: string) => (v.trim() === "" ? undefined : Number(v));
 
 const ALL_SOURCES: RateSource[] = ["VENDOR", "AGENT", "CATEGORY", "LEVEL", "GLOBAL"];
 const SOURCE_LABEL: Record<RateSource, string> = {
@@ -65,6 +86,8 @@ function toForm(v: AgentSettingsValues): Form {
     enabledPayoutMethods: v.enabledPayoutMethods ?? [],
     autoApproveWithdrawalLimit: v.autoApproveWithdrawalLimit ? String(Number(v.autoApproveWithdrawalLimit)) : "",
     registrationRequiresApproval: v.registrationRequiresApproval ?? true,
+    weights: Object.fromEntries(WEIGHTS.map((w) => [w.key, v.performanceWeights ? String(v.performanceWeights[w.key]) : ""])) as Form["weights"],
+    alerts: Object.fromEntries(ALERTS.map((a) => [a.key, v.vendorAlertRules ? String(v.vendorAlertRules[a.key]) : ""])) as Form["alerts"],
   };
 }
 
@@ -83,6 +106,9 @@ function payloadOf(f: Form): Partial<Record<SettingKey, unknown>> {
   if (f.enabledPayoutMethods.length) out.enabledPayoutMethods = f.enabledPayoutMethods;
   if (f.autoApproveWithdrawalLimit.trim() !== "") out.autoApproveWithdrawalLimit = f.autoApproveWithdrawalLimit.trim();
   out.registrationRequiresApproval = f.registrationRequiresApproval;
+  // Both groups are saved as a whole once every field is filled in.
+  if (WEIGHTS.every((w) => f.weights[w.key].trim() !== "")) out.performanceWeights = Object.fromEntries(WEIGHTS.map((w) => [w.key, intOrUndefined(f.weights[w.key])]));
+  if (ALERTS.every((a) => f.alerts[a.key].trim() !== "")) out.vendorAlertRules = Object.fromEntries(ALERTS.map((a) => [a.key, intOrUndefined(f.alerts[a.key])]));
   return out;
 }
 
@@ -310,6 +336,56 @@ export default function AgentSettingsPage() {
                   Agents will be able to request between <b>{bdt(form.minWithdrawalAmount)}</b> and <b>{bdt(form.maxWithdrawalAmount)}</b> per withdrawal.
                 </p>
               )}
+            </div>
+          </Panel>
+
+          <Panel title="Performance score" subtitle="Weights of the four factors in the agents' 0–100 score. Whole numbers that add up to 100. Until saved, agents see “not configured”.">
+            <div className="grid gap-5 p-5 sm:grid-cols-2 lg:grid-cols-4">
+              {WEIGHTS.map((w) => (
+                <FieldRow key={w.key} label={`${w.label} %`} hint={w.hint}>
+                  <input
+                    className={inputCls(!!errors.performanceWeights)}
+                    inputMode="numeric"
+                    value={form.weights[w.key]}
+                    onChange={(e) => set("weights", { ...form.weights, [w.key]: e.target.value })}
+                    placeholder="e.g. 25"
+                    aria-label={`${w.label} weight`}
+                  />
+                </FieldRow>
+              ))}
+              {(() => {
+                const filled = WEIGHTS.filter((w) => form.weights[w.key].trim() !== "");
+                const total = filled.reduce((s, w) => s + (Number(form.weights[w.key]) || 0), 0);
+                return (
+                  <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
+                    <span className={`text-sm font-semibold ${filled.length === WEIGHTS.length && total !== 100 ? "text-red-600" : "text-slate-600"}`}>
+                      Total: {total} / 100{filled.length < WEIGHTS.length ? ` — fill in all four to save` : ""}
+                    </span>
+                    <NotSet show={missing.has("performanceWeights")} />
+                    {errors.performanceWeights && <span className="text-xs font-medium text-red-600">{errors.performanceWeights}</span>}
+                  </div>
+                );
+              })()}
+            </div>
+          </Panel>
+
+          <Panel title="Vendor activity alerts" subtitle="When agents are alerted about their vendors. Fill in every threshold to switch alerts on.">
+            <div className="grid gap-5 p-5 md:grid-cols-2 xl:grid-cols-3">
+              {ALERTS.map((a) => (
+                <FieldRow key={a.key} label={`${a.label} (${a.unit})`} hint={a.hint}>
+                  <input
+                    className={inputCls(!!errors.vendorAlertRules)}
+                    inputMode="numeric"
+                    value={form.alerts[a.key]}
+                    onChange={(e) => set("alerts", { ...form.alerts, [a.key]: e.target.value })}
+                    aria-label={a.label}
+                  />
+                </FieldRow>
+              ))}
+              <div className="flex items-center gap-2 md:col-span-2 xl:col-span-3">
+                <NotSet show={missing.has("vendorAlertRules")} />
+                {errors.vendorAlertRules && <span className="text-xs font-medium text-red-600">{errors.vendorAlertRules}</span>}
+              </div>
             </div>
           </Panel>
 

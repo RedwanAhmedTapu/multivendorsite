@@ -29,6 +29,8 @@ const TABS = [
   { href: "/admin-dashboard/agents/bonus-rules", label: "Bonus rules" },
   { href: "/admin-dashboard/agents/commissions", label: "Commissions" },
   { href: "/admin-dashboard/agents/withdrawals", label: "Withdrawals" },
+  { href: "/admin-dashboard/agents/payables", label: "Payables" },
+  { href: "/admin-dashboard/agents/training", label: "Training" },
   { href: "/admin-dashboard/agents/audit", label: "Audit log" },
 ];
 
