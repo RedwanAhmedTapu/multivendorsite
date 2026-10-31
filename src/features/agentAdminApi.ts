@@ -145,7 +145,7 @@ const qs = (p: Record<string, string | number | undefined | null>) => {
 };
 
 const api = apiSlice.enhanceEndpoints({
-  addTagTypes: ["AgentSettings", "AgentAudit", "AgentLevels", "AgentOverrides", "AgentBonusRules", "AgentAdmin"],
+  addTagTypes: ["AgentSettings", "AgentAudit", "AgentLevels", "AgentOverrides", "AgentBonusRules", "AgentAdmin", "AgentCommissions"],
 });
 
 export const agentAdminApi = api.injectEndpoints({
@@ -274,6 +274,17 @@ export const agentAdminApi = api.injectEndpoints({
       query: (q) => `/admin/agents/lookup/agents${qs({ q })}`,
       transformResponse: unwrap<Array<{ id: string; name: string; agentCode: string; status: AgentStatus }>>,
     }),
+    // commissions (Phase 6)
+    listAgentCommissions: b.query<AdminCommissionList, AdminCommissionQuery & { page?: number; limit?: number }>({
+      query: (p) => `/admin/agents/commissions${qs(p)}`,
+      transformResponse: unwrap<AdminCommissionList>,
+      providesTags: ["AgentCommissions"],
+    }),
+    /** CSV text of the filtered list (server cap: 5,000 rows). */
+    exportAgentCommissions: b.query<string, AdminCommissionQuery>({
+      query: (p) => ({ url: `/admin/agents/commissions/export${qs(p)}`, responseHandler: (r: Response) => r.text() }),
+      keepUnusedDataFor: 0,
+    }),
   }),
   overrideExisting: false,
 });
@@ -304,7 +315,49 @@ export const {
   useLookupAgentVendorsQuery,
   useLookupAgentCategoriesQuery,
   useLookupAgentsQuery,
+  useListAgentCommissionsQuery,
+  useLazyExportAgentCommissionsQuery,
 } = agentAdminApi;
+
+// ── commissions (Phase 6) — money as ৳ decimal strings ─────────────────────
+export type AdminCommissionStatus = "PENDING" | "AVAILABLE" | "PARTIALLY_REVERSED" | "REVERSED";
+export type AdminCommissionQuery = {
+  status?: "ALL" | AdminCommissionStatus;
+  agentId?: string;
+  vendorId?: string;
+  from?: string;
+  to?: string;
+};
+export type AdminCommissionRow = {
+  id: string;
+  ref: string;
+  agentId: string;
+  agentName: string;
+  agentCode: string | null;
+  levelName: string | null;
+  orderId: string;
+  orderNumber: string | null;
+  vendorId: string;
+  storeName: string;
+  quantity: number;
+  reversedQty: number;
+  baseAmount: string;
+  ratePercent: string;
+  rateSource: string;
+  amount: string;
+  reversedAmount: string;
+  netAmount: string;
+  status: AdminCommissionStatus;
+  earnedAt: string;
+  availableAt: string;
+};
+export type AdminCommissionList = {
+  items: AdminCommissionRow[];
+  total: number;
+  page: number;
+  limit: number;
+  totals: { earned: string; reversed: string; net: string };
+};
 
 /** Message from an RTK Query error (the backend sends { message, code, details }). */
 export function apiErrorMessage(error: unknown, fallback = "Something went wrong"): string {
