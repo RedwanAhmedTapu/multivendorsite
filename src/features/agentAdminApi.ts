@@ -1,0 +1,319 @@
+// Admin management of the Agent Commission System (backend: /api/admin/agents).
+// Injected into the existing apiSlice, so no store change is needed.
+
+import { apiSlice } from "./apiSlice";
+
+type Envelope<T> = { success: true; data: T };
+const unwrap = <T,>(r: Envelope<T>) => r.data;
+
+export type AgentStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+export type RateSource = "VENDOR" | "AGENT" | "CATEGORY" | "LEVEL" | "GLOBAL";
+export type PayoutMethod = "BKASH" | "NAGAD" | "BANK";
+export type WithdrawalFee = { type: "NONE" } | { type: "FLAT"; amount: string } | { type: "PERCENT"; percent: string };
+
+export type AgentSettingsValues = {
+  defaultCommissionPercent: string | null;
+  ratePrecedence: RateSource[] | null;
+  holdDays: number | null;
+  commissionDurationMonths: number | null;
+  minWithdrawalAmount: string | null;
+  maxWithdrawalAmount: string | null;
+  withdrawalFee: WithdrawalFee | null;
+  enabledPayoutMethods: PayoutMethod[] | null;
+  autoApproveWithdrawalLimit: string | null;
+  registrationRequiresApproval: boolean | null;
+};
+export type SettingKey = keyof AgentSettingsValues;
+
+export type AgentSettingsResponse = {
+  values: AgentSettingsValues;
+  missing: SettingKey[];
+  meta: Partial<Record<SettingKey, { updatedAt: string; updatedById: string | null }>>;
+  definitions: Array<{ key: SettingKey; group: "commission" | "withdrawal" | "registration"; label: string; description: string; kind: string }>;
+  changed?: SettingKey[];
+};
+
+export type AuditEntry = {
+  id: string;
+  entity: "SETTING" | "LEVEL" | "OVERRIDE" | "BONUS_RULE" | "AGENT" | "VENDOR_LINK";
+  entityId: string;
+  action: string;
+  oldValue: unknown;
+  newValue: unknown;
+  actorUserId: string;
+  actorName: string | null;
+  ip: string | null;
+  createdAt: string;
+};
+
+export type AgentLevel = {
+  id: string;
+  name: string;
+  rank: number;
+  minActiveVendors: number;
+  minDeliveredSales: string;
+  minPerformanceScore: number | null;
+  commissionPercent: string | null;
+  bonusAmount: string | null;
+  perks: string[];
+  isActive: boolean;
+  agentCount?: number;
+};
+
+export type LevelInput = {
+  name: string;
+  rank: number;
+  minActiveVendors: number;
+  minDeliveredSales: string;
+  minPerformanceScore: number | null;
+  commissionPercent: string | null;
+  bonusAmount: string | null;
+  perks: string[];
+  isActive: boolean;
+};
+
+export type RateOverride = {
+  id: string;
+  scope: "VENDOR" | "AGENT" | "CATEGORY";
+  vendorId: string | null;
+  agentId: string | null;
+  categoryId: string | null;
+  targetName: string | null;
+  ratePercent: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  isActive: boolean;
+  note: string | null;
+  endedAt: string | null;
+  createdAt: string;
+};
+
+export type BonusRule = {
+  id: string;
+  name: string;
+  description: string | null;
+  scope: "PER_VENDOR" | "PER_AGENT";
+  metric: "DELIVERED_ORDERS" | "DELIVERED_SALES" | "ACTIVE_VENDORS" | "NEW_VENDORS";
+  threshold: string;
+  amount: string;
+  recurrence: "ONE_TIME" | "MONTHLY";
+  validFrom: string;
+  validTo: string | null;
+  isActive: boolean;
+  awardCount?: number;
+};
+
+export type AdminAgent = {
+  id: string;
+  agentCode: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  status: AgentStatus;
+  avatar: string | null;
+  referralCode: string;
+  statusReason?: string | null;
+  lastLoginAt: string | null;
+  createdAt: string;
+  level: { id: string; name: string; rank: number } | null;
+  activeVendorCount?: number;
+};
+
+export type AgentDetail = {
+  agent: AdminAgent & { approvedAt: string | null };
+  vendorLinks: Array<{
+    id: string;
+    source: string;
+    startedAt: string;
+    endedAt: string | null;
+    note: string | null;
+    vendor: { id: string; storeName: string; status: string; avatar: string | null };
+  }>;
+};
+
+export type RateResolution =
+  | { status: "RESOLVED"; source: RateSource; refId: string | null; ratePercent: string; trace: Array<{ source: RateSource; outcome: string; detail: string }> }
+  | { status: "NOT_CONFIGURED"; reason: string; trace: Array<{ source: RateSource; outcome: string; detail: string }> };
+
+type Paged<T> = { items: T[]; total: number; page: number; limit: number };
+
+const qs = (p: Record<string, string | number | undefined | null>) => {
+  const s = new URLSearchParams();
+  for (const [k, v] of Object.entries(p)) if (v !== undefined && v !== null && v !== "") s.set(k, String(v));
+  const out = s.toString();
+  return out ? `?${out}` : "";
+};
+
+const api = apiSlice.enhanceEndpoints({
+  addTagTypes: ["AgentSettings", "AgentAudit", "AgentLevels", "AgentOverrides", "AgentBonusRules", "AgentAdmin"],
+});
+
+export const agentAdminApi = api.injectEndpoints({
+  endpoints: (b) => ({
+    // settings
+    getAgentSettings: b.query<AgentSettingsResponse, void>({
+      query: () => "/admin/agents/settings",
+      transformResponse: unwrap<AgentSettingsResponse>,
+      providesTags: ["AgentSettings"],
+    }),
+    updateAgentSettings: b.mutation<AgentSettingsResponse, Partial<Record<SettingKey, unknown>>>({
+      query: (body) => ({ url: "/admin/agents/settings", method: "PATCH", body }),
+      transformResponse: unwrap<AgentSettingsResponse>,
+      invalidatesTags: ["AgentSettings", "AgentAudit"],
+    }),
+    getAgentAudit: b.query<Paged<AuditEntry>, { entity?: string; entityId?: string; page?: number; limit?: number }>({
+      query: (p) => `/admin/agents/audit${qs(p)}`,
+      transformResponse: unwrap<Paged<AuditEntry>>,
+      providesTags: ["AgentAudit"],
+    }),
+    // levels
+    listAgentLevels: b.query<AgentLevel[], void>({
+      query: () => "/admin/agents/levels",
+      transformResponse: unwrap<AgentLevel[]>,
+      providesTags: ["AgentLevels"],
+    }),
+    createAgentLevel: b.mutation<AgentLevel, LevelInput>({
+      query: (body) => ({ url: "/admin/agents/levels", method: "POST", body }),
+      transformResponse: unwrap<AgentLevel>,
+      invalidatesTags: ["AgentLevels", "AgentAudit"],
+    }),
+    updateAgentLevel: b.mutation<AgentLevel, { id: string; body: Partial<LevelInput> }>({
+      query: ({ id, body }) => ({ url: `/admin/agents/levels/${id}`, method: "PATCH", body }),
+      transformResponse: unwrap<AgentLevel>,
+      invalidatesTags: ["AgentLevels", "AgentAudit"],
+    }),
+    deleteAgentLevel: b.mutation<{ deleted: boolean }, string>({
+      query: (id) => ({ url: `/admin/agents/levels/${id}`, method: "DELETE" }),
+      transformResponse: unwrap<{ deleted: boolean }>,
+      invalidatesTags: ["AgentLevels", "AgentAudit"],
+    }),
+    // overrides
+    listAgentOverrides: b.query<Paged<RateOverride>, { scope?: string; active?: string; page?: number; limit?: number }>({
+      query: (p) => `/admin/agents/overrides${qs(p)}`,
+      transformResponse: unwrap<Paged<RateOverride>>,
+      providesTags: ["AgentOverrides"],
+    }),
+    createAgentOverride: b.mutation<RateOverride, { scope: string; targetId: string; ratePercent: string; effectiveTo?: string | null; note?: string; replaceExisting?: boolean }>({
+      query: (body) => ({ url: "/admin/agents/overrides", method: "POST", body }),
+      transformResponse: unwrap<RateOverride>,
+      invalidatesTags: ["AgentOverrides", "AgentAudit"],
+    }),
+    endAgentOverride: b.mutation<RateOverride, { id: string; note?: string }>({
+      query: ({ id, note }) => ({ url: `/admin/agents/overrides/${id}/end`, method: "POST", body: note ? { note } : {} }),
+      transformResponse: unwrap<RateOverride>,
+      invalidatesTags: ["AgentOverrides", "AgentAudit"],
+    }),
+    agentRatePreview: b.query<{ agentId: string | null; resolution: RateResolution }, { agentId?: string; vendorId?: string; categoryId?: string }>({
+      query: (p) => `/admin/agents/rate-preview${qs(p)}`,
+      transformResponse: unwrap<{ agentId: string | null; resolution: RateResolution }>,
+    }),
+    // bonus rules
+    listAgentBonusRules: b.query<BonusRule[], void>({
+      query: () => "/admin/agents/bonus-rules",
+      transformResponse: unwrap<BonusRule[]>,
+      providesTags: ["AgentBonusRules"],
+    }),
+    createAgentBonusRule: b.mutation<BonusRule, Record<string, unknown>>({
+      query: (body) => ({ url: "/admin/agents/bonus-rules", method: "POST", body }),
+      transformResponse: unwrap<BonusRule>,
+      invalidatesTags: ["AgentBonusRules", "AgentAudit"],
+    }),
+    updateAgentBonusRule: b.mutation<BonusRule, { id: string; body: Record<string, unknown> }>({
+      query: ({ id, body }) => ({ url: `/admin/agents/bonus-rules/${id}`, method: "PATCH", body }),
+      transformResponse: unwrap<BonusRule>,
+      invalidatesTags: ["AgentBonusRules", "AgentAudit"],
+    }),
+    deleteAgentBonusRule: b.mutation<{ deleted: boolean }, string>({
+      query: (id) => ({ url: `/admin/agents/bonus-rules/${id}`, method: "DELETE" }),
+      transformResponse: unwrap<{ deleted: boolean }>,
+      invalidatesTags: ["AgentBonusRules", "AgentAudit"],
+    }),
+    // agents
+    listAdminAgents: b.query<Paged<AdminAgent> & { statusCounts: Record<AgentStatus, number> }, { status?: string; levelId?: string; q?: string; page?: number; limit?: number }>({
+      query: (p) => `/admin/agents${qs(p)}`,
+      transformResponse: unwrap<Paged<AdminAgent> & { statusCounts: Record<AgentStatus, number> }>,
+      providesTags: ["AgentAdmin"],
+    }),
+    getAdminAgent: b.query<AgentDetail, string>({
+      query: (id) => `/admin/agents/${id}`,
+      transformResponse: unwrap<AgentDetail>,
+      providesTags: ["AgentAdmin"],
+    }),
+    createAdminAgent: b.mutation<{ agent: AdminAgent; inviteEmailSent: boolean }, { name: string; email: string; phone?: string; levelId?: string | null }>({
+      query: (body) => ({ url: "/admin/agents", method: "POST", body }),
+      transformResponse: unwrap<{ agent: AdminAgent; inviteEmailSent: boolean }>,
+      invalidatesTags: ["AgentAdmin", "AgentAudit"],
+    }),
+    updateAdminAgent: b.mutation<unknown, { id: string; body: { name?: string; phone?: string | null; levelId?: string | null } }>({
+      query: ({ id, body }) => ({ url: `/admin/agents/${id}`, method: "PATCH", body }),
+      invalidatesTags: ["AgentAdmin", "AgentAudit"],
+    }),
+    agentStatusAction: b.mutation<AgentDetail, { id: string; action: "approve" | "suspend" | "reactivate" | "deactivate"; reason?: string }>({
+      query: ({ id, action, reason }) => ({ url: `/admin/agents/${id}/${action}`, method: "POST", body: reason ? { reason } : {} }),
+      transformResponse: unwrap<AgentDetail>,
+      invalidatesTags: ["AgentAdmin", "AgentAudit"],
+    }),
+    assignAgentVendor: b.mutation<unknown, { id: string; vendorId: string; note?: string; transfer?: boolean }>({
+      query: ({ id, ...body }) => ({ url: `/admin/agents/${id}/vendors`, method: "POST", body }),
+      invalidatesTags: ["AgentAdmin", "AgentAudit"],
+    }),
+    endAgentVendorLink: b.mutation<unknown, { linkId: string; reason?: string }>({
+      query: ({ linkId, reason }) => ({ url: `/admin/agents/vendor-links/${linkId}/end`, method: "POST", body: reason ? { reason } : {} }),
+      invalidatesTags: ["AgentAdmin", "AgentAudit"],
+    }),
+    // look-ups
+    lookupAgentVendors: b.query<Array<{ id: string; storeName: string; status: string; currentAgent: { id: string; name: string; agentCode: string } | null }>, string>({
+      query: (q) => `/admin/agents/lookup/vendors${qs({ q })}`,
+      transformResponse: unwrap<Array<{ id: string; storeName: string; status: string; currentAgent: { id: string; name: string; agentCode: string } | null }>>,
+    }),
+    lookupAgentCategories: b.query<Array<{ id: string; name: string; parent: { name: string } | null }>, string>({
+      query: (q) => `/admin/agents/lookup/categories${qs({ q })}`,
+      transformResponse: unwrap<Array<{ id: string; name: string; parent: { name: string } | null }>>,
+    }),
+    lookupAgents: b.query<Array<{ id: string; name: string; agentCode: string; status: AgentStatus }>, string>({
+      query: (q) => `/admin/agents/lookup/agents${qs({ q })}`,
+      transformResponse: unwrap<Array<{ id: string; name: string; agentCode: string; status: AgentStatus }>>,
+    }),
+  }),
+  overrideExisting: false,
+});
+
+export const {
+  useGetAgentSettingsQuery,
+  useUpdateAgentSettingsMutation,
+  useGetAgentAuditQuery,
+  useListAgentLevelsQuery,
+  useCreateAgentLevelMutation,
+  useUpdateAgentLevelMutation,
+  useDeleteAgentLevelMutation,
+  useListAgentOverridesQuery,
+  useCreateAgentOverrideMutation,
+  useEndAgentOverrideMutation,
+  useAgentRatePreviewQuery,
+  useListAgentBonusRulesQuery,
+  useCreateAgentBonusRuleMutation,
+  useUpdateAgentBonusRuleMutation,
+  useDeleteAgentBonusRuleMutation,
+  useListAdminAgentsQuery,
+  useGetAdminAgentQuery,
+  useCreateAdminAgentMutation,
+  useUpdateAdminAgentMutation,
+  useAgentStatusActionMutation,
+  useAssignAgentVendorMutation,
+  useEndAgentVendorLinkMutation,
+  useLookupAgentVendorsQuery,
+  useLookupAgentCategoriesQuery,
+  useLookupAgentsQuery,
+} = agentAdminApi;
+
+/** Message from an RTK Query error (the backend sends { message, code, details }). */
+export function apiErrorMessage(error: unknown, fallback = "Something went wrong"): string {
+  const data = (error as { data?: { message?: string } } | undefined)?.data;
+  return typeof data?.message === "string" ? data.message : fallback;
+}
+
+/** Field errors from a 400 VALIDATION_ERROR (zod errors or details.errors). */
+export function apiFieldErrors(error: unknown): Record<string, string> {
+  const data = (error as { data?: { errors?: Record<string, string>; details?: { errors?: Record<string, string> } } } | undefined)?.data;
+  return data?.errors ?? data?.details?.errors ?? {};
+}
