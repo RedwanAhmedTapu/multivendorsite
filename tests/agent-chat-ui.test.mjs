@@ -5,9 +5,12 @@ import { readFileSync } from "node:fs";
 
 const read = (p) => readFileSync(new URL(`../src/${p}`, import.meta.url), "utf8");
 
-test("the agent pieces are gated by NEXT_PUBLIC_AGENT_CHAT_ENABLED and render only for agent conversations", () => {
+test("agent chat is on by default (kill switch: \"0\" / \"false\") and the pieces render only for agent conversations", () => {
   const ui = read("lib/agent-chat-ui.tsx");
-  assert.match(ui, /AGENT_CHAT_UI_ENABLED = process\.env\.NEXT_PUBLIC_AGENT_CHAT_ENABLED === "true"/);
+  assert.match(ui, /AGENT_CHAT_UI_ENABLED = !\/\^\(0\|false\)\$\/i\.test\(\(process\.env\.NEXT_PUBLIC_AGENT_CHAT_ENABLED \?\? ""\)\.trim\(\)\)/);
+  const rule = (v) => !/^(0|false)$/i.test((v ?? "").trim());
+  for (const v of [undefined, "", "1", "true"]) assert.equal(rule(v), true, String(v));
+  for (const v of ["0", "false", "FALSE"]) assert.equal(rule(v), false, String(v));
   assert.match(ui, /type === "AGENT_SUPPORT" \|\| type === "AGENT_VENDOR"/);
   const list = read("components/chatbox/ChatList.tsx");
   assert.match(list, /AGENT_CHAT_UI_ENABLED && \(item\.otherParticipant\?\.participantType as string \| undefined\) === "AGENT" && <AgentChatBadge \/>/);
@@ -23,5 +26,5 @@ test("the staff page reuses the existing UnifiedChat and only the agent admin AP
   assert.match(page, /AgentChatNotice/);
   assert.ok(!/useGetSupportQueueQuery|chatApi\.endpoints/.test(page));
   const ui = read("components/agent-admin/AgentAdminUI.tsx");
-  assert.match(ui, /NEXT_PUBLIC_AGENT_CHAT_ENABLED === "true" \? \[\{ href: "\/admin-dashboard\/agents\/messages", label: "Messages" \}\] : \[\]/);
+  assert.match(ui, /AGENT_CHAT_UI_ENABLED \? \[\{ href: "\/admin-dashboard\/agents\/messages", label: "Messages" \}\] : \[\]/);
 });

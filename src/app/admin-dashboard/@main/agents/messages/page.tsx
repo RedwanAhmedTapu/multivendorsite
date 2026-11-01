@@ -3,8 +3,8 @@
 // Agent messages (P10) — FinixMart staff's view of agent conversations, shown
 // in the EXISTING chat UI (UnifiedChat / ChatBox, unchanged). Agent↔staff
 // chats are a shared inbox (read + reply); agent↔vendor chats are read-only
-// moderation and every read is audited by the backend. Visible only while
-// NEXT_PUBLIC_AGENT_CHAT_ENABLED is "true" (and the backend flag is on).
+// moderation and every read is audited by the backend. On by default; hidden
+// when the kill switch NEXT_PUBLIC_AGENT_CHAT_ENABLED is "0" / "false".
 
 import { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
@@ -59,7 +59,7 @@ export default function AgentMessagesPage() {
       <div className="mx-auto max-w-screen-xl px-4 py-6 sm:px-6">
         <AgentAdminHeader title="Agent messages" subtitle="Agent messaging is switched off." />
         <Panel>
-          <Empty title="Agent messaging is off" text="Set NEXT_PUBLIC_AGENT_CHAT_ENABLED=true (site) and AGENT_CHAT_ENABLED=1 (backend) to enable it." />
+          <Empty title="Agent messaging is off" text="The kill switch is set: remove NEXT_PUBLIC_AGENT_CHAT_ENABLED=0 from the site's environment (and AGENT_CHAT_ENABLED=0 from the backend's) to turn it back on." />
         </Panel>
       </div>
     );

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Loader2, X } from "lucide-react";
 import { formatBDT } from "@/lib/cart/display";
+import { AGENT_CHAT_UI_ENABLED } from "@/lib/agent-chat-ui";
 
 export const bdt = (v: string | number | null | undefined, fallback = "—") =>
   v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? fallback : formatBDT(Number(v));
@@ -31,8 +32,8 @@ const TABS = [
   { href: "/admin-dashboard/agents/withdrawals", label: "Withdrawals" },
   { href: "/admin-dashboard/agents/payables", label: "Payables" },
   { href: "/admin-dashboard/agents/training", label: "Training" },
-  // P10: agent chat (existing chat engine) — only while the site flag is on
-  ...(process.env.NEXT_PUBLIC_AGENT_CHAT_ENABLED === "true" ? [{ href: "/admin-dashboard/agents/messages", label: "Messages" }] : []),
+  // P10: agent chat (existing chat engine) — hidden only by the kill switch
+  ...(AGENT_CHAT_UI_ENABLED ? [{ href: "/admin-dashboard/agents/messages", label: "Messages" }] : []),
   { href: "/admin-dashboard/agents/audit", label: "Audit log" },
 ];
 

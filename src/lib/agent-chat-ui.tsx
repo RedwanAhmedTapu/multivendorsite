@@ -1,11 +1,12 @@
 // Agent chat (P10) — small presentational pieces the existing chat UI shows
-// ONLY for agent conversations, and only while NEXT_PUBLIC_AGENT_CHAT_ENABLED
-// is "true". For every other conversation they render nothing, so the
-// existing customer / vendor / admin chat looks exactly as before.
+// ONLY for agent conversations. On by default; NEXT_PUBLIC_AGENT_CHAT_ENABLED
+// is an optional kill switch ("0" or "false" turns it off). For every other
+// conversation they render nothing, so the existing customer / vendor / admin
+// chat looks exactly as before.
 
 import { ShieldCheck } from "lucide-react";
 
-export const AGENT_CHAT_UI_ENABLED = process.env.NEXT_PUBLIC_AGENT_CHAT_ENABLED === "true";
+export const AGENT_CHAT_UI_ENABLED = !/^(0|false)$/i.test((process.env.NEXT_PUBLIC_AGENT_CHAT_ENABLED ?? "").trim());
 
 /** Conversation types that involve an agent (backend AGENT_SUPPORT / AGENT_VENDOR). */
 export const isAgentConversation = (type: unknown): boolean => type === "AGENT_SUPPORT" || type === "AGENT_VENDOR";
