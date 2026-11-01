@@ -31,6 +31,8 @@ const TABS = [
   { href: "/admin-dashboard/agents/withdrawals", label: "Withdrawals" },
   { href: "/admin-dashboard/agents/payables", label: "Payables" },
   { href: "/admin-dashboard/agents/training", label: "Training" },
+  // P10: agent chat (existing chat engine) — only while the site flag is on
+  ...(process.env.NEXT_PUBLIC_AGENT_CHAT_ENABLED === "true" ? [{ href: "/admin-dashboard/agents/messages", label: "Messages" }] : []),
   { href: "/admin-dashboard/agents/audit", label: "Audit log" },
 ];
 

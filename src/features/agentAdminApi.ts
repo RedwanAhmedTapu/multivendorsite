@@ -149,7 +149,7 @@ const qs = (p: Record<string, string | number | undefined | null>) => {
 };
 
 const api = apiSlice.enhanceEndpoints({
-  addTagTypes: ["AgentSettings", "AgentAudit", "AgentLevels", "AgentOverrides", "AgentBonusRules", "AgentAdmin", "AgentCommissions", "AgentWithdrawals", "AgentTraining", "AgentWallet"],
+  addTagTypes: ["AgentSettings", "AgentAudit", "AgentLevels", "AgentOverrides", "AgentBonusRules", "AgentAdmin", "AgentCommissions", "AgentWithdrawals", "AgentTraining", "AgentWallet", "AgentChat"],
 });
 
 export const agentAdminApi = api.injectEndpoints({
@@ -343,6 +343,17 @@ export const agentAdminApi = api.injectEndpoints({
       transformResponse: unwrap<{ replayed: boolean }>,
       invalidatesTags: ["AgentWallet", "AgentAudit"],
     }),
+    // agent chat (P10): staff list; reading / replying uses the existing chat API
+    listAgentChats: b.query<AgentChatList, { type?: "AGENT_SUPPORT" | "AGENT_VENDOR"; agentId?: string; page?: number; limit?: number }>({
+      query: (p) => `/admin/agents/chat/conversations${qs(p)}`,
+      transformResponse: unwrap<AgentChatList>,
+      providesTags: ["AgentChat"],
+    }),
+    openAgentChat: b.mutation<{ id: string }, string>({
+      query: (agentId) => ({ url: `/admin/agents/${agentId}/chat`, method: "POST" }),
+      transformResponse: unwrap<{ id: string }>,
+      invalidatesTags: ["AgentChat"],
+    }),
     agentPayableReport: b.query<PayableReport, { page?: number; limit?: number }>({
       query: (p) => `/admin/agents/reports/payable${qs(p)}`,
       transformResponse: unwrap<PayableReport>,
@@ -391,6 +402,8 @@ export const {
   useGetAdminAgentWalletQuery,
   useAdjustAgentWalletMutation,
   useAgentPayableReportQuery,
+  useListAgentChatsQuery,
+  useOpenAgentChatMutation,
 } = agentAdminApi;
 
 // ── commissions (Phase 6) — money as ৳ decimal strings ─────────────────────
@@ -506,6 +519,22 @@ export type PayableReport = {
   limit: number;
   asOf: string;
 };
+
+// ── agent chat (P10) ──────────────────────────────────────────────────────
+export type AgentChatRow = {
+  id: string;
+  type: "AGENT_SUPPORT" | "AGENT_VENDOR";
+  status: string;
+  lastMessageAt: string | null;
+  lastMessageText: string | null;
+  awaitingStaff: boolean;
+  agent: { id: string; displayName: string | null; displayImage: string | null } | null;
+  vendor: { id: string; displayName: string | null; displayImage: string | null } | null;
+  staffMayWrite: boolean;
+  readOnlyReason: string | null;
+  notice: string;
+};
+export type AgentChatList = { items: AgentChatRow[]; total: number; page: number; limit: number };
 
 /** Message from an RTK Query error (the backend sends { message, code, details }). */
 export function apiErrorMessage(error: unknown, fallback = "Something went wrong"): string {
