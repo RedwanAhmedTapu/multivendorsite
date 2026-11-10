@@ -356,7 +356,7 @@ export default function HorizontalCategoryNav({
   };
 
   return (
-    <div className="relative w-full bg-white border-b" ref={dropdownRef}>
+    <div className="relative w-full bg-card border-b" ref={dropdownRef}>
       {/* Navigation Bar */}
       <Container>
         <ul className="flex items-center justify-between gap-1">
@@ -367,13 +367,13 @@ export default function HorizontalCategoryNav({
               onMouseEnter={() => handleMouseEnter(category)}
               onMouseLeave={handleMouseLeave}
             >
-              <button className="relative px-4 py-4 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors duration-200 whitespace-nowrap">
+              <button className="relative px-4 py-4 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap">
                 {category.name}
                 
                 {/* Animated bottom border */}
                 <span 
                   className={cn(
-                    "absolute bottom-0 left-0 h-0.5 bg-teal-600 transition-all duration-500 ease-out",
+                    "absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-500 ease-out",
                     "scale-x-0 group-hover:scale-x-100 origin-left"
                   )}
                   style={{ width: '100%' }}
@@ -384,13 +384,13 @@ export default function HorizontalCategoryNav({
           
           {/* More button */}
           <li className="relative group">
-            <button className="relative px-4 py-4 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors duration-200">
+            <button className="relative px-4 py-4 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200">
               <MoreHorizontal className="w-5 h-5" />
               
               {/* Animated bottom border */}
               <span 
                 className={cn(
-                  "absolute bottom-0 left-0 h-0.5 bg-teal-600 transition-all duration-500 ease-out",
+                  "absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-500 ease-out",
                   "scale-x-0 group-hover:scale-x-100 origin-left"
                 )}
                 style={{ width: '100%' }}
@@ -402,7 +402,7 @@ export default function HorizontalCategoryNav({
       {/* Mega Dropdown Menu */}
       {showDropdown && activeCategory && (
         <div
-          className="absolute left-0 right-0 top-full bg-white shadow-xl z-50 border-t"
+          className="absolute left-0 right-0 top-full bg-card shadow-xl z-50 border-t"
           onMouseEnter={handleDropdownEnter}
           onMouseLeave={handleMouseLeave}
         >
@@ -429,7 +429,7 @@ export default function HorizontalCategoryNav({
                 <div className="grid grid-cols-3 gap-8">
                   {activeCategory.children?.map((sub) => (
                     <div key={sub.id}>
-                      <h4 className="font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-200">
+                      <h4 className="font-semibold text-foreground mb-3 pb-2 border-b border-border">
                         {sub.name}
                       </h4>
                       <ul className="space-y-2">
@@ -437,7 +437,7 @@ export default function HorizontalCategoryNav({
                           <Link href={"/products?category=" + child.name} key={child.id}>
                           <li
                             key={child.id}
-                            className="text-sm text-gray-600 hover:text-teal-600 cursor-pointer transition-colors duration-200"
+                            className="text-sm text-muted-foreground hover:text-primary cursor-pointer transition-colors duration-200"
                             onClick={() => {
                               onSelectCategory?.(child.id);
                               setShowDropdown(false);

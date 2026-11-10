@@ -1,7 +1,7 @@
-// app/admin/courier/credentials/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ import {
   Settings,
   ArrowRight,
   Check,
+  Wallet,
 } from "lucide-react";
 import {
   useGetCourierProvidersQuery,
@@ -49,6 +50,7 @@ import {
   useTestCourierCredentialsMutation,
   useToggleCredentialStatusMutation,
   useRefreshCredentialTokenMutation,
+  useLazySteadfastGetBalanceQuery,
   type CourierProvider,
   type CourierCredential,
   type Environment,
@@ -63,6 +65,10 @@ type ProviderTemplate = {
   productionBaseUrl: string;
   sandboxBaseUrl: string;
   authType: CourierAuthType;
+  supportsCOD?: boolean;
+  supportsTracking?: boolean;
+  supportsBulkOrder?: boolean;
+  supportsWebhook?: boolean;
 };
 
 const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
@@ -73,6 +79,10 @@ const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     productionBaseUrl: "https://api.pathao.com",
     sandboxBaseUrl: "https://api-sandbox.pathao.com",
     authType: "OAUTH2",
+    supportsCOD: true,
+    supportsTracking: true,
+    supportsBulkOrder: false,
+    supportsWebhook: true,
   },
   RedX: {
     name: "RedX",
@@ -81,14 +91,29 @@ const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     productionBaseUrl: "https://api.redx.com.bd",
     sandboxBaseUrl: "https://api-sandbox.redx.com.bd",
     authType: "BEARER",
+    supportsCOD: true,
+    supportsTracking: true,
+    supportsBulkOrder: false,
+    supportsWebhook: true,
   },
   Steadfast: {
     name: "Steadfast",
     displayName: "Steadfast",
     description: "Steadfast Courier Service",
-    productionBaseUrl: "https://api.steadfast.com.bd",
-    sandboxBaseUrl: "",
+    // Steadfast has a single API base for both environments — there's no
+    // separate sandbox host (see Steadfast's own API docs). Point both at
+    // the same URL so picking "Sandbox" in the environment selector still
+    // works instead of hitting an empty/broken base URL.
+    productionBaseUrl: "https://portal.packzy.com/api/v1",
+    sandboxBaseUrl: "https://portal.packzy.com/api/v1",
     authType: "API_KEY",
+    supportsCOD: true,
+    supportsTracking: true,
+    // Matches courier.service.ts's real Steadfast implementation:
+    // steadfastBulkCreateOrder exists, but there's no webhook (poll
+    // steadfastCheckStatus instead).
+    supportsBulkOrder: true,
+    supportsWebhook: false,
   },
   Paperfly: {
     name: "Paperfly",
@@ -97,6 +122,10 @@ const PROVIDER_TEMPLATES: Record<string, ProviderTemplate> = {
     productionBaseUrl: "https://api.paperfly.com.bd",
     sandboxBaseUrl: "",
     authType: "API_KEY",
+    supportsCOD: true,
+    supportsTracking: true,
+    supportsBulkOrder: false,
+    supportsWebhook: false,
   },
 };
 
@@ -119,16 +148,29 @@ export default function CourierCredentialsPage() {
   }, [isLoading, providers.length]);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div
+      className="min-h-screen bg-[#F0F4FA]"
+      style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
+    >
+    <div className="container mx-auto px-3 py-4 sm:p-6 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Courier Credentials</h1>
-          <p className="text-muted-foreground">
+          <div className="flex items-center gap-3 mb-1">
+            <Link href="/admin-dashboard/courier">
+              <Button variant="outline" size="sm" className="border-[#E5EAF2] text-[#3D5068] hover:bg-[#FAFBFD]">
+                ← Back to Courier
+              </Button>
+            </Link>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-[#1D4ED8] to-[#7C3AED] bg-clip-text text-transparent">
+            Courier Credentials
+          </h1>
+          <p className="text-[#7A90AB] text-sm">
             Manage API credentials for courier integrations
           </p>
         </div>
-        <Badge variant="outline" className="text-sm">
+        <Badge variant="outline" className="text-sm border-[#E5EAF2] text-[#1D4ED8] bg-[#EEF3FB] w-fit">
           <Key className="w-3 h-3 mr-1" />
           Platform Admin
         </Badge>
@@ -136,16 +178,16 @@ export default function CourierCredentialsPage() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="providers">
+        <TabsList className="grid w-full grid-cols-3 rounded-xl border border-[#E5EAF2] bg-white p-1 h-auto gap-1 shadow-sm">
+          <TabsTrigger value="providers" className="rounded-lg text-xs sm:text-sm py-2 data-[state=active]:bg-[#EEF3FB] data-[state=active]:text-[#1D4ED8]">
             <Building2 className="w-4 h-4 mr-2" />
             Providers ({providers.length})
           </TabsTrigger>
-          <TabsTrigger value="add-provider">
+          <TabsTrigger value="add-provider" className="rounded-lg text-xs sm:text-sm py-2 data-[state=active]:bg-[#EEF3FB] data-[state=active]:text-[#1D4ED8]">
             <Plus className="w-4 h-4 mr-2" />
             Add New
           </TabsTrigger>
-          <TabsTrigger value="manage" disabled={!selectedProvider}>
+          <TabsTrigger value="manage" disabled={!selectedProvider} className="rounded-lg text-xs sm:text-sm py-2 data-[state=active]:bg-[#EEF3FB] data-[state=active]:text-[#1D4ED8]">
             <Settings className="w-4 h-4 mr-2" />
             Manage
           </TabsTrigger>
@@ -154,10 +196,10 @@ export default function CourierCredentialsPage() {
         {/* Providers Tab */}
         <TabsContent value="providers" className="space-y-6">
           {providers.length === 0 ? (
-            <Card className="bg-gradient-to-br from-teal-50 to-blue-50 border-teal-100">
+            <Card className="rounded-2xl bg-gradient-to-br from-[#EEF3FB] to-[#F3EEFB] border-[#E5EAF2] shadow-sm">
               <CardContent className="flex flex-col items-center justify-center py-16 space-y-6">
                 <div className="p-4 rounded-full bg-white shadow-sm">
-                  <Cloud className="w-12 h-12 text-teal-600" />
+                  <Cloud className="w-12 h-12 text-[#1D4ED8]" />
                 </div>
                 <div className="text-center space-y-2 max-w-md">
                   <h3 className="text-2xl font-bold">No Courier Providers Yet</h3>
@@ -166,7 +208,7 @@ export default function CourierCredentialsPage() {
                     We'll guide you through the process.
                   </p>
                 </div>
-                <Button size="lg" onClick={() => setActiveTab("add-provider")} className="mt-4">
+                <Button size="lg" onClick={() => setActiveTab("add-provider")} className="mt-4 bg-gradient-to-r from-[#1D4ED8] to-[#7C3AED] hover:from-[#2563EB] hover:to-[#8B5CF6] text-white border-0 shadow-sm">
                   <Plus className="w-5 h-5 mr-2" />
                   Add Your First Provider
                   <ArrowRight className="w-5 h-5 ml-2" />
@@ -174,7 +216,7 @@ export default function CourierCredentialsPage() {
               </CardContent>
             </Card>
           ) : (
-            <Card className="bg-teal-50 border-teal-100">
+            <Card className="rounded-2xl bg-[#FAFBFD]/60 border-[#E5EAF2] shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Shield className="w-5 h-5" />
@@ -187,7 +229,7 @@ export default function CourierCredentialsPage() {
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {isLoading ? (
-                    <Card>
+                    <Card className="rounded-2xl border-[#E5EAF2] shadow-sm">
                       <CardContent className="flex items-center justify-center h-32">
                         <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
                       </CardContent>
@@ -279,7 +321,7 @@ export default function CourierCredentialsPage() {
               onRefetch={refetch}
             />
           ) : (
-            <Card>
+            <Card className="rounded-2xl border-[#E5EAF2] shadow-sm">
               <CardContent className="flex flex-col items-center justify-center h-48 space-y-4">
                 <AlertCircle className="w-12 h-12 text-muted-foreground" />
                 <div className="text-center space-y-2">
@@ -312,6 +354,7 @@ export default function CourierCredentialsPage() {
         />
       )}
     </div>
+    </div>
   );
 }
 
@@ -334,7 +377,7 @@ function ProviderCard({
   const hasSandbox = (sandboxCredentials?.length || 0) > 0;
 
   return (
-    <Card className={`${isSelected ? 'ring-2 ring-primary' : ''} transition-all hover:shadow-md`}>
+    <Card className={`rounded-2xl border-[#E5EAF2] shadow-sm ${isSelected ? 'ring-2 ring-[#1D4ED8]' : ''} transition-all hover:shadow-md`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
@@ -437,6 +480,46 @@ function AddProviderAndCredentialsTab({
   const [createProvider, { isLoading: isCreatingProvider }] = useCreateCourierProviderMutation();
   const [createCredentials, { isLoading: isCreatingCredentials }] = useCreateCourierCredentialsMutation();
 
+  // BUGFIX: previously this form's local state (credentialsForm, step, etc.)
+  // never reset when `selectedProvider` changed, because this component stays
+  // mounted across tab switches (Radix Tabs keeps inactive TabsContent in the
+  // DOM). That meant picking "Add Creds" on a different provider right after
+  // saving one would silently keep the old provider's typed values around.
+  // Resetting everything whenever the selected provider identity changes
+  // fixes that.
+  useEffect(() => {
+    setCredentialsForm({
+      clientId: "",
+      clientSecret: "",
+      username: "",
+      password: "",
+      apiKey: "",
+      bearerToken: "",
+      storeId: "",
+      merchantId: "",
+    });
+    setShowSecrets(false);
+    setEnvironment("PRODUCTION");
+    setStep(selectedProvider ? "credentials" : "provider");
+
+    // Starting a brand-new "create provider" flow (no provider selected from
+    // the list) should also forget whatever provider was created/typed last
+    // time, otherwise re-opening "Add New" resumes the previous session.
+    if (!selectedProvider) {
+      setNewProvider(null);
+      setSelectedTemplate("");
+      setProviderForm({
+        name: "",
+        displayName: "",
+        description: "",
+        productionBaseUrl: "",
+        sandboxBaseUrl: "",
+        authType: "API_KEY",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProvider?.id]);
+
   // Load template when selected
   const handleTemplateSelect = (templateKey: string) => {
     const template = PROVIDER_TEMPLATES[templateKey];
@@ -464,6 +547,13 @@ function AddProviderAndCredentialsTab({
       return;
     }
 
+    // Use the selected template's capability flags when available (e.g.
+    // Steadfast supports bulk order but not webhooks) instead of always
+    // hardcoding supportsBulkOrder/supportsWebhook to false — a
+    // provider created from a template should actually reflect what that
+    // provider's real API supports.
+    const template = PROVIDER_TEMPLATES[selectedTemplate];
+
     try {
       const result = await createProvider({
         name: providerForm.name,
@@ -472,10 +562,10 @@ function AddProviderAndCredentialsTab({
         productionBaseUrl: providerForm.productionBaseUrl,
         sandboxBaseUrl: providerForm.sandboxBaseUrl,
         authType: providerForm.authType,
-        supportsCOD: true,
-        supportsTracking: true,
-        supportsBulkOrder: false,
-        supportsWebhook: false,
+        supportsCOD: template?.supportsCOD ?? true,
+        supportsTracking: template?.supportsTracking ?? true,
+        supportsBulkOrder: template?.supportsBulkOrder ?? false,
+        supportsWebhook: template?.supportsWebhook ?? false,
         priority: 100,
         isPreferred: false,
       }).unwrap();
@@ -502,6 +592,8 @@ function AddProviderAndCredentialsTab({
       return;
     }
 
+    const isSteadfast = provider.name.toLowerCase() === "steadfast";
+
     // Validate based on auth type
     if (provider.authType === "OAUTH2") {
       if (!credentialsForm.clientId || !credentialsForm.clientSecret || !credentialsForm.username || !credentialsForm.password) {
@@ -521,6 +613,18 @@ function AddProviderAndCredentialsTab({
       if (!credentialsForm.apiKey) {
         toast.error("Validation Error", {
           description: "Please enter API Key",
+        });
+        return;
+      }
+      // Steadfast's API_KEY auth is really a KEY + SECRET pair
+      // (Api-Key / Secret-Key headers) — see getSteadfastHeaders() in
+      // courier.service.ts, which reads apiKey + clientSecret off this
+      // same credential row. Other API_KEY providers (e.g. Paperfly) may
+      // only need the single key, so this extra check is scoped to
+      // Steadfast specifically.
+      if (isSteadfast && !credentialsForm.clientSecret) {
+        toast.error("Validation Error", {
+          description: "Steadfast also requires a Secret Key",
         });
         return;
       }
@@ -547,23 +651,24 @@ function AddProviderAndCredentialsTab({
   // Determine auth type
   const provider = selectedProvider || newProvider;
   const authType = provider?.authType || providerForm.authType;
+  const isSteadfastProvider = (provider?.name || providerForm.name).toLowerCase() === "steadfast";
 
   return (
     <div className="space-y-6">
       {/* Progress Indicator */}
       {!selectedProvider && (
-        <Card className="bg-gradient-to-r from-teal-50 to-blue-50 border-teal-200">
+        <Card className="rounded-2xl bg-gradient-to-r from-[#EEF3FB] to-[#F3EEFB] border-[#E5EAF2] shadow-sm">
           <CardContent className="py-6">
             <div className="flex items-center justify-center gap-4">
-              <div className={`flex items-center gap-2 ${step === "provider" ? "text-teal-700 font-semibold" : "text-gray-500"}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step === "provider" ? "bg-teal-600 text-white" : newProvider ? "bg-green-600 text-white" : "bg-gray-300 text-gray-600"}`}>
+              <div className={`flex items-center gap-2 ${step === "provider" ? "text-[#1D4ED8] font-semibold" : "text-gray-500"}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step === "provider" ? "bg-gradient-to-br from-[#1D4ED8] to-[#7C3AED] text-white" : newProvider ? "bg-green-600 text-white" : "bg-gray-300 text-gray-600"}`}>
                   {newProvider ? <Check className="w-5 h-5" /> : "1"}
                 </div>
                 <span>Create Provider</span>
               </div>
               <ArrowRight className="w-5 h-5 text-gray-400" />
-              <div className={`flex items-center gap-2 ${step === "credentials" ? "text-teal-700 font-semibold" : "text-gray-400"}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step === "credentials" ? "bg-teal-600 text-white" : "bg-gray-300 text-gray-600"}`}>
+              <div className={`flex items-center gap-2 ${step === "credentials" ? "text-[#1D4ED8] font-semibold" : "text-gray-400"}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step === "credentials" ? "bg-gradient-to-br from-[#1D4ED8] to-[#7C3AED] text-white" : "bg-gray-300 text-gray-600"}`}>
                   2
                 </div>
                 <span>Add Credentials</span>
@@ -577,7 +682,7 @@ function AddProviderAndCredentialsTab({
       {step === "provider" && !selectedProvider && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Template Selection */}
-          <Card className="lg:col-span-1 bg-teal-50 border-teal-100">
+          <Card className="lg:col-span-1 rounded-2xl bg-[#FAFBFD]/60 border-[#E5EAF2] shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Building2 className="w-5 h-5" />
@@ -603,7 +708,7 @@ function AddProviderAndCredentialsTab({
           </Card>
 
           {/* Provider Details Form */}
-          <Card className="lg:col-span-2">
+          <Card className="lg:col-span-2 rounded-2xl border-[#E5EAF2] shadow-sm">
             <CardHeader>
               <CardTitle>Provider Details</CardTitle>
               <CardDescription>
@@ -661,6 +766,11 @@ function AddProviderAndCredentialsTab({
                       <SelectItem value="BASIC">Basic Auth</SelectItem>
                     </SelectContent>
                   </Select>
+                  {providerForm.name.toLowerCase() === "steadfast" && providerForm.authType === "API_KEY" && (
+                    <p className="text-xs text-muted-foreground">
+                      Steadfast's "API Key" auth is really a Key + Secret pair — you'll enter both in the next step.
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -702,7 +812,7 @@ function AddProviderAndCredentialsTab({
       {step === "credentials" && provider && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Provider Info */}
-          <Card className="lg:col-span-1 bg-teal-50 border-teal-100">
+          <Card className="lg:col-span-1 rounded-2xl bg-[#FAFBFD]/60 border-[#E5EAF2] shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Building2 className="w-5 h-5" />
@@ -739,12 +849,18 @@ function AddProviderAndCredentialsTab({
                     <SelectItem value="SANDBOX">Sandbox</SelectItem>
                   </SelectContent>
                 </Select>
+                {isSteadfastProvider && (
+                  <p className="text-xs text-muted-foreground">
+                    Steadfast has one API for both — Sandbox here just stores a
+                    separate credential row, it doesn't hit a different host.
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* Credentials Form */}
-          <Card className="lg:col-span-2">
+          <Card className="lg:col-span-2 rounded-2xl border-[#E5EAF2] shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="w-5 h-5" />
@@ -888,36 +1004,69 @@ function AddProviderAndCredentialsTab({
                   </div>
                 )}
 
-                {/* API Key */}
+                {/* API Key (Steadfast needs Key + Secret; other API_KEY
+                    providers like Paperfly only need the one field) */}
                 {authType === "API_KEY" && (
                   <div className="space-y-4">
                     <Alert>
                       <AlertCircle className="w-4 h-4" />
                       <AlertDescription>
-                        API Key authentication - enter your API key
+                        {isSteadfastProvider
+                          ? "Steadfast authenticates with an Api-Key and Secret-Key pair, sent as headers on every request."
+                          : "API Key authentication - enter your API key"}
                       </AlertDescription>
                     </Alert>
 
-                    <div className="space-y-2">
-                      <Label>API Key *</Label>
-                      <div className="relative">
-                        <Input
-                          type={showSecrets ? "text" : "password"}
-                          value={credentialsForm.apiKey}
-                          onChange={(e) => setCredentialsForm({ ...credentialsForm, apiKey: e.target.value })}
-                          required
-                          placeholder="Enter your API key"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3"
-                          onClick={() => setShowSecrets(!showSecrets)}
-                        >
-                          {showSecrets ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </Button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label>{isSteadfastProvider ? "Api-Key *" : "API Key *"}</Label>
+                        <div className="relative">
+                          <Input
+                            type={showSecrets ? "text" : "password"}
+                            value={credentialsForm.apiKey}
+                            onChange={(e) => setCredentialsForm({ ...credentialsForm, apiKey: e.target.value })}
+                            required
+                            placeholder={isSteadfastProvider ? "Enter your Steadfast Api-Key" : "Enter your API key"}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3"
+                            onClick={() => setShowSecrets(!showSecrets)}
+                          >
+                            {showSecrets ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </Button>
+                        </div>
                       </div>
+
+                      {isSteadfastProvider && (
+                        <div className="space-y-2">
+                          <Label>Secret-Key *</Label>
+                          <div className="relative">
+                            <Input
+                              type={showSecrets ? "text" : "password"}
+                              value={credentialsForm.clientSecret}
+                              onChange={(e) => setCredentialsForm({ ...credentialsForm, clientSecret: e.target.value })}
+                              required
+                              placeholder="Enter your Steadfast Secret-Key"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3"
+                              onClick={() => setShowSecrets(!showSecrets)}
+                            >
+                              {showSecrets ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Stored in the credential's "Client Secret" column — there's no
+                            separate secretKey field on the backend yet.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -971,17 +1120,35 @@ function ManageProviderTab({
 }) {
   const [testCredentials] = useTestCourierCredentialsMutation();
   const [refreshToken] = useRefreshCredentialTokenMutation();
+  const [getSteadfastBalance] = useLazySteadfastGetBalanceQuery();
   const [testingId, setTestingId] = useState<string | null>(null);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
+
+  const isSteadfast = provider.name.toLowerCase() === "steadfast";
 
   const handleTest = async (credential: CourierCredential) => {
     setTestingId(credential.id);
     try {
-      await testCredentials({ credentialId: credential.id }).unwrap();
-      toast.success("Credentials are valid!");
+      if (isSteadfast) {
+        // courier.controller.ts's testCourierCredentials only implements
+        // Pathao/RedX and returns "not implemented" for everything else.
+        // Steadfast's balance endpoint is a practical substitute — it
+        // fails with a real auth error if the Api-Key/Secret-Key pair is
+        // wrong, exactly like a dedicated credential test would.
+        const result = await getSteadfastBalance({
+          courierProviderId: provider.id,
+          environment: credential.environment,
+        }).unwrap();
+        toast.success("Steadfast credentials are valid!", {
+          description: `Current balance: ৳${result.data?.current_balance ?? 0}`,
+        });
+      } else {
+        await testCredentials({ credentialId: credential.id }).unwrap();
+        toast.success("Credentials are valid!");
+      }
     } catch (error: any) {
       toast.error("Test failed", {
-        description: error?.data?.message || "Credential test failed",
+        description: error?.data?.message || error?.data?.error || "Credential test failed",
       });
     } finally {
       setTestingId(null);
@@ -1033,9 +1200,24 @@ function ManageProviderTab({
         </Badge>
       </div>
 
+      {isSteadfast && (
+        <Alert className="bg-[#EEF3FB] border-[#E5EAF2]">
+          <Wallet className="w-4 h-4 text-[#1D4ED8]" />
+          <AlertDescription className="text-[#1D4ED8]">
+            Steadfast doesn't have a city/zone/area API like Pathao or RedX — pricing
+            comes from a flat-rate pricing rule instead. See the{" "}
+            <Link href="/admin-dashboard/courier" className="underline font-medium">
+              Steadfast tab
+            </Link>{" "}
+            on the Courier Management page to check balance, look up a
+            consignment's status, or place a bulk order.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Provider Details */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-teal-50 border-teal-100">
+        <Card className="rounded-2xl bg-[#FAFBFD]/60 border-[#E5EAF2] shadow-sm">
           <CardHeader>
             <CardTitle className="text-sm font-medium">Provider Details</CardTitle>
           </CardHeader>
@@ -1066,7 +1248,7 @@ function ManageProviderTab({
         </Card>
 
         {/* Credentials Summary */}
-        <Card>
+        <Card className="rounded-2xl border-[#E5EAF2] shadow-sm">
           <CardHeader>
             <CardTitle className="text-sm font-medium">Credentials Summary</CardTitle>
           </CardHeader>
@@ -1107,7 +1289,7 @@ function ManageProviderTab({
         </Card>
 
         {/* Statistics */}
-        <Card>
+        <Card className="rounded-2xl border-[#E5EAF2] shadow-sm">
           <CardHeader>
             <CardTitle className="text-sm font-medium">Statistics</CardTitle>
           </CardHeader>
@@ -1118,7 +1300,9 @@ function ManageProviderTab({
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Serviceable Areas</span>
-              <span className="font-semibold">{provider._count?.courier_serviceable_areas || 0}</span>
+              <span className="font-semibold">
+                {isSteadfast ? "N/A (flat-rate)" : provider._count?.courier_serviceable_areas || 0}
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Priority</span>
@@ -1183,7 +1367,7 @@ function CredentialsTable({
 }) {
   if (credentials.length === 0) {
     return (
-      <Card>
+      <Card className="rounded-2xl border-[#E5EAF2] shadow-sm">
         <CardContent className="flex flex-col items-center justify-center h-48 space-y-4">
           <AlertCircle className="w-12 h-12 text-muted-foreground" />
           <div className="text-center space-y-2">
@@ -1201,7 +1385,7 @@ function CredentialsTable({
     <div className="border rounded-lg bg-white">
       <Table>
         <TableHeader>
-          <TableRow className="bg-teal-50 hover:bg-teal-50">
+          <TableRow className="bg-[#FAFBFD]/60 hover:bg-[#FAFBFD]/60">
             <TableHead className="font-semibold">Status</TableHead>
             <TableHead className="font-semibold">Credentials</TableHead>
             <TableHead className="font-semibold">Token Status</TableHead>
@@ -1210,107 +1394,121 @@ function CredentialsTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {credentials.map((credential) => (
-            <TableRow key={credential.id} className="hover:bg-gray-50">
-              <TableCell>
-                {credential.isActive ? (
-                  <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
-                    Active
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary">Inactive</Badge>
-                )}
-              </TableCell>
-              <TableCell>
-                <div className="space-y-1">
-                  <code className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
-                    {credential.clientId || credential.apiKey || credential.bearerToken?.substring(0, 8) + "..." || "•••••••••"}
-                  </code>
-                  <p className="text-xs text-muted-foreground">
-                    {credential.username ? `User: ${credential.username}` : "No username"}
-                  </p>
-                </div>
-              </TableCell>
-              <TableCell>
-                {credential.accessToken ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                    <span className="text-sm">Valid</span>
-                    {credential.tokenExpiresAt && (
-                      <span className="text-xs text-muted-foreground">
-                        expires {new Date(credential.tokenExpiresAt).toLocaleDateString()}
-                      </span>
-                    )}
+          {credentials.map((credential) => {
+            const isSteadfastCred = credential.courier_providers?.name?.toLowerCase() === "steadfast";
+            return (
+              <TableRow key={credential.id} className="hover:bg-gray-50">
+                <TableCell>
+                  {credential.isActive ? (
+                    <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
+                      Active
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary">Inactive</Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="space-y-1">
+                    <code className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
+                      {credential.clientId || credential.apiKey || credential.bearerToken?.substring(0, 8) + "..." || "•••••••••"}
+                    </code>
+                    <p className="text-xs text-muted-foreground">
+                      {isSteadfastCred
+                        ? credential.clientSecret
+                          ? "Secret-Key: configured"
+                          : "Secret-Key: missing"
+                        : credential.username
+                        ? `User: ${credential.username}`
+                        : "No username"}
+                    </p>
                   </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                    <span className="text-sm">Not Authenticated</span>
+                </TableCell>
+                <TableCell>
+                  {isSteadfastCred ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                      <span className="text-sm">Static key — no token</span>
+                    </div>
+                  ) : credential.accessToken ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <span className="text-sm">Valid</span>
+                      {credential.tokenExpiresAt && (
+                        <span className="text-xs text-muted-foreground">
+                          expires {new Date(credential.tokenExpiresAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                      <span className="text-sm">Not Authenticated</span>
+                    </div>
+                  )}
+                </TableCell>
+                <TableCell className="text-sm">
+                  <div className="space-y-1">
+                    <div>{new Date(credential.updatedAt).toLocaleDateString()}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(credential.updatedAt).toLocaleTimeString()}
+                    </div>
                   </div>
-                )}
-              </TableCell>
-              <TableCell className="text-sm">
-                <div className="space-y-1">
-                  <div>{new Date(credential.updatedAt).toLocaleDateString()}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(credential.updatedAt).toLocaleTimeString()}
-                  </div>
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onTest(credential)}
-                    disabled={testingId === credential.id}
-                    className="hover:bg-blue-50"
-                    title="Test credentials"
-                  >
-                    {testingId === credential.id ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <TestTube className="w-4 h-4" />
-                    )}
-                  </Button>
-                  {credential.courier_providers?.authType === "OAUTH2" && (
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => onRefreshToken(credential)}
-                      disabled={refreshingId === credential.id}
-                      className="hover:bg-purple-50"
-                      title="Refresh OAuth token"
+                      onClick={() => onTest(credential)}
+                      disabled={testingId === credential.id}
+                      className="hover:bg-blue-50"
+                      title={isSteadfastCred ? "Test by checking balance" : "Test credentials"}
                     >
-                      {refreshingId === credential.id ? (
+                      {testingId === credential.id ? (
                         <RefreshCw className="w-4 h-4 animate-spin" />
                       ) : (
-                        <RefreshCw className="w-4 h-4" />
+                        <TestTube className="w-4 h-4" />
                       )}
                     </Button>
-                  )}
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => onEdit(credential)}
-                    className="hover:bg-teal-50"
-                    title="Edit credentials"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onDelete(credential)}
-                    className="text-destructive hover:bg-red-50"
-                    title="Delete credentials"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
+                    {credential.courier_providers?.authType === "OAUTH2" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onRefreshToken(credential)}
+                        disabled={refreshingId === credential.id}
+                        className="hover:bg-purple-50"
+                        title="Refresh OAuth token"
+                      >
+                        {refreshingId === credential.id ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4" />
+                        )}
+                      </Button>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => onEdit(credential)}
+                      className="hover:bg-[#EEF3FB]"
+                      title="Edit credentials"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDelete(credential)}
+                      className="text-destructive hover:bg-red-50"
+                      title="Delete credentials"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

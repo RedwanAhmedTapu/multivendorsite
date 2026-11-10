@@ -81,14 +81,14 @@ export interface VendorInfo {
 export interface CourierOrderSummary {
   id: string;
   courierTrackingId?: string;
+  courierOrderId?: string;
   status: CourierOrderStatus;
-  courierStatus?: string;
+  shipmentKind?: string;
   lastStatusUpdate: string;
-  courier_providers?: {
-    name: string;
-    displayName?: string;
-    logo?: string;
-  };
+  warehouseId?: string;
+  returnedAt?: string;
+  vendorConfirmedReturnAt?: string;
+  courier_providers: { name: string; displayName?: string; logo?: string };
 }
 
 export interface VendorOrder {

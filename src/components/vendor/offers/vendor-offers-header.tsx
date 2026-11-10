@@ -1,92 +1,76 @@
 // components/vendor/offers/vendor-offers-header.tsx
+import { BadgePercent, Plus, ShieldCheck, Ticket, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Ticket, AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { VendorPermissions } from "@/features/offerApi";
+import { formatTaka } from "@/lib/offers/offer-view";
+import {
+  OfferMetaPill,
+  OfferPageHeader,
+  offerPrimaryButton,
+  offerSecondaryButton,
+} from "@/components/offers/shared/offer-ui";
 
 interface VendorOffersHeaderProps {
+  permissions?: VendorPermissions;
+  permissionsLoading: boolean;
+  /** Any offer type the vendor may create (same rule as the create page). */
+  canCreateOffer: boolean;
+  canCreateVoucher: boolean;
   onCreateOffer: () => void;
   onCreateVoucher: () => void;
-  permissions?: VendorPermissions;
 }
 
-export function VendorOffersHeader({ 
-  onCreateOffer, 
-  onCreateVoucher, 
-  permissions 
+export function VendorOffersHeader({
+  permissions,
+  permissionsLoading,
+  canCreateOffer,
+  canCreateVoucher,
+  onCreateOffer,
+  onCreateVoucher,
 }: VendorOffersHeaderProps) {
-  // Comprehensive debugging
-  console.log('=== VENDOR OFFERS HEADER DEBUG ===');
-  console.log('Permissions prop:', permissions);
-  console.log('Type of permissions:', typeof permissions);
-  console.log('Is permissions null?', permissions === null);
-  console.log('Is permissions undefined?', permissions === undefined);
-  
-  if (permissions) {
-    console.log('Permissions object keys:', Object.keys(permissions));
-    console.log('canCreateRegular:', permissions.canCreateRegular);
-    console.log('canCreateVoucher:', permissions.canCreateVoucher);
-    console.log('requiresApproval:', permissions.requiresApproval);
-  } else {
-    console.log('No permissions object received');
-  }
-
-  const canCreateOffer = permissions?.canCreateRegular ?? true;
-  const canCreateVoucher = permissions?.canCreateVoucher ?? true;
-
-  console.log('Final decision - canCreateOffer:', canCreateOffer, 'canCreateVoucher:', canCreateVoucher);
-
+  const noAccessTitle = permissionsLoading ? "Checking your offer permissions…" : "Your store doesn't have permission for this. Contact FinixMart support.";
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Offer Management</h1>
-          <p className="text-muted-foreground">
-            Create and manage your promotional offers and vouchers
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Create Voucher Button */}
-          {canCreateVoucher && (
-            <Button variant="outline" onClick={onCreateVoucher}>
-              <Ticket className="w-4 h-4 mr-2" />
-              Create Voucher
-            </Button>
-          )}
-          
-          {/* Create Offer Button */}
-          {canCreateOffer && (
-            <Button onClick={onCreateOffer}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Offer
-            </Button>
-          )}
-          
-          {/* Debug badge */}
-          <Badge variant="outline" className="ml-2">
-            Perms: {permissions ? 'Yes' : 'No'}
-          </Badge>
-        </div>
-      </div>
-
-      {/* Debug information */}
-      {!permissions && (
-        <div className="flex items-center gap-2 p-3 border border-red-200 bg-red-50 rounded-lg">
-          <AlertCircle className="w-4 h-4 text-red-600" />
-          <div className="text-sm text-red-800">
-            <strong>Debug:</strong> No permissions object received. Check parent component.
-          </div>
-        </div>
-      )}
-
-      {permissions?.requiresApproval && (
-        <div className="flex items-center gap-2 p-3 border border-amber-200 bg-amber-50 rounded-lg">
-          <AlertCircle className="w-4 h-4 text-amber-600" />
-          <div className="text-sm text-amber-800">
-            <strong>Approval Required:</strong> All new offers require admin approval before becoming active.
-          </div>
-        </div>
-      )}
-    </div>
+    <OfferPageHeader
+      icon={BadgePercent}
+      eyebrow="Marketing"
+      title="Offers & vouchers"
+      description="Create discounts and voucher codes for your store and track how they perform."
+      meta={
+        permissions && (
+          <>
+            <OfferMetaPill icon={ShieldCheck} tone="indigo">
+              Up to {permissions.maxDiscountPercent}% or {formatTaka(permissions.maxDiscountAmount)} off
+            </OfferMetaPill>
+            <OfferMetaPill tone="slate">{permissions.maxActiveOffers} active offers max</OfferMetaPill>
+          </>
+        )
+      }
+      actions={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            className={cn("h-9 flex-1 sm:flex-none", offerSecondaryButton)}
+            onClick={onCreateVoucher}
+            disabled={!canCreateVoucher}
+            title={canCreateVoucher ? undefined : noAccessTitle}
+          >
+            {canCreateVoucher || permissionsLoading ? <Ticket className="mr-1.5 h-4 w-4 text-violet-600" /> : <Lock className="mr-1.5 h-4 w-4" />}
+            Create voucher
+          </Button>
+          <Button
+            type="button"
+            className={cn("h-9 flex-1 sm:flex-none", offerPrimaryButton)}
+            onClick={onCreateOffer}
+            disabled={!canCreateOffer}
+            title={canCreateOffer ? undefined : noAccessTitle}
+          >
+            {canCreateOffer || permissionsLoading ? <Plus className="mr-1.5 h-4 w-4" /> : <Lock className="mr-1.5 h-4 w-4" />}
+            Create offer
+          </Button>
+        </>
+      }
+    />
   );
 }

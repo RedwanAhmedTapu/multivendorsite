@@ -53,11 +53,13 @@ export default function NestedCategoryMenu({
     setHoveredLevel2(category);
   };
 
+  // --fm-* accent vars carry today's exact colors as fallbacks; the homepage's
+  // palette injection overrides them for "/" only (other routes unchanged).
   return (
     <div className="flex gap-0 bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200">
       {/* Level 1: Root Categories */}
       <div className="w-64 border-r border-gray-200 bg-white">
-        <div className="p-3 bg-gradient-to-r from-teal-600 to-teal-700 text-white font-semibold text-sm">
+        <div className="p-3 bg-gradient-to-r from-[var(--fm-accent,#0d9488)] to-[var(--fm-accent-hover,#0f766e)] text-white font-semibold text-sm">
           All Categories
         </div>
         <div className="max-h-[500px] overflow-y-auto">
@@ -65,8 +67,8 @@ export default function NestedCategoryMenu({
             rootCategories.map((category) => (
               <div key={category.id}>
                 <div
-                  className={`flex items-center justify-between px-4 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 hover:text-teal-500 ${
-                    hoveredLevel1?.id === category.id ? 'bg-teal-50 text-teal-500' : ''
+                  className={`flex items-center justify-between px-4 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 hover:text-[var(--fm-accent-light,#14b8a6)] ${
+                    hoveredLevel1?.id === category.id ? 'bg-[var(--fm-accent-tint,#f0fdfa)] text-[var(--fm-accent-light,#14b8a6)]' : ''
                   }`}
                   onMouseEnter={() => handleLevel1MouseEnter(category)}
                   onClick={(e) => handleCategoryClick(category.slug, e, true)}
@@ -103,8 +105,8 @@ export default function NestedCategoryMenu({
             {hoveredLevel1.children.map((child) => (
               <div key={child.id}>
                 <div
-                  className={`flex items-center justify-between px-4 py-2.5 cursor-pointer text-gray-600 hover:bg-gray-50 hover:text-teal-500 ${
-                    hoveredLevel2?.id === child.id ? 'bg-teal-50 text-teal-500' : ''
+                  className={`flex items-center justify-between px-4 py-2.5 cursor-pointer text-gray-600 hover:bg-gray-50 hover:text-[var(--fm-accent-light,#14b8a6)] ${
+                    hoveredLevel2?.id === child.id ? 'bg-[var(--fm-accent-tint,#f0fdfa)] text-[var(--fm-accent-light,#14b8a6)]' : ''
                   }`}
                   onMouseEnter={() => handleLevel2MouseEnter(child)}
                   onClick={(e) => handleCategoryClick(child.slug, e, false)}
@@ -135,7 +137,7 @@ export default function NestedCategoryMenu({
             {hoveredLevel2.children.map((grandChild) => (
               <div key={grandChild.id}>
                 <div
-                  className="px-4 py-2.5 cursor-pointer text-gray-900 hover:bg-teal-50 hover:text-teal-500"
+                  className="px-4 py-2.5 cursor-pointer text-gray-900 hover:bg-[var(--fm-accent-tint,#f0fdfa)] hover:text-[var(--fm-accent-light,#14b8a6)]"
                   onClick={(e) => handleCategoryClick(grandChild.slug, e, false)}
                 >
                   <span className="text-sm font-medium truncate block">

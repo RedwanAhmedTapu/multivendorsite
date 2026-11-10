@@ -25,7 +25,7 @@ export interface VendorOrderParent {
   totalAmount: number;
   paymentStatus: import("@/types/orderpage").PaymentStatus;
   createdAt: string;
-  confirmedAt: string;
+  confirmedAt?: string | null; 
   paidAt?: string;
   user?: VendorOrderCustomer;
   address?: import("@/types/orderpage").OrderAddress;
@@ -44,8 +44,8 @@ export interface VendorOrderRow {
   deliveredAt?: string;
   cancelledAt?: string;
   items: import("@/types/orderpage").OrderItem[];
-  courierOrder?: import("@/types/orderpage").CourierOrderSummary;
-  order: VendorOrderParent; // parent order context joined from API
+  courierOrders?: import("@/types/orderpage").CourierOrderSummary[]; // ← array
+  order: VendorOrderParent;
 }
 
 // ─── Status transitions allowed for vendor ──────────────────────────────────

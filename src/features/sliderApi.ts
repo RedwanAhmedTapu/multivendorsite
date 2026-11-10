@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import baseQueryWithReauth from "./baseQueryWithReauth";
+import { buildSliderFormData } from "@/lib/slider/slider-form";
 
 // Types
 export interface Slider {
@@ -11,7 +12,8 @@ export interface Slider {
   buttonText?: string;
   buttonLink?: string;
   type: "HOMEPAGE" | "VENDORPAGE";
-  vendorId?: number;
+  vendorId?: string;
+  vendor?: { id: string; storeName: string; avatar?: string | null } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -24,7 +26,7 @@ export interface CreateSliderRequest {
   buttonText?: string;
   buttonLink?: string;
   type: "HOMEPAGE" | "VENDORPAGE";
-  vendorId?: number;
+  vendorId?: string;
 }
 
 export interface UpdateSliderRequest extends Partial<CreateSliderRequest> {
@@ -37,59 +39,37 @@ export const sliderApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: ["Slider"],
   endpoints: (builder) => ({
-    // Get all sliders
-    getSliders: builder.query<Slider[], void>({
-      query: () => "/sliders",
+    // Get all sliders — optionally filtered by type (HOMEPAGE/VENDORPAGE) and/or vendorId
+    getSliders: builder.query<Slider[], { type?: "HOMEPAGE" | "VENDORPAGE"; vendorId?: string } | void>({
+      query: (params) => ({ url: "/sliders", params: params ?? undefined }),
       providesTags: ["Slider"],
     }),
 
     // Get single slider
     getSliderById: builder.query<Slider, string>({
-      query: (id) => `/silders/${id}`,
+      query: (id) => `/sliders/${id}`,
       providesTags: ["Slider"],
     }),
 
     // Create slider with image
     createSlider: builder.mutation<Slider, CreateSliderRequest>({
-      query: (body) => {
-        const formData = new FormData();
-        formData.append("image", body.image); // compulsory
-        if (body.title) formData.append("title", body.title);
-        if (body.subtitle) formData.append("subtitle", body.subtitle);
-        if (body.description) formData.append("description", body.description);
-        if (body.buttonText) formData.append("buttonText", body.buttonText);
-        if (body.buttonLink) formData.append("buttonLink", body.buttonLink);
-        formData.append("type", body.type);
-        if (body.vendorId) formData.append("vendorId", body.vendorId.toString());
-
-        return {
-          url: "/sliders",
-          method: "POST",
-          body: formData,
-        };
-      },
+      query: (body) => ({
+        url: "/sliders",
+        method: "POST",
+        body: buildSliderFormData(body, "create"), // image compulsory
+      }),
       invalidatesTags: ["Slider"],
     }),
 
     // Update slider
     updateSlider: builder.mutation<Slider, UpdateSliderRequest>({
-      query: ({ id, ...body }) => {
-        const formData = new FormData();
-        if (body.image) formData.append("image", body.image); // optional in update
-        if (body.title) formData.append("title", body.title);
-        if (body.subtitle) formData.append("subtitle", body.subtitle);
-        if (body.description) formData.append("description", body.description);
-        if (body.buttonText) formData.append("buttonText", body.buttonText);
-        if (body.buttonLink) formData.append("buttonLink", body.buttonLink);
-        if (body.type) formData.append("type", body.type);
-        if (body.vendorId) formData.append("vendorId", body.vendorId.toString());
-
-        return {
-          url: `/sliders/${id}`,
-          method: "PUT",
-          body: formData,
-        };
-      },
+      // Sends cleared ("") text fields so they are saved; the image only when a
+      // new file was chosen — the server keeps the current image otherwise.
+      query: ({ id, ...body }) => ({
+        url: `/sliders/${id}`,
+        method: "PUT",
+        body: buildSliderFormData(body, "update"),
+      }),
       invalidatesTags: ["Slider"],
     }),
 

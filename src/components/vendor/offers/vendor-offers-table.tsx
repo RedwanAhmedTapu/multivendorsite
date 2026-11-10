@@ -1,12 +1,10 @@
 // components/vendor/offers/vendor-offers-table.tsx
 import { useState } from "react";
-import {
-  useDeactivateVendorOfferMutation,
-} from "@/features/offerApi";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Copy, Edit, MoreHorizontal, PowerOff } from "lucide-react";
+import { toast } from "sonner";
+import { useDeactivateVendorOfferMutation } from "@/features/offerApi";
+import type { Offer } from "@/features/offerApi";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,203 +13,105 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Filter, MoreHorizontal, Edit, PowerOff, Eye } from "lucide-react";
-import { format } from "date-fns";
-import type { Offer, VendorPermissions } from "@/features/offerApi";
-import { toast } from "sonner";
+import { getOfferDisplayStatus } from "@/lib/offers/offer-view";
+import { OfferListTable } from "@/components/offers/shared/offer-list-table";
+import { OfferConfirmDialog } from "@/components/offers/shared/offer-ui";
 
 interface VendorOffersTableProps {
   offers: Offer[];
   isLoading: boolean;
+  isFetching: boolean;
+  error: string | null;
+  onRetry: () => void;
   onEdit: (offer: Offer) => void;
-  permissions?: VendorPermissions;
+  empty: { title: string; description?: string; action?: React.ReactNode };
 }
 
-export function VendorOffersTable({ offers, isLoading, onEdit }: VendorOffersTableProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [deactivateOffer] = useDeactivateVendorOfferMutation();
+export function VendorOffersTable({ offers, isLoading, isFetching, error, onRetry, onEdit, empty }: VendorOffersTableProps) {
+  const [deactivateOffer, { isLoading: deactivating }] = useDeactivateVendorOfferMutation();
+  const [confirming, setConfirming] = useState<Offer | null>(null);
 
-  const filteredOffers = offers.filter(offer =>
-    offer.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    offer.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleDeactivateOffer = async (offerId: string) => {
+  const handleDeactivate = async () => {
+    if (!confirming) return;
     try {
-      await deactivateOffer(offerId).unwrap();
-      toast.success("Offer deactivated successfully");
-    } catch (error) {
-      toast.error("Failed to deactivate offer");
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-muted-foreground">Loading your offers...</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search your offers..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <Button variant="outline" size="sm">
-          <Filter className="w-4 h-4 mr-2" />
-          Filter
-        </Button>
-      </div>
-
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Offer</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Discount</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Usage</TableHead>
-            <TableHead>Valid Until</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredOffers.map((offer) => (
-            <VendorOfferTableRow
-              key={offer.id}
-              offer={offer}
-              onEdit={onEdit}
-              onDeactivate={handleDeactivateOffer}
-            />
-          ))}
-        </TableBody>
-      </Table>
-
-      {filteredOffers.length === 0 && (
-        <div className="text-center py-8 text-muted-foreground">
-          {searchTerm ? "No offers match your search" : "No offers found"}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function VendorOfferTableRow({
-  offer,
-  onEdit,
-  onDeactivate,
-}: {
-  offer: Offer;
-  onEdit: (offer: Offer) => void;
-  onDeactivate: (offerId: string) => void;
-}) {
-  const getStatusBadge = (offer: Offer) => {
-    if (!offer.isActive) {
-      if (offer.createdByType === "VENDOR") {
-        return <Badge variant="outline">Pending Approval</Badge>;
+      const res = await deactivateOffer(confirming.id).unwrap();
+      // Only report success when the server's copy says the offer is off.
+      if (res?.data && res.data.isActive === false) {
+        toast.success("Offer deactivated");
+      } else {
+        toast.error("The server didn't switch this offer off. It is still active — please contact FinixMart support.");
       }
-      return <Badge variant="secondary">Inactive</Badge>;
+    } catch (error) {
+      const message = (error as { data?: { message?: string } })?.data?.message;
+      toast.error(message ? `Couldn't deactivate: ${message}` : "Couldn't deactivate the offer");
+    } finally {
+      setConfirming(null);
     }
-    
-    const now = new Date();
-    const validTo = offer.validTo ? new Date(offer.validTo) : null;
-    
-    if (validTo && validTo < now) {
-      return <Badge variant="destructive">Expired</Badge>;
-    }
-    
-    return <Badge variant="default">Active</Badge>;
   };
 
-  const getTypeBadge = (type: string) => {
-    const variants = {
-      VOUCHER: "secondary",
-      FLASH_SALE: "destructive",
-      COUNTDOWN_DEAL: "outline",
-      REGULAR_DISCOUNT: "default",
-    } as const;
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast.success(`Copied ${code}`);
+    } catch {
+      toast.error("Couldn't copy the code");
+    }
+  };
 
+  const renderActions = (offer: Offer) => {
+    const status = getOfferDisplayStatus(offer);
+    const canDeactivate = offer.isActive && status !== "expired" && status !== "rejected";
     return (
-      <Badge variant={variants[type as keyof typeof variants] || "default"}>
-        {type.replace(/_/g, " ")}
-      </Badge>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-[#3D5068] hover:bg-[#EEF3FB]" aria-label={`Actions for ${offer.title}`}>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48 rounded-xl">
+          <DropdownMenuLabel className="text-xs text-[#7A90AB]">Offer actions</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => onEdit(offer)}>
+            <Edit className="mr-2 h-4 w-4" /> Edit details
+          </DropdownMenuItem>
+          {offer.voucherConfig?.code && (
+            <DropdownMenuItem onClick={() => copyCode(offer.voucherConfig!.code)}>
+              <Copy className="mr-2 h-4 w-4" /> Copy voucher code
+            </DropdownMenuItem>
+          )}
+          {canDeactivate && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setConfirming(offer)} className="text-orange-600 focus:text-orange-700">
+                <PowerOff className="mr-2 h-4 w-4" /> Deactivate
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   };
 
-  const getDiscountText = (offer: Offer) => {
-    switch (offer.discountType) {
-      case "PERCENTAGE":
-        return `${offer.discountValue}% off`;
-      case "FIXED_AMOUNT":
-        return `$${offer.discountValue} off`;
-      case "FREE_SHIPPING":
-        return "Free Shipping";
-      case "BUY_X_GET_Y":
-        return "Buy X Get Y";
-      default:
-        return "Discount";
-    }
-  };
-
   return (
-    <TableRow>
-      <TableCell className="font-medium">
-        <div>
-          <div className="font-semibold">{offer.title}</div>
-          <div className="text-sm text-muted-foreground line-clamp-1">
-            {offer.description}
-          </div>
-        </div>
-      </TableCell>
-      <TableCell>{getTypeBadge(offer.type)}</TableCell>
-      <TableCell>{getDiscountText(offer)}</TableCell>
-      <TableCell>{getStatusBadge(offer)}</TableCell>
-      <TableCell>
-        {offer.currentUsageCount} / {offer.totalUsageLimit || "∞"}
-      </TableCell>
-      <TableCell>
-        {offer.validTo ? format(new Date(offer.validTo), "MMM dd, yyyy") : "No expiry"}
-      </TableCell>
-      <TableCell className="text-right">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm">
-              <MoreHorizontal className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => onEdit(offer)}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Eye className="w-4 h-4 mr-2" />
-              View Analytics
-            </DropdownMenuItem>
-            {offer.isActive && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => onDeactivate(offer.id)}
-                  className="text-amber-600"
-                >
-                  <PowerOff className="w-4 h-4 mr-2" />
-                  Deactivate
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </TableCell>
-    </TableRow>
+    <>
+      <OfferListTable
+        offers={offers}
+        isLoading={isLoading}
+        isFetching={isFetching}
+        error={error}
+        onRetry={onRetry}
+        renderActions={renderActions}
+        empty={empty}
+      />
+      <OfferConfirmDialog
+        open={!!confirming}
+        onOpenChange={(o) => { if (!o) setConfirming(null); }}
+        title="Deactivate this offer?"
+        description={<>Customers will no longer be able to use <strong>{confirming?.title}</strong>. You may need admin approval to turn it back on.</>}
+        confirmText="Deactivate"
+        tone="destructive"
+        busy={deactivating}
+        onConfirm={handleDeactivate}
+      />
+    </>
   );
 }

@@ -6,10 +6,9 @@ import {
   useApproveVendorOfferMutation,
   useUpdateOfferMutation,
 } from "@/features/offerApi";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,37 +25,42 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { 
-  Search, 
-  MoreHorizontal, 
-  CheckCircle, 
-  XCircle, 
-  Store, 
+import {
+  MoreHorizontal,
+  CheckCircle,
+  XCircle,
   Eye,
   EyeOff,
-  Calendar,
-  Users,
   AlertTriangle,
   Info,
-  Edit
+  Edit,
+  Copy,
+  Trash2,
+  BarChart3,
 } from "lucide-react";
-import { format } from "date-fns";
-import type { Offer, OfferStatus, OfferType, CreatorType, CreateOfferRequest } from "@/features/offerApi";
+import type { Offer, OfferStatus } from "@/features/offerApi";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { OfferListTable } from "@/components/offers/shared/offer-list-table";
+import { offerPrimaryButton, offerSecondaryButton } from "@/components/offers/shared/offer-ui";
 
 interface OffersTableProps {
   offers: Offer[];
   isLoading: boolean;
-  onEdit?: (offer: Offer) => void; // Made optional since we're using router now
+  isFetching?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+  onEdit?: (offer: Offer) => void; // Optional: editing navigates to the edit page
   showVendorInfo?: boolean;
   onViewAnalytics?: (offer: Offer) => void;
+  empty?: { title: string; description?: string; action?: React.ReactNode };
 }
 
-type ActionType = 
-  | 'delete' 
-  | 'approve' 
-  | 'reject' 
-  | 'activate' 
+type ActionType =
+  | 'delete'
+  | 'approve'
+  | 'reject'
+  | 'activate'
   | 'deactivate';
 
 interface ConfirmationDialogState {
@@ -69,20 +73,22 @@ interface ConfirmationDialogState {
   variant: 'default' | 'destructive' | 'success';
 }
 
-export function OffersTable({ 
-  offers, 
-  isLoading, 
-  onEdit, 
+export function OffersTable({
+  offers,
+  isLoading,
+  isFetching,
+  error,
+  onRetry,
+  onEdit,
   showVendorInfo = false,
-  onViewAnalytics 
+  onViewAnalytics,
+  empty = { title: "No offers found" },
 }: OffersTableProps) {
   const router = useRouter();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<OfferStatus | "ALL">("ALL");
-  const [typeFilter, setTypeFilter] = useState<OfferType | "ALL">("ALL");
   const [deleteOffer] = useDeleteOfferMutation();
   const [approveVendorOffer] = useApproveVendorOfferMutation();
   const [updateOffer] = useUpdateOfferMutation();
+  const [working, setWorking] = useState(false);
 
   const [confirmationDialog, setConfirmationDialog] = useState<ConfirmationDialogState>({
     isOpen: false,
@@ -93,33 +99,18 @@ export function OffersTable({
     confirmText: '',
     variant: 'default'
   });
+  // Rejecting a vendor offer requires a reason (kept in the audit log).
+  const [rejectReason, setRejectReason] = useState("");
+  const rejectReasonMissing = confirmationDialog.action === 'reject' && !rejectReason.trim();
 
-  // Handle edit navigation
   const handleEdit = (offer: Offer) => {
-    // Use router to navigate to the edit page
     router.push(`/admin-dashboard/offer-manage/edit-offer/${offer.id}`);
-    
-    // Also call the onEdit prop if provided (for backward compatibility)
-    if (onEdit) {
-      onEdit(offer);
-    }
+    onEdit?.(offer);
   };
 
-  const filteredOffers = offers.filter(offer => {
-    const matchesSearch = 
-      offer.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      offer.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      offer.voucherConfig?.code?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus = statusFilter === "ALL" || offer.status === statusFilter;
-    const matchesType = typeFilter === "ALL" || offer.type === typeFilter;
-
-    return matchesSearch && matchesStatus && matchesType;
-  });
-
   const showConfirmationDialog = (
-    action: ActionType, 
-    offer: Offer, 
+    action: ActionType,
+    offer: Offer,
     options: {
       title: string;
       description: string;
@@ -127,6 +118,7 @@ export function OffersTable({
       variant?: 'default' | 'destructive' | 'success';
     }
   ) => {
+    setRejectReason("");
     setConfirmationDialog({
       isOpen: true,
       action,
@@ -139,62 +131,58 @@ export function OffersTable({
   };
 
   const handleConfirmAction = async () => {
-    if (!confirmationDialog.offer) return;
+    if (!confirmationDialog.offer || working) return;
 
     const { action, offer } = confirmationDialog;
+    if (action === 'reject' && !rejectReason.trim()) {
+      toast.error("Please enter a reason for rejecting this offer");
+      return;
+    }
 
+    setWorking(true);
     try {
       switch (action) {
         case 'delete':
           await deleteOffer(offer.id).unwrap();
-          toast.success("Offer deleted successfully");
+          toast.success("Offer deleted");
           break;
 
         case 'approve':
           await approveVendorOffer({ offerId: offer.id, approved: true }).unwrap();
-          toast.success("Offer approved successfully");
+          toast.success("Offer approved");
           break;
 
         case 'reject':
-          await approveVendorOffer({ offerId: offer.id, approved: false }).unwrap();
-          toast.success("Offer rejected successfully");
+          await approveVendorOffer({ offerId: offer.id, approved: false, reason: rejectReason.trim() }).unwrap();
+          toast.success("Offer rejected");
           break;
 
         case 'activate':
           // Only send the status field to avoid sending undefined values
-          await updateOffer({ 
-            offerId: offer.id, 
-            data: { 
-              status: 'ACTIVE' as OfferStatus
-            } 
-          }).unwrap();
-          toast.success("Offer activated successfully");
+          await updateOffer({ offerId: offer.id, data: { status: 'ACTIVE' as OfferStatus } }).unwrap();
+          toast.success("Offer activated");
           break;
 
         case 'deactivate':
           // Only send the status field to avoid sending undefined values
-          await updateOffer({ 
-            offerId: offer.id, 
-            data: { 
-              status: 'PAUSED' as OfferStatus
-            } 
-          }).unwrap();
-          toast.success("Offer deactivated successfully");
+          await updateOffer({ offerId: offer.id, data: { status: 'PAUSED' as OfferStatus } }).unwrap();
+          toast.success("Offer paused");
           break;
       }
-    } catch (error: any) {
-      console.error(`Failed to ${action} offer:`, error);
-      toast.error(`Failed to ${action} offer: ${error?.data?.message || 'Unknown error'}`);
+    } catch (error) {
+      const message = (error as { data?: { message?: string } })?.data?.message;
+      toast.error(`Couldn't ${action} the offer${message ? `: ${message}` : ''}`);
     } finally {
+      setWorking(false);
       setConfirmationDialog(prev => ({ ...prev, isOpen: false }));
     }
   };
 
   const handleDeleteOffer = (offer: Offer) => {
     showConfirmationDialog('delete', offer, {
-      title: "Delete Offer",
-      description: `Are you sure you want to delete "${offer.title}"? This action cannot be undone and will remove all associated data.`,
-      confirmText: "Delete Offer",
+      title: "Delete offer?",
+      description: `"${offer.title}" will be permanently deleted along with its associated data. This can't be undone.`,
+      confirmText: "Delete offer",
       variant: 'destructive'
     });
   };
@@ -202,439 +190,153 @@ export function OffersTable({
   const handleApproveVendorOffer = (offer: Offer, approved: boolean) => {
     const action = approved ? 'approve' : 'reject';
     showConfirmationDialog(action, offer, {
-      title: `${approved ? 'Approve' : 'Reject'} Offer`,
-      description: `Are you sure you want to ${approved ? 'approve' : 'reject'} the offer "${offer.title}"? ${approved ? 'This will make it available to customers.' : 'This will prevent the offer from being used.'}`,
-      confirmText: `${approved ? 'Approve' : 'Reject'} Offer`,
+      title: approved ? 'Approve vendor offer?' : 'Reject vendor offer?',
+      description: approved
+        ? `"${offer.title}" will go live for customers.`
+        : `"${offer.title}" won't be usable. Your reason is saved in the offer's audit log.`,
+      confirmText: approved ? 'Approve offer' : 'Reject offer',
       variant: approved ? 'success' : 'destructive'
     });
   };
 
   const handleToggleActive = (offer: Offer) => {
     const isActive = offer.status === 'ACTIVE';
-    const action = isActive ? 'deactivate' : 'activate';
-    
-    showConfirmationDialog(action, offer, {
-      title: `${isActive ? 'Deactivate' : 'Activate'} Offer`,
-      description: `Are you sure you want to ${isActive ? 'deactivate' : 'activate'} the offer "${offer.title}"? ${isActive ? 'This will make it unavailable to customers.' : 'This will make it available to customers.'}`,
-      confirmText: `${isActive ? 'Deactivate' : 'Activate'} Offer`,
+    showConfirmationDialog(isActive ? 'deactivate' : 'activate', offer, {
+      title: isActive ? 'Pause offer?' : 'Activate offer?',
+      description: isActive
+        ? `"${offer.title}" will stop being available to customers until you activate it again.`
+        : `"${offer.title}" will become available to customers.`,
+      confirmText: isActive ? 'Pause offer' : 'Activate offer',
       variant: isActive ? 'destructive' : 'success'
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-muted-foreground">Loading offers...</div>
-      </div>
-    );
-  }
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast.success(`Copied ${code}`);
+    } catch {
+      toast.error("Couldn't copy the code");
+    }
+  };
 
+  const renderActions = (offer: Offer) => {
+    const requiresApproval = offer.createdByType === "VENDOR" && offer.status === "PENDING";
+    const canToggleActive = !requiresApproval && (offer.status === 'ACTIVE' || offer.status === 'PAUSED' || offer.status === 'APPROVED');
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-[#3D5068] hover:bg-[#EEF3FB]" aria-label={`Actions for ${offer.title}`}>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52 rounded-xl">
+          {requiresApproval && (
+            <>
+              <DropdownMenuLabel className="text-xs text-[#7A90AB]">Vendor approval</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => handleApproveVendorOffer(offer, true)} className="text-emerald-700 focus:text-emerald-800">
+                <CheckCircle className="mr-2 h-4 w-4" /> Approve
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleApproveVendorOffer(offer, false)} className="text-rose-600 focus:text-rose-700">
+                <XCircle className="mr-2 h-4 w-4" /> Reject…
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
+          <DropdownMenuLabel className="text-xs text-[#7A90AB]">Offer actions</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => handleEdit(offer)}>
+            <Edit className="mr-2 h-4 w-4" /> Edit offer
+          </DropdownMenuItem>
+          {offer.voucherConfig?.code && (
+            <DropdownMenuItem onClick={() => copyCode(offer.voucherConfig!.code)}>
+              <Copy className="mr-2 h-4 w-4" /> Copy voucher code
+            </DropdownMenuItem>
+          )}
+          {onViewAnalytics && (
+            <DropdownMenuItem onClick={() => onViewAnalytics(offer)}>
+              <BarChart3 className="mr-2 h-4 w-4" /> View analytics
+            </DropdownMenuItem>
+          )}
+          {canToggleActive && (
+            <DropdownMenuItem
+              onClick={() => handleToggleActive(offer)}
+              className={offer.status === "ACTIVE" ? "text-orange-600 focus:text-orange-700" : "text-emerald-700 focus:text-emerald-800"}
+            >
+              {offer.status === "ACTIVE" ? <><EyeOff className="mr-2 h-4 w-4" /> Pause offer</> : <><Eye className="mr-2 h-4 w-4" /> Activate offer</>}
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="text-rose-600 focus:text-rose-700" onClick={() => handleDeleteOffer(offer)}>
+            <Trash2 className="mr-2 h-4 w-4" /> Delete offer
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
+  const tone = confirmationDialog.variant;
   return (
     <>
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search offers by title, description, or voucher code..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          
-          <div className="flex gap-2">
-            <select 
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as OfferStatus | "ALL")}
-            >
-              <option value="ALL">All Status</option>
-              <option value="ACTIVE">Active</option>
-              <option value="PENDING">Pending</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="EXPIRED">Expired</option>
-            </select>
-
-            <select 
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as OfferType | "ALL")}
-            >
-              <option value="ALL">All Types</option>
-              <option value="REGULAR_DISCOUNT">Regular Discount</option>
-              <option value="VOUCHER">Voucher</option>
-              <option value="COUNTDOWN_DEAL">Countdown Deal</option>
-              <option value="FLASH_SALE">Flash Sale</option>
-              <option value="BUY_X_GET_Y">Buy X Get Y</option>
-              <option value="FREE_SHIPPING">Free Shipping</option>
-              <option value="BUNDLE_DEAL">Bundle Deal</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Offer Details</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Discount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Usage</TableHead>
-                <TableHead>Validity</TableHead>
-                {showVendorInfo && <TableHead>Created By</TableHead>}
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOffers.map((offer) => (
-                <OfferTableRow
-                  key={offer.id}
-                  offer={offer}
-                  onEdit={handleEdit} // Use the new handleEdit function
-                  onDelete={handleDeleteOffer}
-                  onApprove={handleApproveVendorOffer}
-                  onToggleActive={handleToggleActive}
-                  onViewAnalytics={onViewAnalytics}
-                  showVendorInfo={showVendorInfo}
-                />
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-
-        {filteredOffers.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground border rounded-lg">
-            <div className="flex flex-col items-center gap-2">
-              <Search className="h-8 w-8" />
-              <div>
-                {searchTerm || statusFilter !== "ALL" || typeFilter !== "ALL" 
-                  ? "No offers match your filters" 
-                  : "No offers found"
-                }
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <OfferListTable
+        offers={offers}
+        isLoading={isLoading}
+        isFetching={isFetching}
+        error={error}
+        onRetry={onRetry}
+        renderActions={renderActions}
+        showCreator={showVendorInfo}
+        empty={empty}
+      />
 
       {/* Confirmation Dialog */}
-      <Dialog open={confirmationDialog.isOpen} onOpenChange={(open) => setConfirmationDialog(prev => ({ ...prev, isOpen: open }))}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={confirmationDialog.isOpen} onOpenChange={(open) => { if (!working) setConfirmationDialog(prev => ({ ...prev, isOpen: open })); }}>
+        <DialogContent className="rounded-2xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {confirmationDialog.variant === 'destructive' && (
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-              )}
-              {confirmationDialog.variant === 'success' && (
-                <Info className="h-5 w-5 text-green-600" />
-              )}
-              {confirmationDialog.title}
-            </DialogTitle>
-            <DialogDescription>
-              {confirmationDialog.description}
-            </DialogDescription>
+            <div className="flex items-start gap-3">
+              <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl ring-1",
+                tone === 'destructive' ? "bg-rose-50 text-rose-600 ring-rose-100" : tone === 'success' ? "bg-emerald-50 text-emerald-600 ring-emerald-100" : "bg-indigo-50 text-indigo-600 ring-indigo-100")}>
+                {tone === 'destructive' ? <AlertTriangle className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+              </span>
+              <div className="space-y-1 text-left">
+                <DialogTitle className="text-base text-[#0D1B2E]">{confirmationDialog.title}</DialogTitle>
+                <DialogDescription className="text-sm text-[#3D5068]">{confirmationDialog.description}</DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+          {confirmationDialog.action === 'reject' && (
+            <div className="space-y-2">
+              <Label htmlFor="offer-reject-reason" className="text-xs font-semibold text-[#3D5068]">Reason for rejection</Label>
+              <Textarea
+                id="offer-reject-reason"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Explain why this offer is being rejected"
+                rows={3}
+                maxLength={500}
+                className="rounded-lg border-[#E5EAF2]"
+              />
+              <p className="text-right text-[11px] text-[#7A90AB]">{rejectReason.length}/500</p>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-2">
             <Button
               variant="outline"
+              className={offerSecondaryButton}
               onClick={() => setConfirmationDialog(prev => ({ ...prev, isOpen: false }))}
-              className="sm:flex-1"
+              disabled={working}
             >
               Cancel
             </Button>
             <Button
-              variant={confirmationDialog.variant === 'destructive' ? 'destructive' : 'default'}
+              className={tone === 'destructive' ? "bg-rose-600 text-white hover:bg-rose-500" : tone === 'success' ? "bg-emerald-600 text-white hover:bg-emerald-500" : offerPrimaryButton}
               onClick={handleConfirmAction}
-              className="sm:flex-1"
+              disabled={rejectReasonMissing || working}
             >
-              {confirmationDialog.confirmText}
+              {working ? "Working…" : confirmationDialog.confirmText}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-function OfferTableRow({
-  offer,
-  onEdit,
-  onDelete,
-  onApprove,
-  onToggleActive,
-  onViewAnalytics,
-  showVendorInfo,
-}: {
-  offer: Offer;
-  onEdit: (offer: Offer) => void;
-  onDelete: (offer: Offer) => void;
-  onApprove: (offer: Offer, approved: boolean) => void;
-  onToggleActive: (offer: Offer) => void;
-  onViewAnalytics?: (offer: Offer) => void;
-  showVendorInfo: boolean;
-}) {
-  const getStatusBadge = (offer: Offer) => {
-    const statusConfig = {
-      ACTIVE: { variant: "default" as const, label: "Active" },
-      PENDING: { variant: "outline" as const, label: "Pending" },
-      APPROVED: { variant: "default" as const, label: "Approved" },
-      REJECTED: { variant: "destructive" as const, label: "Rejected" },
-      PAUSED: { variant: "secondary" as const, label: "Paused" },
-      EXPIRED: { variant: "destructive" as const, label: "Expired" },
-    };
-
-    const config = statusConfig[offer.status];
-    return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
-
-  const getTypeBadge = (type: OfferType) => {
-    const variants: Record<OfferType, "default" | "secondary" | "destructive" | "outline"> = {
-      REGULAR_DISCOUNT: "default",
-      VOUCHER: "secondary",
-      COUNTDOWN_DEAL: "outline",
-      FLASH_SALE: "destructive",
-      BUY_X_GET_Y: "default",
-      FREE_SHIPPING: "secondary",
-      BUNDLE_DEAL: "outline",
-      SEASONAL_SALE: "default",
-      LOYALTY_REWARD: "secondary",
-      REFERRAL_BONUS: "outline",
-    };
-
-    return (
-      <Badge variant={variants[type] || "default"} className="capitalize">
-        {type.toLowerCase().replace(/_/g, " ")}
-      </Badge>
-    );
-  };
-
-  const getDiscountText = (offer: Offer) => {
-    switch (offer.discountType) {
-      case "PERCENTAGE":
-        return `${offer.discountValue}%${offer.maxDiscountAmount ? ` (max $${offer.maxDiscountAmount})` : ''}`;
-      case "FIXED_AMOUNT":
-        return `$${offer.discountValue} off`;
-      case "FREE_SHIPPING":
-        return "Free Shipping";
-      case "BUY_X_GET_Y":
-        const config = offer.buyXGetYOffer;
-        return config ? `Buy ${config.buyQuantity} Get ${config.getQuantity}` : "Buy X Get Y";
-      default:
-        return "Discount";
-    }
-  };
-
-  const getValidityStatus = (offer: Offer) => {
-    const now = new Date();
-    const validFrom = new Date(offer.validFrom);
-    const validTo = offer.validTo ? new Date(offer.validTo) : null;
-
-    if (validTo && validTo < now) {
-      return { status: "expired", text: "Expired" };
-    }
-    if (validFrom > now) {
-      return { status: "scheduled", text: `Starts ${format(validFrom, "MMM dd")}` };
-    }
-    if (validTo) {
-      const daysLeft = Math.ceil((validTo.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      return { 
-        status: "active", 
-        text: daysLeft <= 3 ? `${daysLeft}d left` : format(validTo, "MMM dd")
-      };
-    }
-    return { status: "no-expiry", text: "No expiry" };
-  };
-
-  const getCreatorBadge = (createdByType: CreatorType, vendor?: any) => {
-    const config = {
-      ADMIN: { variant: "default" as const, label: "Admin", icon: null },
-      VENDOR: { variant: "outline" as const, label: vendor?.storeName || "Vendor", icon: Store },
-      SYSTEM: { variant: "secondary" as const, label: "System", icon: null },
-    };
-
-    const creatorConfig = config[createdByType];
-    const IconComponent = creatorConfig.icon;
-
-    return (
-      <Badge variant={creatorConfig.variant} className="flex items-center gap-1">
-        {IconComponent && <IconComponent className="w-3 h-3" />}
-        {creatorConfig.label}
-      </Badge>
-    );
-  };
-
-  const validity = getValidityStatus(offer);
-  const isVendorOffer = offer.createdByType === "VENDOR";
-  const requiresApproval = isVendorOffer && offer.status === "PENDING";
-  const canToggleActive = !requiresApproval && (offer.status === 'ACTIVE' || offer.status === 'PAUSED' || offer.status === 'APPROVED');
-
-  return (
-    <TableRow>
-      <TableCell>
-        <div className="flex flex-col space-y-1">
-          <div className="font-semibold flex items-center gap-2">
-            {offer.title}
-            {offer.voucherConfig?.code && (
-              <Badge variant="outline" className="text-xs">
-                {offer.voucherConfig.code}
-              </Badge>
-            )}
-          </div>
-          <div className="text-sm text-muted-foreground line-clamp-2">
-            {offer.description}
-          </div>
-          {offer.priority > 1 && (
-            <div className="text-xs text-blue-600">
-              Priority: {offer.priority}
-            </div>
-          )}
-        </div>
-      </TableCell>
-      
-      <TableCell>
-        <div className="flex flex-col gap-1">
-          {getTypeBadge(offer.type)}
-          {offer.category && offer.category !== "GENERAL" && (
-            <div className="text-xs text-muted-foreground capitalize">
-              {offer.category.toLowerCase().replace(/_/g, " ")}
-            </div>
-          )}
-        </div>
-      </TableCell>
-      
-      <TableCell>
-        <div className="font-medium">{getDiscountText(offer)}</div>
-        {(offer?.minOrderAmount ?? 0) > 0 && (
-          <div className="text-xs text-muted-foreground">
-            Min: ${offer.minOrderAmount ?? 0}
-          </div>
-        )}
-      </TableCell>
-      
-      <TableCell>
-        <div className="flex flex-col gap-1">
-          {getStatusBadge(offer)}
-          {!offer.isPublic && (
-            <Badge variant="outline" className="text-xs">
-              Private
-            </Badge>
-          )}
-        </div>
-      </TableCell>
-      
-      <TableCell>
-        <div className="flex flex-col">
-          <div className="flex items-center gap-1 text-sm">
-            <Users className="w-3 h-3" />
-            {offer.currentUsageCount}
-            {offer.totalUsageLimit && ` / ${offer.totalUsageLimit}`}
-          </div>
-          {(offer.userUsageLimit ?? 0) > 1 && (
-            <div className="text-xs text-muted-foreground">
-              {offer.userUsageLimit} per user
-            </div>
-          )}
-        </div>
-      </TableCell>
-      
-      <TableCell>
-        <div className="flex flex-col">
-          <div className={`text-sm ${
-            validity.status === "expired" ? "text-destructive" : 
-            validity.status === "scheduled" ? "text-blue-600" : 
-            "text-foreground"
-          }`}>
-            {validity.text}
-          </div>
-          {offer.validTo && validity.status !== "expired" && (
-            <div className="text-xs text-muted-foreground flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              {format(new Date(offer.validTo), "MMM dd, yyyy")}
-            </div>
-          )}
-        </div>
-      </TableCell>
-      
-      {showVendorInfo && (
-        <TableCell>
-          {getCreatorBadge(offer.createdByType, offer.createdByVendor)}
-        </TableCell>
-      )}
-      
-      <TableCell className="text-right">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm">
-              <MoreHorizontal className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>Offer Actions</DropdownMenuLabel>
-            
-            <DropdownMenuItem onClick={() => onEdit(offer)}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit Offer
-            </DropdownMenuItem>
-
-            {onViewAnalytics && (
-              <DropdownMenuItem onClick={() => onViewAnalytics(offer)}>
-                View Analytics
-              </DropdownMenuItem>
-            )}
-
-            {canToggleActive && (
-              <DropdownMenuItem 
-                onClick={() => onToggleActive(offer)}
-                className={offer.status === "ACTIVE" ? "text-orange-600" : "text-green-600"}
-              >
-                {offer.status === "ACTIVE" ? (
-                  <>
-                    <EyeOff className="w-4 h-4 mr-2" />
-                    Deactivate Offer
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-4 h-4 mr-2" />
-                    Activate Offer
-                  </>
-                )}
-              </DropdownMenuItem>
-            )}
-
-            {requiresApproval && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Vendor Approval</DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={() => onApprove(offer, true)}
-                  className="text-green-600"
-                >
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Approve Offer
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => onApprove(offer, false)}
-                  className="text-red-600"
-                >
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Reject Offer
-                </DropdownMenuItem>
-              </>
-            )}
-
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={() => onDelete(offer)}
-            >
-              Delete Offer
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </TableCell>
-    </TableRow>
   );
 }

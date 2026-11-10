@@ -343,7 +343,7 @@ export const agentAdminApi = api.injectEndpoints({
       transformResponse: unwrap<{ replayed: boolean }>,
       invalidatesTags: ["AgentWallet", "AgentAudit"],
     }),
-    // agent chat (P10): staff list; reading / replying uses the existing chat API
+    // agent chat (P10): staff list for the admin Live Chat page; reading / replying uses the existing chat API
     listAgentChats: b.query<AgentChatList, { type?: "AGENT_SUPPORT" | "AGENT_VENDOR"; agentId?: string; page?: number; limit?: number }>({
       query: (p) => `/admin/agents/chat/conversations${qs(p)}`,
       transformResponse: unwrap<AgentChatList>,

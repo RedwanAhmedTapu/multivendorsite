@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Supplier } from "../types/purchase";
+import { Supplier } from "../../../../../../types/purchase.types";
 
 interface Props {
   suppliers: Supplier[];

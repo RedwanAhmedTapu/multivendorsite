@@ -313,20 +313,20 @@ const BenefitsSection: React.FC<BenefitsSectionProps> = ({
   };
 
   const iconBgColors: Record<string, string> = {
-    FreeShipping: "bg-blue-50 text-blue-600",
-    SecurePayment: "bg-green-50 text-green-600",
-    Return: "bg-purple-50 text-purple-600",
-    Brands: "bg-orange-50 text-orange-600",
-    Worldwide: "bg-blue-50 text-blue-600",
-    ExpertCustomerService: "bg-indigo-50 text-indigo-600",
-    CompetitivePrice: "bg-red-50 text-red-600",
-    AuthenticProducts: "bg-teal-50 text-teal-600",
+    FreeShipping: "bg-info/10 text-info",
+    SecurePayment: "bg-success/10 text-success",
+    Return: "bg-chart-3/10 text-chart-3",
+    Brands: "bg-chart-1/10 text-chart-1",
+    Worldwide: "bg-info/10 text-info",
+    ExpertCustomerService: "bg-chart-5/10 text-chart-5",
+    CompetitivePrice: "bg-destructive/10 text-destructive",
+    AuthenticProducts: "bg-primary/10 text-primary",
   };
 
   // Default variant
   return (
     <Container className="">
-      <div className=" grid grid-cols-3 2xl:grid-cols-6 justify-items-center-safe py-4    gap-1    bg-teal-50 rounded-sm">
+      <div className=" grid grid-cols-3 2xl:grid-cols-6 justify-items-center-safe py-4    gap-1    bg-primary-tint rounded-sm">
         {benefits.map((benefit, index) => {
           const iconName = getIconName(benefit.icon);
           const bgColorClass =
@@ -347,10 +347,10 @@ const BenefitsSection: React.FC<BenefitsSectionProps> = ({
 
               {/* Text Content */}
               <div className="flex-1 min-w-0">
-                <h3 className=" sm:text-sm font-semibold text-gray-900 mb-1 group-hover:text-teal-600 transition-colors">
+                <h3 className=" sm:text-sm font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">
                   {benefit.title}
                 </h3>
-                <p className="text-xs text-gray-600 leading-relaxed">
+                <p className="text-xs text-muted-foreground leading-relaxed">
                   {benefit.description}
                 </p>
               </div>

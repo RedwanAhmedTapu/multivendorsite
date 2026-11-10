@@ -149,13 +149,15 @@ function WishlistItemCard({ item, onRemove, onMoveToCart, onUpdatePriority, onTo
         </Link>
         
         {/* Variant Info */}
-        {hasVariant && variant.attributeValues && Object.keys(variant.attributeValues).length > 0 && (
+        {hasVariant && variant.attributes && variant.attributes.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {Object.entries(variant.attributeValues).map(([key, value]) => (
-              <span key={key} className="text-xs text-slate-400">
-                {value}
-              </span>
-            ))}
+            {variant.attributes.map(
+              (a: { attributeValue: { value: string; attribute: { name: string } } }) => (
+                <span key={`${a.attributeValue.attribute.name}-${a.attributeValue.value}`} className="text-xs text-slate-400">
+                  {a.attributeValue.value}
+                </span>
+              ),
+            )}
           </div>
         )}
         

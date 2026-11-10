@@ -67,8 +67,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { store } from "@/store/store";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { OFFER_WIZARD_STEPS, formatTaka, validateWizardStep, type OfferWizardStep } from "@/lib/offers/offer-view";
+import { OfferBanner, OfferMetaPill } from "@/components/offers/shared/offer-ui";
+import {
+  OfferWizardFooter,
+  OfferWizardHeader,
+  OfferWizardStepper,
+  WIZARD_STEP_META,
+  useOfferWizard,
+  wizardCard,
+  wizardCardTitle,
+} from "@/components/offers/shared/offer-wizard";
 
 // Helper functions to create default config objects
 const createDefaultCountdownConfig = (): CountdownOfferConfig => ({
@@ -263,8 +273,7 @@ const OFFER_CATEGORIES = [
 
 export const VendorCreateOfferPage: React.FC = () => {
   const router = useRouter();
-  const auth = store.getState().auth;
-  const vendorId = auth?.user?.vendorId;
+  // The vendor is taken from the session server-side; nothing vendor-specific is sent.
 
   // Get vendor permissions
   const { data: permissionsData, isLoading: permissionsLoading } =
@@ -272,7 +281,6 @@ export const VendorCreateOfferPage: React.FC = () => {
   const permissions = permissionsData?.data;
 
   const [createOffer, { isLoading }] = useCreateVendorOfferMutation();
-  const [activeTab, setActiveTab] = useState("basic");
   const [targetProductIds, setTargetProductIds] = useState<string[]>([]);
   const [bannerImageFile, setBannerImageFile] = useState<File | null>(null);
   const [bannerImagePreview, setBannerImagePreview] = useState<string>("");
@@ -430,8 +438,31 @@ export const VendorCreateOfferPage: React.FC = () => {
     setOfferData((prev) => ({ ...prev, bannerImage: "" }));
   };
 
+  const OFFERS_LIST = "/vendor-dashboard/offer/offer-manage";
+
+  const validateStep = (step: OfferWizardStep) => {
+    const issues = validateWizardStep(step, offerData, {
+      limits: permissions ? { maxDiscountPercent: permissions.maxDiscountPercent, maxDiscountAmount: permissions.maxDiscountAmount } : undefined,
+      targetProductCount: targetProductIds.length,
+    });
+    if (step === "basic" && offerData.bannerImage && !/^https:\/\//i.test(offerData.bannerImage)) {
+      issues.push("Banner image link must start with https://");
+    }
+    return issues;
+  };
+  const wizard = useOfferWizard(validateStep);
+  const activeTab = wizard.active;
+  const setActiveTab = (tab: string) => wizard.setActive(tab as OfferWizardStep);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Enter inside a field on an earlier step moves forward instead of submitting.
+    if (!wizard.isLast) {
+      wizard.next();
+      return;
+    }
+    if (wizard.submitLock.current || isLoading) return;
+    if (!wizard.validateAll()) return;
 
     // Validate discount against permissions
     if (permissions) {
@@ -450,12 +481,13 @@ export const VendorCreateOfferPage: React.FC = () => {
         offerData.discountValue > permissions.maxDiscountAmount
       ) {
         toast.error(
-          `Maximum allowed discount amount is $${permissions.maxDiscountAmount}`
+          `Maximum allowed discount amount is ${formatTaka(permissions.maxDiscountAmount)}`
         );
         return;
       }
     }
 
+    wizard.submitLock.current = true;
     try {
       await createOffer({
         ...offerData,
@@ -467,23 +499,29 @@ export const VendorCreateOfferPage: React.FC = () => {
         status: "PENDING", // Vendor offers always start as pending
       }).unwrap();
 
-      toast.success("Offer created successfully! Waiting for admin approval.");
-      router.push("/vendor-dashboard/offers");
+      toast.success(
+        permissions?.requiresApproval
+          ? "Offer created and sent for admin approval"
+          : "Offer created"
+      );
+      router.push(OFFERS_LIST);
     } catch (error) {
-      toast.error("Failed to create offer");
-      console.error("Create offer error:", error);
+      const message = (error as { data?: { message?: string } })?.data?.message;
+      toast.error(message ? `Couldn't create offer: ${message}` : "Couldn't create the offer");
+    } finally {
+      wizard.submitLock.current = false;
     }
   };
 
   const handleCancel = () => {
-    router.push("/vendor-dashboard/offers");
+    router.push(OFFERS_LIST);
   };
 
   const calculateDiscountPreview = () => {
     if (offerData.discountType === "PERCENTAGE") {
       return `${offerData.discountValue}% off`;
     } else if (offerData.discountType === "FIXED_AMOUNT") {
-      return `$${offerData.discountValue} off`;
+      return `${formatTaka(offerData.discountValue)} off`;
     } else if (offerData.discountType === "FREE_SHIPPING") {
       return "Free Shipping";
     }
@@ -511,7 +549,7 @@ export const VendorCreateOfferPage: React.FC = () => {
   if (permissionsLoading) {
     return (
       <div className="container mx-auto py-6">
-        <Card>
+        <Card className={wizardCard}>
           <CardContent className="flex justify-center items-center py-12">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
@@ -529,7 +567,7 @@ export const VendorCreateOfferPage: React.FC = () => {
   if (!canCreateAnyOffer) {
     return (
       <div className="container mx-auto py-6">
-        <Card>
+        <Card className={wizardCard}>
           <CardHeader>
             <CardTitle className="text-2xl flex items-center gap-2">
               <Button variant="ghost" size="icon" onClick={handleCancel}>
@@ -557,153 +595,47 @@ export const VendorCreateOfferPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCancel}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">Create New Offer</h1>
-            <p className="text-muted-foreground">
-              Create promotional offers for your products
-            </p>
-          </div>
-        </div>
-
-        {/* Offer Type Badge */}
-        <Badge
-          variant="outline"
-          className={cn("text-lg px-4 py-2", currentConfig.color)}
-        >
-          <span className="flex items-center gap-2">
+    <div className="mx-auto max-w-6xl space-y-4 pb-2">
+      <OfferWizardHeader
+        title="Create offer"
+        subtitle="Set up a discount for your store's products"
+        onBack={handleCancel}
+        badge={
+          <Badge variant="outline" className={cn("gap-1.5 rounded-full px-3 py-1 text-xs", currentConfig.color)}>
             {currentConfig.icon}
             {offerData.type.replace(/_/g, " ")}
-          </span>
-        </Badge>
-      </div>
+          </Badge>
+        }
+        meta={
+          permissions && (
+            <>
+              <OfferMetaPill tone="indigo">
+                Discount limit: {permissions.maxDiscountPercent}% or {formatTaka(permissions.maxDiscountAmount)}
+              </OfferMetaPill>
+              <OfferMetaPill tone="slate">{permissions.maxActiveOffers} active offers max</OfferMetaPill>
+            </>
+          )
+        }
+      />
 
-      {/* Permission Limits Notice */}
-      {permissions && (
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-4">
-                <div>
-                  <span className="font-medium">Discount Limit: </span>
-                  {permissions.maxDiscountPercent}% or $
-                  {permissions.maxDiscountAmount}
-                </div>
-                <div>
-                  <span className="font-medium">Active Offers: </span>
-                  {permissions.maxActiveOffers} maximum
-                </div>
-              </div>
-              <Badge variant="outline" className="bg-white">
-                Vendor Permissions
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
+      {permissions?.requiresApproval && (
+        <OfferBanner tone="amber" icon={Info} title="Admin approval required">
+          Your offer is submitted for review and goes live once a FinixMart admin approves it.
+        </OfferBanner>
       )}
 
-      {/* Progress Steps */}
-      <div className="flex items-center justify-between max-w-2xl mx-auto">
-        {["Basic Info", "Discount", "Rules", "Advanced"].map((step, index) => (
-          <div key={step} className="flex items-center">
-            <div
-              className={cn(
-                "flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-medium",
-                activeTab === step.toLowerCase().replace(" ", "")
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : index <
-                    ["basic", "discount", "rules", "advanced"].indexOf(
-                      activeTab
-                    )
-                  ? "bg-green-500 text-white border-green-500"
-                  : "border-muted-foreground text-muted-foreground"
-              )}
-            >
-              {index <
-              ["basic", "discount", "rules", "advanced"].indexOf(activeTab) ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                index + 1
-              )}
-            </div>
-            <span
-              className={cn(
-                "ml-2 text-sm font-medium",
-                activeTab === step.toLowerCase().replace(" ", "") ||
-                  index <
-                    ["basic", "discount", "rules", "advanced"].indexOf(
-                      activeTab
-                    )
-                  ? "text-foreground"
-                  : "text-muted-foreground"
-              )}
-            >
-              {step}
-            </span>
-            {index < 3 && (
-              <div
-                className={cn(
-                  "w-16 h-0.5 mx-4",
-                  index <
-                    ["basic", "discount", "rules", "advanced"].indexOf(
-                      activeTab
-                    )
-                    ? "bg-green-500"
-                    : "bg-muted"
-                )}
-              />
-            )}
-          </div>
-        ))}
-      </div>
+      <OfferWizardStepper active={wizard.active} onSelect={wizard.setActive} complete={wizard.complete} />
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-4 mb-8 w-full max-w-2xl mx-auto h-auto">
-            <TabsTrigger value="basic" className="flex items-center gap-2 py-3">
-              <Info className="h-4 w-4" />
-              Basic Info
-            </TabsTrigger>
-            <TabsTrigger
-              value="discount"
-              className="flex items-center gap-2 py-3"
-            >
-              <Percent className="h-4 w-4" />
-              Discount
-            </TabsTrigger>
-            <TabsTrigger value="rules" className="flex items-center gap-2 py-3">
-              <Shield className="h-4 w-4" />
-              Rules & Limits
-            </TabsTrigger>
-            <TabsTrigger
-              value="advanced"
-              className="flex items-center gap-2 py-3"
-            >
-              <Users className="h-4 w-4" />
-              Advanced
-            </TabsTrigger>
-          </TabsList>
-
           {/* Basic Info Tab */}
-          <TabsContent value="basic" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TabsContent value="basic" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Main Content */}
               <div className="lg:col-span-2 space-y-6">
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Offer Details</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Offer Details</CardTitle>
                     <CardDescription>
                       Basic information about your offer
                     </CardDescription>
@@ -840,9 +772,9 @@ export const VendorCreateOfferPage: React.FC = () => {
 
                 {/* Voucher Configuration */}
                 {currentConfig.showVoucherConfig && (
-                  <Card>
+                  <Card className={wizardCard}>
                     <CardHeader>
-                      <CardTitle>Voucher Configuration</CardTitle>
+                      <CardTitle className={wizardCardTitle}>Voucher Configuration</CardTitle>
                       <CardDescription>
                         Settings for voucher code generation and usage
                       </CardDescription>
@@ -924,9 +856,9 @@ export const VendorCreateOfferPage: React.FC = () => {
 
                 {/* Countdown Configuration */}
                 {currentConfig.showCountdownConfig && (
-                  <Card>
+                  <Card className={wizardCard}>
                     <CardHeader>
-                      <CardTitle>Countdown Configuration</CardTitle>
+                      <CardTitle className={wizardCardTitle}>Countdown Configuration</CardTitle>
                       <CardDescription>
                         Timer and urgency settings for time-sensitive offers
                       </CardDescription>
@@ -1052,11 +984,11 @@ export const VendorCreateOfferPage: React.FC = () => {
               </div>
 
               {/* Sidebar */}
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Banner Image Upload */}
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Banner Image</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Banner Image</CardTitle>
                     <CardDescription>
                       Add a banner to make your offer stand out
                     </CardDescription>
@@ -1107,78 +1039,49 @@ export const VendorCreateOfferPage: React.FC = () => {
                     <p className="text-xs text-muted-foreground">
                       Recommended size: 1200×400px
                     </p>
-                  </CardContent>
-                </Card>
-
-                {/* Quick Actions */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={() => setActiveTab("discount")}
-                    >
-                      <Percent className="h-4 w-4 mr-2" />
-                      Set Discount
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={() => setActiveTab("rules")}
-                    >
-                      <Clock className="h-4 w-4 mr-2" />
-                      Set Validity
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={() => setActiveTab("advanced")}
-                    >
-                      <Users className="h-4 w-4 mr-2" />
-                      Target Products
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Approval Notice */}
-                {permissions?.requiresApproval && (
-                  <Card className="bg-amber-50 border-amber-200">
-                    <CardHeader>
-                      <CardTitle className="text-amber-800 flex items-center gap-2">
-                        <Info className="h-4 w-4" />
-                        Approval Required
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-amber-700">
-                        Your offer will be submitted for admin approval before
-                        becoming active.
+                    {bannerImageFile && (
+                      <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-100">
+                        Preview only: vendor offers can&apos;t upload image files yet, so this file
+                        won&apos;t be saved. Paste a hosted image link below instead.
                       </p>
-                    </CardContent>
-                  </Card>
-                )}
+                    )}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="banner-url" className="text-xs font-semibold text-[#3D5068]">
+                        Banner image link (optional)
+                      </Label>
+                      <Input
+                        id="banner-url"
+                        type="url"
+                        inputMode="url"
+                        placeholder="https://…"
+                        value={offerData.bannerImage || ""}
+                        onChange={(e) =>
+                          setOfferData({ ...offerData, bannerImage: e.target.value.trim() })
+                        }
+                      />
+                      {offerData.bannerImage && !/^https:\/\//i.test(offerData.bannerImage) && (
+                        <p className="text-xs text-rose-600">Use an https:// image link.</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
               </div>
             </div>
           </TabsContent>
 
           {/* Discount Tab */}
-          <TabsContent value="discount" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TabsContent value="discount" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2 space-y-6">
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Discount Configuration</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Discount Configuration</CardTitle>
                     <CardDescription>
                       Set up the discount value and type
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-6">
+                  <CardContent className="space-y-4">
                     {/* Discount Preview */}
                     {offerData.discountValue > 0 && (
                       <div className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border">
@@ -1195,7 +1098,7 @@ export const VendorCreateOfferPage: React.FC = () => {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="discountType">Discount Type *</Label>
                         <Select
@@ -1339,9 +1242,9 @@ export const VendorCreateOfferPage: React.FC = () => {
 
                 {/* Buy X Get Y Configuration */}
                 {currentConfig.showBuyXGetYConfig && (
-                  <Card>
+                  <Card className={wizardCard}>
                     <CardHeader>
-                      <CardTitle>Buy X Get Y Configuration</CardTitle>
+                      <CardTitle className={wizardCardTitle}>Buy X Get Y Configuration</CardTitle>
                       <CardDescription>
                         Set up the buy X get Y free offer details
                       </CardDescription>
@@ -1437,10 +1340,10 @@ export const VendorCreateOfferPage: React.FC = () => {
               </div>
 
               {/* Sidebar */}
-              <div className="space-y-6">
-                <Card>
+              <div className="space-y-4">
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Discount Tips</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Discount Tips</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
                     <div className="flex items-start gap-2">
@@ -1477,12 +1380,12 @@ export const VendorCreateOfferPage: React.FC = () => {
           </TabsContent>
 
           {/* Rules & Limits Tab */}
-          <TabsContent value="rules" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TabsContent value="rules" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2 space-y-6">
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Validity Period</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Validity Period</CardTitle>
                     <CardDescription>
                       Set when the offer starts and ends
                     </CardDescription>
@@ -1581,9 +1484,9 @@ export const VendorCreateOfferPage: React.FC = () => {
                 </Card>
 
                 {currentConfig.showUsageLimits && (
-                  <Card>
+                  <Card className={wizardCard}>
                     <CardHeader>
-                      <CardTitle>Usage Limits</CardTitle>
+                      <CardTitle className={wizardCardTitle}>Usage Limits</CardTitle>
                       <CardDescription>
                         Control how many times this offer can be used
                       </CardDescription>
@@ -1641,9 +1544,9 @@ export const VendorCreateOfferPage: React.FC = () => {
 
                 {/* Stack Rules */}
                 {currentConfig.showStackRules && (
-                  <Card>
+                  <Card className={wizardCard}>
                     <CardHeader>
-                      <CardTitle>Stacking Rules</CardTitle>
+                      <CardTitle className={wizardCardTitle}>Stacking Rules</CardTitle>
                       <CardDescription>
                         Control how this offer interacts with other offers
                       </CardDescription>
@@ -1708,10 +1611,10 @@ export const VendorCreateOfferPage: React.FC = () => {
               </div>
 
               {/* Sidebar */}
-              <div className="space-y-6">
-                <Card>
+              <div className="space-y-4">
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Best Practices</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Best Practices</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
                     <div className="flex items-start gap-2">
@@ -1748,12 +1651,12 @@ export const VendorCreateOfferPage: React.FC = () => {
           </TabsContent>
 
           {/* Advanced Tab */}
-          <TabsContent value="advanced" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TabsContent value="advanced" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2 space-y-6">
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Product Targeting</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Product Targeting</CardTitle>
                     <CardDescription>
                       Choose which products this offer applies to
                     </CardDescription>
@@ -1868,9 +1771,9 @@ export const VendorCreateOfferPage: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Visibility & Status</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Visibility & Status</CardTitle>
                     <CardDescription>
                       Control who can see and use this offer
                     </CardDescription>
@@ -1910,9 +1813,9 @@ export const VendorCreateOfferPage: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Terms & Conditions</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Terms & Conditions</CardTitle>
                     <CardDescription>
                       Additional terms and conditions for this offer
                     </CardDescription>
@@ -1944,10 +1847,10 @@ export const VendorCreateOfferPage: React.FC = () => {
               </div>
 
               {/* Sidebar */}
-              <div className="space-y-6">
-                <Card>
+              <div className="space-y-4">
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Offer Summary</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Offer Summary</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-3">
@@ -2018,70 +1921,47 @@ export const VendorCreateOfferPage: React.FC = () => {
                 </Card>
 
                 {/* Quick Actions */}
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Ready to Create</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Ready to submit</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      {!offerData.title && (
-                        <div className="flex items-center gap-2 text-sm text-destructive">
-                          <X className="h-4 w-4" />
-                          <span>Offer title is required</span>
-                        </div>
-                      )}
-                      {!offerData.discountValue && (
-                        <div className="flex items-center gap-2 text-sm text-destructive">
-                          <X className="h-4 w-4" />
-                          <span>Discount value is required</span>
-                        </div>
-                      )}
-                      {offerData.title && offerData.discountValue && (
-                        <div className="flex items-center gap-2 text-sm text-green-600">
-                          <Check className="h-4 w-4" />
-                          <span>All requirements met</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <Button
-                      type="submit"
-                      disabled={
-                        isLoading ||
-                        !offerData.title ||
-                        !offerData.discountValue
-                      }
-                      className="w-full"
-                      size="lg"
-                    >
-                      {isLoading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                          Creating Offer...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4 mr-2" />
-                          Create Offer
-                        </>
-                      )}
-                    </Button>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleCancel}
-                      disabled={isLoading}
-                      className="w-full"
-                    >
-                      Cancel
-                    </Button>
+                    <ul className="space-y-1.5" aria-label="Step checklist">
+                      {OFFER_WIZARD_STEPS.map((step) => (
+                        <li key={step} className="flex items-center gap-2 text-sm">
+                          {wizard.complete[step] ? (
+                            <Check className="h-4 w-4 text-emerald-600" />
+                          ) : (
+                            <X className="h-4 w-4 text-rose-500" />
+                          )}
+                          <button
+                            type="button"
+                            className={cn("text-left underline-offset-2 hover:underline", wizard.complete[step] ? "text-[#3D5068]" : "font-medium text-rose-600")}
+                            onClick={() => wizard.setActive(step)}
+                          >
+                            {WIZARD_STEP_META[step].label}
+                            {!wizard.complete[step] && ` — ${validateStep(step)[0]}`}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   </CardContent>
                 </Card>
               </div>
             </div>
           </TabsContent>
         </Tabs>
+
+        <OfferWizardFooter
+          active={wizard.active}
+          onBack={wizard.back}
+          onNext={wizard.next}
+          onCancel={handleCancel}
+          submitting={isLoading || wizard.submitLock.current}
+          submitLabel={permissions?.requiresApproval ? "Submit for approval" : "Create offer"}
+          submittingLabel="Creating…"
+          issues={wizard.issues}
+        />
       </form>
     </div>
   );

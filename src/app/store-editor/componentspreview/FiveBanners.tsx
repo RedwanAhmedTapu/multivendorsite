@@ -1,5 +1,11 @@
 import { ComponentHandler } from "../ComponentHandler";
 
+export interface FiveBannersFormData {
+  // [topLeft, topRight, centerMain, bottomLeft, bottomRight]
+  slotImages?: (string | undefined)[];
+  isVisible?: boolean;
+}
+
 interface FiveBannersProps {
   isActive?: boolean;
   onDragOver?: (e: React.DragEvent) => void;
@@ -9,7 +15,19 @@ interface FiveBannersProps {
   onCopy?: () => void;
   onDelete?: () => void;
   viewMode?: 'mobile' | 'desktop';
+  formData?: FiveBannersFormData;
 }
+
+const Placeholder = ({ src, iconClass }: { src?: string; iconClass: string }) =>
+  src ? (
+    <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" />
+  ) : (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <svg className={iconClass} fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+      </svg>
+    </div>
+  );
 
 export const FiveBanners = ({
   isActive = false,
@@ -19,8 +37,12 @@ export const FiveBanners = ({
   onMoveDown,
   onCopy,
   onDelete,
-  viewMode = 'mobile'
+  viewMode = 'mobile',
+  formData = {},
 }: FiveBannersProps) => {
+  const images = formData.slotImages ?? [];
+  const [topLeftImg, topRightImg, centerImg, bottomLeftImg, bottomRightImg] = images;
+
   // Mobile View Design - Smaller heights
   const renderMobileView = () => (
     <div className="w-full bg-white border border-gray-200 rounded-lg">
@@ -28,22 +50,14 @@ export const FiveBanners = ({
         {/* Top Row - Two Corner Banners */}
         <div className="grid grid-cols-2 gap-2">
           <div className="relative h-20 rounded-lg overflow-hidden bg-blue-50 border border-blue-200 transition-all duration-300 hover:shadow-sm group">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-              </svg>
-            </div>
+            <Placeholder src={topLeftImg} iconClass="w-6 h-6 text-blue-300" />
             <div className="absolute top-1 left-1 bg-white/80 px-1 py-0.5 rounded text-xs font-medium text-blue-700">
               Top Left
             </div>
           </div>
-          
+
           <div className="relative h-20 rounded-lg overflow-hidden bg-purple-50 border border-purple-200 transition-all duration-300 hover:shadow-sm group">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <svg className="w-6 h-6 text-purple-300" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-              </svg>
-            </div>
+            <Placeholder src={topRightImg} iconClass="w-6 h-6 text-purple-300" />
             <div className="absolute top-1 right-1 bg-white/80 px-1 py-0.5 rounded text-xs font-medium text-purple-700">
               Top Right
             </div>
@@ -52,11 +66,7 @@ export const FiveBanners = ({
 
         {/* Center Main Banner */}
         <div className="relative h-28 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-300 transition-all duration-300 hover:shadow-md group">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <svg className="w-10 h-10 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-            </svg>
-          </div>
+          <Placeholder src={centerImg} iconClass="w-10 h-10 text-gray-500" />
           <div className="absolute top-2 left-2 bg-white/90 px-2 py-1 rounded text-sm font-semibold text-gray-800 border border-gray-200">
             Featured
           </div>
@@ -68,22 +78,14 @@ export const FiveBanners = ({
         {/* Bottom Row - Two Corner Banners */}
         <div className="grid grid-cols-2 gap-2">
           <div className="relative h-20 rounded-lg overflow-hidden bg-green-50 border border-green-200 transition-all duration-300 hover:shadow-sm group">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-300" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-              </svg>
-            </div>
+            <Placeholder src={bottomLeftImg} iconClass="w-6 h-6 text-green-300" />
             <div className="absolute bottom-1 left-1 bg-white/80 px-1 py-0.5 rounded text-xs font-medium text-green-700">
               Bottom Left
             </div>
           </div>
-          
+
           <div className="relative h-20 rounded-lg overflow-hidden bg-orange-50 border border-orange-200 transition-all duration-300 hover:shadow-sm group">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <svg className="w-6 h-6 text-orange-300" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-              </svg>
-            </div>
+            <Placeholder src={bottomRightImg} iconClass="w-6 h-6 text-orange-300" />
             <div className="absolute bottom-1 right-1 bg-white/80 px-1 py-0.5 rounded text-xs font-medium text-orange-700">
               Bottom Right
             </div>
@@ -99,11 +101,7 @@ export const FiveBanners = ({
       <div className="grid grid-cols-4 grid-rows-2 gap-3 h-[300px]">
         {/* ==== TOP LEFT BANNER ==== */}
         <div className="relative rounded-lg overflow-hidden bg-blue-50 border border-blue-200 transition-all duration-300 hover:shadow-sm group">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <svg className="w-8 h-8 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-            </svg>
-          </div>
+          <Placeholder src={topLeftImg} iconClass="w-8 h-8 text-blue-300" />
           <div className="absolute top-2 left-2 bg-white/90 px-2 py-1 rounded text-xs font-medium text-blue-700 border border-blue-200">
             Top Left
           </div>
@@ -111,11 +109,7 @@ export const FiveBanners = ({
 
         {/* ==== CENTER MAIN BANNER ==== */}
         <div className="relative col-span-2 row-span-2 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-300 transition-all duration-300 hover:shadow-md group">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <svg className="w-12 h-12 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-            </svg>
-          </div>
+          <Placeholder src={centerImg} iconClass="w-12 h-12 text-gray-500" />
           <div className="absolute top-3 left-3 bg-white/90 px-2 py-1 rounded text-sm font-semibold text-gray-800 border border-gray-200">
             Featured
           </div>
@@ -126,11 +120,7 @@ export const FiveBanners = ({
 
         {/* ==== TOP RIGHT BANNER ==== */}
         <div className="relative rounded-lg overflow-hidden bg-purple-50 border border-purple-200 transition-all duration-300 hover:shadow-sm group">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <svg className="w-8 h-8 text-purple-300" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-            </svg>
-          </div>
+          <Placeholder src={topRightImg} iconClass="w-8 h-8 text-purple-300" />
           <div className="absolute top-2 right-2 bg-white/90 px-2 py-1 rounded text-xs font-medium text-purple-700 border border-purple-200">
             Top Right
           </div>
@@ -138,11 +128,7 @@ export const FiveBanners = ({
 
         {/* ==== BOTTOM LEFT BANNER ==== */}
         <div className="relative rounded-lg overflow-hidden bg-green-50 border border-green-200 transition-all duration-300 hover:shadow-sm group">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <svg className="w-8 h-8 text-green-300" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-            </svg>
-          </div>
+          <Placeholder src={bottomLeftImg} iconClass="w-8 h-8 text-green-300" />
           <div className="absolute bottom-2 left-2 bg-white/90 px-2 py-1 rounded text-xs font-medium text-green-700 border border-green-200">
             Bottom Left
           </div>
@@ -150,11 +136,7 @@ export const FiveBanners = ({
 
         {/* ==== BOTTOM RIGHT BANNER ==== */}
         <div className="relative rounded-lg overflow-hidden bg-orange-50 border border-orange-200 transition-all duration-300 hover:shadow-sm group">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <svg className="w-8 h-8 text-orange-300" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-            </svg>
-          </div>
+          <Placeholder src={bottomRightImg} iconClass="w-8 h-8 text-orange-300" />
           <div className="absolute bottom-2 right-2 bg-white/90 px-2 py-1 rounded text-xs font-medium text-orange-700 border border-orange-200">
             Bottom Right
           </div>
@@ -162,6 +144,8 @@ export const FiveBanners = ({
       </div>
     </div>
   );
+
+  if (formData.isVisible === false) return null;
 
   return (
     <div

@@ -1,10 +1,7 @@
-import CustomerReviewManagement from '@/components/customermanagement/CustomerReviews'
-import React from 'react'
+import { AdminReviewsScreen } from "@/components/reviews/admin-reviews-screen";
 
-const page = () => {
-  return (
-    <CustomerReviewManagement/>
-  )
-}
+const Page = () => {
+  return <AdminReviewsScreen />;
+};
 
-export default page
+export default Page;

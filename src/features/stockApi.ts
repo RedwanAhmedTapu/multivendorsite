@@ -10,12 +10,31 @@ export interface StockListParams {
   page?: number;
   limit?: number;
   warehouseId?: string;
+  // FIX: added rack/row/shelf filtering so the inventory list can be
+  // narrowed to an exact shelf within a warehouse, mirroring the
+  // WarehouseLocationInput shape already used by the mutation requests.
+  rackId?: string;
+  rowNumber?: number;
+  shelfNumber?: number;
   categoryId?: string;
   status?: StockStatus;
   q?: string;
 }
 
-export interface StockAdjustRequest {
+// FIX: shared exact-shelf targeting input, mirrors backend's
+// WarehouseLocationInput (stock-inventory.types.ts). All fields optional —
+// omit entirely for vendors who don't manage rack/row/shelf (backend then
+// falls back to the warehouse's loose row / spreads across all rows).
+export interface WarehouseLocationInput {
+  rackId?: string;
+  rowNumber?: number;
+  shelfNumber?: number;
+}
+
+// FIX: extends WarehouseLocationInput so rack-managing vendors can target
+// an exact shelf. Previously missing entirely, so a warehouse with only
+// racked stock (no loose row) could never be adjusted from this request.
+export interface StockAdjustRequest extends WarehouseLocationInput {
   variantId: string;
   warehouseId: string;
   quantity: number;
@@ -25,7 +44,7 @@ export interface StockAdjustRequest {
   entityId?: string;
 }
 
-export interface StockDamageRequest {
+export interface StockDamageRequest extends WarehouseLocationInput {
   variantId: string;
   warehouseId: string;
   quantity: number;
@@ -35,18 +54,24 @@ export interface StockDamageRequest {
   entityId?: string;
 }
 
+// FIX: transfer needs a source AND destination location, so it takes two
+// separate optional location objects instead of extending
+// WarehouseLocationInput directly (a flat rackId would be ambiguous about
+// which side it refers to). Matches backend's StockTransferDTO.from/.to.
 export interface StockTransferRequest {
   variantId: string;
   fromWarehouseId: string;
   toWarehouseId: string;
   quantity: number;
+  from?: WarehouseLocationInput;
+  to?: WarehouseLocationInput;
   reason?: string;
   notes?: string;
   entityType: EntityType;
   entityId?: string;
 }
 
-export interface StockSellDamageRequest {
+export interface StockSellDamageRequest extends WarehouseLocationInput {
   variantId: string;
   warehouseId: string;
   quantity: number;
@@ -76,13 +101,34 @@ export interface PaginatedResponse<T> {
   };
 }
 
-export interface WarehouseStockBreakdown {
-  warehouseId: string;
-  warehouseName: string;
+// A single rack/row/shelf slice within a warehouse, as returned by
+// stock.service.ts -> groupByWarehouse()
+export interface WarehouseLocation {
+  rackId: string | null;
+  rackCode: string | null;
+  rackLabel: string | null;
+  rowNumber: number | null;
+  shelfNumber: number | null;
   quantity: number;
   reservedQty: number;
   damagedQty: number;
 }
+
+// Matches groupByWarehouse() output exactly: warehouseId, warehouseName,
+// warehouseCode, ...totals (quantity/damagedQty/reservedQty/available), locations
+export interface WarehouseStockBreakdown {
+  warehouseId: string;
+  warehouseName: string;
+  warehouseCode: string | null;
+  quantity: number;
+  reservedQty: number;
+  damagedQty: number;
+  available: number;
+  locations: WarehouseLocation[];
+}
+
+// Same shape is used for both the list view and the variant detail view
+export type WarehouseBreakdownDetail = WarehouseStockBreakdown;
 
 export interface StockInventoryRow {
   variantId: string;
@@ -92,6 +138,10 @@ export interface StockInventoryRow {
   variantName: string;
   category: string | null;
   image: string | null;
+  // NOTE: backend now converts Decimal -> number via .toNumber() before
+  // responding (stock.service.ts fix), so these are genuinely numbers on
+  // the wire. If the backend fix is not deployed, these arrive as strings
+  // instead — coerce with Number(...) defensively if unsure.
   avgCost: number;
   price: number;
   reorderLevel: number;
@@ -115,25 +165,30 @@ export interface StockStats {
   overstockCount: number;
 }
 
-export interface WarehouseBreakdownDetail {
-  warehouseId: string;
-  warehouseName: string;
-  quantity: number;
-  reservedQty: number;
-  damagedQty: number;
-  available: number;
-}
-
 export interface StockMovement {
   id: string;
   variantId: string;
+  fromWarehouseId: string | null;
+  toWarehouseId: string | null;
+  rackId: string | null;
+  toRackId: string | null;
   movementType: string;
   quantity: number;
   reason: string | null;
   notes: string | null;
-  fromWarehouse: { id: string; name: string } | null;
-  toWarehouse: { id: string; name: string } | null;
+  saleAmount: number | null;
+  coaAccountId: string | null;
+  voucherId: string | null;
+  referenceId: string | null;
+  createdBy: string | null;
   createdAt: string;
+  // NOTE: only populated when the backend query included these relations
+  // (currently only getVariantStockDetail's recentMovements does this).
+  // Mutation responses (adjust/damage/transfer/sell-damage) do NOT include
+  // these — they will always be undefined there, since stock.service.ts's
+  // tx.stockMovement.create() calls don't pass an `include`.
+  fromWarehouse?: { id: string; name: string } | null;
+  toWarehouse?: { id: string; name: string } | null;
 }
 
 export interface VariantStockDetail {
@@ -153,14 +208,26 @@ export interface VariantStockDetail {
   recentMovements: StockMovement[];
 }
 
-export interface StockMutationResponse {
+// The voucher object returned by accountingService.createAutoVoucher().
+// NOTE: confirm exact fields against accounting.services.ts — adjust as needed.
+export interface StockVoucher {
+  id: string;
   voucherNumber: string;
-  amount: number;
+  amount?: number;
+  saleAmount?: number;
+  [key: string]: unknown;
 }
 
+// stockAdjust / stockDamage / stockTransfer all resolve to { movement, voucher }
+export interface StockMutationResponse {
+  movement: StockMovement;
+  voucher: StockVoucher | null;
+}
+
+// sellDamageStock also resolves to { movement, voucher }
 export interface StockSellDamageResponse {
-  voucherNumber: string;
-  saleAmount: number;
+  movement: StockMovement;
+  voucher: StockVoucher | null;
 }
 
 /* ==================== API ==================== */

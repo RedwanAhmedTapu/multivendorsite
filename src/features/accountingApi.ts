@@ -51,6 +51,10 @@ export interface ReverseVoucherRequest {
   reason: string;
 }
 
+export interface RejectVoucherRequest {
+  reason: string;
+}
+
 export interface AutoVoucherOrderConfirmedRequest {
   orderId: number;
   vendorId: string;
@@ -101,7 +105,7 @@ export interface CreateAccountingPeriodRequest {
 }
 
 // ============================================
-// NEW: PURCHASE-RELATED REQUEST TYPES
+// PURCHASE-RELATED REQUEST TYPES
 // ============================================
 
 export interface PurchaseCreatedWebhookRequest {
@@ -228,6 +232,11 @@ export interface Voucher {
   cancelledBy?: string;
   cancelledAt?: string;
   cancelReason?: string;
+  // Approval workflow fields (spec: FRAUD chargeback, ADJ-1)
+  approvalId?: string;
+  approvalStatus?: string; // NOT_REQUIRED | PENDING | APPROVED | REJECTED
+  approvedBy?: string;
+  approvedAt?: string;
   createdBy: string;
   updatedBy?: string;
   createdAt: string;
@@ -370,18 +379,38 @@ export interface CommissionRecord {
   updatedAt: string;
 }
 
-// NEW: Purchase voucher response — two vouchers created together
+// Purchase voucher response — two vouchers created together
 export interface PurchaseVoucherResponse {
   purchaseVoucher: Voucher;
   paymentVoucher?: Voucher; // only present when paidAmount > 0
 }
 
-// NEW: Stock movement voucher response
+// Stock movement voucher response
 export interface StockMovementVoucherResponse {
   voucher: Voucher;
   movementType: StockMovementType;
   stockMovementId: string;
 }
+
+// ============================================
+// NEW: RECONCILIATION RESPONSE TYPES (Phase 10, §10.1-10.4)
+// ============================================
+
+export interface DriftReport {
+  platformTotal: string;
+  vendorTotal: string;
+  drift: string;
+  hardStop: boolean;
+}
+
+export interface OrphanedVoucher {
+  id: string;
+  voucherType: string;
+  orderId: string | null;
+  postingDate: string | null;
+}
+
+export interface UnreversedRefund extends Voucher {}
 
 export interface PaginatedResponse<T> {
   success: boolean;
@@ -416,8 +445,29 @@ export const accountingApi = createApi({
     "AccountingPeriods",
     "AuditLogs",
     "Statistics",
+    "Reconciliation",
   ],
   endpoints: (builder) => ({
+    // ============================================
+    // CHART OF ACCOUNTS SEEDING
+    // ============================================
+
+    seedPlatformCOA: builder.mutation<ApiResponse<ChartOfAccount[]>, void>({
+      query: () => ({
+        url: "/accounting/chart-of-accounts/seed/platform",
+        method: "POST",
+      }),
+      invalidatesTags: ["ChartOfAccounts", "Statistics"],
+    }),
+
+    seedVendorCOA: builder.mutation<ApiResponse<ChartOfAccount[]>, string>({
+      query: (vendorId) => ({
+        url: `/accounting/chart-of-accounts/seed/vendor/${vendorId}`,
+        method: "POST",
+      }),
+      invalidatesTags: ["ChartOfAccounts", "Statistics"],
+    }),
+
     // ============================================
     // CHART OF ACCOUNTS
     // ============================================
@@ -566,6 +616,38 @@ export const accountingApi = createApi({
     }),
 
     // ============================================
+    // NEW: VOUCHER APPROVAL WORKFLOW
+    // (spec: fraud-variant chargeback, ADJ-1 — vouchers held
+    // as approvalStatus=PENDING must go through these)
+    // ============================================
+
+    approveAndPostVoucher: builder.mutation<ApiResponse<Voucher>, string>({
+      query: (id) => ({
+        url: `/accounting/vouchers/${id}/approve`,
+        method: "POST",
+      }),
+      invalidatesTags: [
+        "Vouchers",
+        "Ledger",
+        "Reports",
+        "VendorPayables",
+        "Reconciliation",
+      ],
+    }),
+
+    rejectVoucher: builder.mutation<
+      ApiResponse<Voucher>,
+      { id: string; data: RejectVoucherRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `/accounting/vouchers/${id}/reject`,
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: ["Vouchers"],
+    }),
+
+    // ============================================
     // AUTO VOUCHERS
     // ============================================
 
@@ -606,11 +688,13 @@ export const accountingApi = createApi({
     }),
 
     // ============================================
-    // NEW: PURCHASE WEBHOOKS
+    // PURCHASE WEBHOOKS
+    // NOTE: these routes currently return 410 Gone server-side —
+    // purchaseService creates these vouchers atomically already.
+    // Kept here for API-surface parity; calling them will fail
+    // until re-enabled server-side per the router's own comments.
     // ============================================
 
-    // Fires when a PurchaseOrder is confirmed — creates the PURCHASE voucher
-    // (Inventory DR / VAT Input DR / AP Supplier CR)
     purchaseCreatedWebhook: builder.mutation<
       ApiResponse<PurchaseVoucherResponse>,
       PurchaseCreatedWebhookRequest
@@ -629,8 +713,6 @@ export const accountingApi = createApi({
       ],
     }),
 
-    // Fires when a PurchasePayment row is saved — creates the PAYMENT voucher
-    // (AP Supplier DR / Bank CR)
     purchasePaymentWebhook: builder.mutation<
       ApiResponse<Voucher>,
       PurchasePaymentWebhookRequest
@@ -644,16 +726,9 @@ export const accountingApi = createApi({
     }),
 
     // ============================================
-    // NEW: STOCK MOVEMENT WEBHOOK
+    // STOCK MOVEMENT WEBHOOK
     // ============================================
 
-    // Single endpoint for all stock movement types.
-    // The server dispatches to the correct voucher method
-    // based on movementType:
-    //   ADJUSTMENT   → STOCK_ADJUSTMENT  (Adj Expense DR / Inventory CR)
-    //   DAMAGE       → DAMAGE_RECORDED   (Damage Expense DR / Inventory CR)
-    //   TRANSFER     → STOCK_TRANSFER    (Transfer Expense DR / Bank CR)
-    //   SELL_DAMAGE  → DAMAGE_STOCK_SOLD (Bank DR / Sale Income CR)
     stockMovementWebhook: builder.mutation<
       ApiResponse<StockMovementVoucherResponse>,
       StockMovementWebhookRequest
@@ -818,6 +893,28 @@ export const accountingApi = createApi({
     }),
 
     // ============================================
+    // NEW: RECONCILIATION (Phase 10, §10.1-10.4)
+    // ============================================
+
+    getDriftReport: builder.query<ApiResponse<DriftReport>, void>({
+      query: () => "/accounting/reconciliation/drift",
+      providesTags: ["Reconciliation"],
+    }),
+
+    getOrphanedVouchers: builder.query<ApiResponse<OrphanedVoucher[]>, void>({
+      query: () => "/accounting/reconciliation/orphaned-vouchers",
+      providesTags: ["Reconciliation"],
+    }),
+
+    getUnreversedRefunds: builder.query<
+      ApiResponse<UnreversedRefund[]>,
+      void
+    >({
+      query: () => "/accounting/reconciliation/unreversed-refunds",
+      providesTags: ["Reconciliation"],
+    }),
+
+    // ============================================
     // VENDOR-SPECIFIC ENDPOINTS
     // ============================================
 
@@ -947,6 +1044,10 @@ export const accountingApi = createApi({
 // ============================================
 
 export const {
+  // Chart of Accounts Seeding (NEW)
+  useSeedPlatformCOAMutation,
+  useSeedVendorCOAMutation,
+
   // Chart of Accounts
   useCreateChartOfAccountMutation,
   useUpdateChartOfAccountMutation,
@@ -968,16 +1069,20 @@ export const {
   useReverseVoucherMutation,
   useCancelVoucherMutation,
 
+  // Voucher Approval Workflow (NEW)
+  useApproveAndPostVoucherMutation,
+  useRejectVoucherMutation,
+
   // Auto Vouchers
   useTriggerAutoVoucherMutation,
   useOrderConfirmedWebhookMutation,
   usePaymentReceivedWebhookMutation,
 
-  // Purchase Webhooks (NEW)
+  // Purchase Webhooks
   usePurchaseCreatedWebhookMutation,
   usePurchasePaymentWebhookMutation,
 
-  // Stock Movement Webhook (NEW)
+  // Stock Movement Webhook
   useStockMovementWebhookMutation,
 
   // Reports
@@ -1003,6 +1108,14 @@ export const {
   // Audit Logs
   useGetAuditLogsQuery,
   useLazyGetAuditLogsQuery,
+
+  // Reconciliation (NEW)
+  useGetDriftReportQuery,
+  useLazyGetDriftReportQuery,
+  useGetOrphanedVouchersQuery,
+  useLazyGetOrphanedVouchersQuery,
+  useGetUnreversedRefundsQuery,
+  useLazyGetUnreversedRefundsQuery,
 
   // Vendor Endpoints
   useGetVendorDashboardQuery,

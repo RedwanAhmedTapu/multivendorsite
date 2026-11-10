@@ -79,7 +79,8 @@ function OrderCard({ order }: any) {
           <tbody>
             {allItems.map((item: any) => {
               const img = item.variant.images?.[0]?.url;
-              const price = item.variant.specialPrice ?? item.variant.price;
+              // Phase 4 (H-4): the price actually paid (persisted on the order line), never today's catalog price.
+              const price = Number(item.price);
 
               return (
                 <tr key={item.id} className="border-b hover:bg-gray-50">

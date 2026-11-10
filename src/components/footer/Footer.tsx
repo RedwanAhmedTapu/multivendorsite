@@ -25,9 +25,9 @@ const Footer = () => {
   // Show loading state
   if (isLoading) {
     return (
-      <Container className="bg-white border-t-2 border-gray-200">
+      <Container className="bg-card border-t-2 border-border">
         <div className="py-12 lg:py-16 text-center">
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </Container>
     );
@@ -37,7 +37,7 @@ const Footer = () => {
   if (error || !footerSettings) {
   console.error("Footer settings error:", error, footerSettings);
   return (
-    <div className="text-center py-6 text-red-500 text-sm">
+    <div className="text-center py-6 text-destructive text-sm">
       Footer failed to load
     </div>
   );
@@ -58,7 +58,7 @@ const Footer = () => {
       : "lg:grid-cols-5";
 
   return (
-    <Container className="bg-white border-t-2 border-gray-200">
+    <Container className="bg-card border-t-2 border-border">
       {/* Main Footer Content */}
       <div className="py-12 lg:py-16">
         <div className="">
@@ -67,38 +67,38 @@ const Footer = () => {
           >
             {/* Contact Info Section */}
             <div className="lg:col-span-1">
-              <h4 className="text-lg font-semibold text-gray-800 mb-6 pl-1">
+              <h4 className="text-lg font-semibold text-foreground mb-6 pl-1">
                 {footerSettings.companyName}
               </h4>
 
               {/* Contact Details */}
               <div className="space-y-4 pl-1">
                 <div className="flex items-start gap-3">
-                  <MapPin className="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
+                  <MapPin className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="text-gray-700 text-sm leading-relaxed">
+                    <p className="text-foreground text-sm leading-relaxed">
                       {footerSettings.address}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <Mail className="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
+                  <Mail className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="text-gray-600 text-sm">
+                    <p className="text-muted-foreground text-sm">
                       {footerSettings.email}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <Phone className="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
+                  <Phone className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="text-gray-600 text-sm">
+                    <p className="text-muted-foreground text-sm">
                       {footerSettings.phone1}
                     </p>
                     {footerSettings.phone2 && (
-                      <p className="text-gray-600 text-sm">
+                      <p className="text-muted-foreground text-sm">
                         {footerSettings.phone2}
                       </p>
                     )}
@@ -108,11 +108,11 @@ const Footer = () => {
 
               {/* Business IDs */}
               <div className="mt-6 space-y-1 pl-1">
-                <p className="text-sm font-bold text-gray-800">
+                <p className="text-sm font-bold text-foreground">
                   DBID NUMBER:{" "}
                   <span className="font-normal">{footerSettings.dbidNumber}</span>
                 </p>
-                <p className="text-sm font-bold text-gray-800">
+                <p className="text-sm font-bold text-foreground">
                   TRADE LICENSE:{" "}
                   <span className="font-normal">
                     {footerSettings.tradeLicense}
@@ -133,7 +133,7 @@ const Footer = () => {
 
               return (
                 <div key={column.id}>
-                  <h4 className="text-lg font-semibold text-gray-800 mb-6 pl-1">
+                  <h4 className="text-lg font-semibold text-foreground mb-6 pl-1">
                     {column.title}
                   </h4>
                   <ul className="space-y-3 pl-1">
@@ -147,7 +147,7 @@ const Footer = () => {
                               ? "noopener noreferrer"
                               : undefined
                           }
-                          className="text-gray-600 hover:text-emerald-600 transition-colors flex items-center gap-2 group text-sm"
+                          className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-2 group text-sm"
                         >
                           <span className="ml-1">
                             {element.label}
@@ -165,11 +165,11 @@ const Footer = () => {
 
             {/* Newsletter */}
             <div className="lg:col-span-1">
-              <h4 className="text-lg font-semibold text-gray-800 mb-6 pl-1">
+              <h4 className="text-lg font-semibold text-foreground mb-6 pl-1">
                 {footerSettings.newsletterTitle}
               </h4>
               <div className="pl-1">
-                <p className="text-gray-600 text-sm mb-4">
+                <p className="text-muted-foreground text-sm mb-4">
                   {footerSettings.newsletterDescription}
                 </p>
 
@@ -177,9 +177,9 @@ const Footer = () => {
                   <Input
                     type="email"
                     placeholder="Enter your email address"
-                    className="w-full bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-emerald-500 text-sm"
+                    className="w-full bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary text-sm"
                   />
-                  <Button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm py-2">
+                  <Button className="w-full bg-primary hover:bg-primary-hover text-primary-foreground text-sm py-2">
                     Subscribe
                   </Button>
                 </div>
@@ -187,7 +187,7 @@ const Footer = () => {
 
               {/* Social Media */}
               <div className="mt-8 pl-1">
-                <h5 className="font-semibold text-gray-800 mb-4 text-sm">
+                <h5 className="font-semibold text-foreground mb-4 text-sm">
                   {footerSettings.socialMediaTitle}
                 </h5>
                 <div className="flex gap-4">
@@ -196,7 +196,7 @@ const Footer = () => {
                       href={footerSettings.twitterUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-gray-400 hover:text-emerald-600 transition-colors"
+                      className="text-muted-foreground hover:text-primary transition-colors"
                       aria-label="Twitter"
                     >
                       <Twitter className="w-5 h-5" />
@@ -207,7 +207,7 @@ const Footer = () => {
                       href={footerSettings.facebookUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-gray-400 hover:text-emerald-600 transition-colors"
+                      className="text-muted-foreground hover:text-primary transition-colors"
                       aria-label="Facebook"
                     >
                       <Facebook className="w-5 h-5" />
@@ -218,7 +218,7 @@ const Footer = () => {
                       href={footerSettings.youtubeUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-gray-400 hover:text-emerald-600 transition-colors"
+                      className="text-muted-foreground hover:text-primary transition-colors"
                       aria-label="YouTube"
                     >
                       <Youtube className="w-5 h-5" />
@@ -229,7 +229,7 @@ const Footer = () => {
                       href={footerSettings.instagramUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-gray-400 hover:text-emerald-600 transition-colors"
+                      className="text-muted-foreground hover:text-primary transition-colors"
                       aria-label="Instagram"
                     >
                       <Instagram className="w-5 h-5" />
@@ -240,7 +240,7 @@ const Footer = () => {
                       href={footerSettings.whatsappUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-gray-400 hover:text-emerald-600 transition-colors"
+                      className="text-muted-foreground hover:text-primary transition-colors"
                       aria-label="WhatsApp"
                     >
                       <svg
@@ -260,11 +260,11 @@ const Footer = () => {
       </div>
 
       {/* Bottom Bar */}
-      <div className="bg-gray-50 border-t border-gray-200 py-6">
+      <div className="bg-muted border-t border-border py-6">
         <div className="">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6 md:gap-4">
             {/* Copyright */}
-            <p className="text-gray-600 w-full md:w-1/2 text-sm text-center md:text-left">
+            <p className="text-muted-foreground w-full md:w-1/2 text-sm text-center md:text-left">
               {footerSettings.copyrightText}
             </p>
 

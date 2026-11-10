@@ -7,11 +7,12 @@ import React, {
   useMemo,
 } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { useCreateProductMutation } from "@/features/productApi";
+import { toast } from "sonner";
+import { useCreateProductMutation } from "@/features/productapi/vendorProductApi";
 import CategoryTreeSelector from "./CategoryTreeSelector";
 import SpecAttributeManager from "./SpecAttributeManager";
 import VariantManager from "./VariantManager";
+import CatalogRequestModal from "./CatalogRequestModal";
 import type { Attribute, VariantNamePart } from "@/types/type";
 import {
   CreateProductData,
@@ -41,16 +42,14 @@ import {
   Package,
   Truck,
   Percent,
-  Warehouse,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import { translateProductName } from "@/utils/translate";
 import { useGetCategoriesQuery } from "@/features/apiSlice";
 import ProductMediaUploader from "@/components/mediauploader/ProductMediaUploader";
-import WarehouseRackSelector, {
-  WarehouseRackSelection,
-} from "./WarehouseRack";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+/* ─── Types ──────────────────────────────────────────────────────────────── */
 
 interface Category {
   id: string;
@@ -65,7 +64,32 @@ interface CategorySuggestion {
   fullPath: string;
 }
 
-// ─── Section Card Shell ───────────────────────────────────────────────────────
+/* ─── Error-glow keyframe injection (once) ──────────────────────────────── */
+
+const ERROR_GLOW_CLASS = "fm-error-glow";
+
+if (typeof document !== "undefined" && !document.getElementById("fm-error-glow-style")) {
+  const s = document.createElement("style");
+  s.id = "fm-error-glow-style";
+  s.textContent = `
+    @keyframes fm-error-pulse {
+      0%, 100% {
+        box-shadow: 0 0 0 2px rgba(168,85,247,0.35), 0 0 10px 0 rgba(239,68,68,0.12);
+        border-color: #A855F7 !important;
+      }
+      50% {
+        box-shadow: 0 0 0 4px rgba(239,68,68,0.28), 0 0 20px 2px rgba(168,85,247,0.18);
+        border-color: #EF4444 !important;
+      }
+    }
+    .${ERROR_GLOW_CLASS} {
+      animation: fm-error-pulse 0.9s ease-in-out 4 !important;
+    }
+  `;
+  document.head.appendChild(s);
+}
+
+/* ─── Section Card Shell ────────────────────────────────────────────────── */
 
 function SectionCard({
   icon,
@@ -95,10 +119,9 @@ function SectionCard({
         boxShadow: error
           ? "0 0 0 3px rgba(239,68,68,0.08)"
           : "0 1px 3px rgba(0,0,0,0.04)",
-        transition: "box-shadow 0.2s, border-color 0.2s",
+        transition: "box-shadow 0.3s, border-color 0.3s",
       }}
     >
-      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -154,21 +177,21 @@ function SectionCard({
               borderRadius: 20,
               background: badge === "required" ? "#FEF2F2" : "#F0F9F0",
               color: badge === "required" ? "#DC2626" : "#16A34A",
-              border: `1px solid ${badge === "required" ? "#FECACA" : "#BBF7D0"}`,
+              border: `1px solid ${
+                badge === "required" ? "#FECACA" : "#BBF7D0"
+              }`,
             }}
           >
             {badge === "required" ? "Required" : "Optional"}
           </span>
         )}
       </div>
-
-      {/* Body */}
       <div style={{ padding: "18px 18px" }}>{children}</div>
     </div>
   );
 }
 
-// ─── Field Label ──────────────────────────────────────────────────────────────
+/* ─── Field Label ────────────────────────────────────────────────────────── */
 
 function FieldLabel({
   children,
@@ -198,13 +221,15 @@ function FieldLabel({
         )}
       </label>
       {hint && (
-        <p style={{ fontSize: 10.5, color: "#9BAABB", marginTop: 2 }}>{hint}</p>
+        <p style={{ fontSize: 10.5, color: "#9BAABB", marginTop: 2 }}>
+          {hint}
+        </p>
       )}
     </div>
   );
 }
 
-// ─── Inline error ─────────────────────────────────────────────────────────────
+/* ─── Inline error ───────────────────────────────────────────────────────── */
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
@@ -225,40 +250,80 @@ function FieldError({ message }: { message?: string }) {
   );
 }
 
-// ─── Step indicator ───────────────────────────────────────────────────────────
+/* ─── Submit Button (custom-designed, never disabled) ───────────────────── */
 
-function StepDot({
-  n,
-  active,
-  done,
+function SubmitProductButton({
+  isLoading,
+  onClick,
 }: {
-  n: number;
-  active?: boolean;
-  done?: boolean;
+  isLoading: boolean;
+  onClick: () => void;
 }) {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isPressed, setIsPressed] = useState(false);
+
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        setIsPressed(false);
+      }}
+      onMouseDown={() => setIsPressed(true)}
+      onMouseUp={() => setIsPressed(false)}
       style={{
-        width: 26,
-        height: 26,
-        borderRadius: "50%",
-        background: done ? "#0D9488" : active ? "#1D4ED8" : "#E5EAF2",
-        color: done || active ? "#fff" : "#94A3B8",
-        display: "flex",
+        padding: "11px 32px",
+        borderRadius: 11,
+        border: "none",
+        background: isHovered
+          ? "linear-gradient(135deg,#2563EB,#8B5CF6)"
+          : "linear-gradient(135deg,#1D4ED8,#7C3AED)",
+        color: "#fff",
+        fontSize: 13.5,
+        fontWeight: 700,
+        letterSpacing: "0.01em",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 11,
-        fontWeight: 800,
-        flexShrink: 0,
-        transition: "all 0.2s",
+        gap: 8,
+        boxShadow: isHovered
+          ? "0 10px 24px rgba(124,58,237,0.35), 0 2px 6px rgba(29,78,216,0.25)"
+          : "0 4px 14px rgba(124,58,237,0.25)",
+        transform: isPressed
+          ? "scale(0.97)"
+          : isHovered
+            ? "translateY(-1px)"
+            : "translateY(0)",
+        transition: "all 0.18s ease",
       }}
     >
-      {done ? <Check size={12} /> : n}
-    </div>
+      {isLoading ? (
+        <>
+          <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} />
+          Saving…
+        </>
+      ) : (
+        <>
+          <Sparkles size={14} style={{ opacity: 0.9 }} />
+          Create Product
+          <ArrowRight
+            size={14}
+            style={{
+              transition: "transform 0.18s ease",
+              transform: isHovered ? "translateX(3px)" : "translateX(0)",
+            }}
+          />
+        </>
+      )}
+    </button>
   );
 }
 
-// ─── Main Form ────────────────────────────────────────────────────────────────
+/* ─── Main Form ─────────────────────────────────────────────────────────── */
 
 function AddProductFormContent() {
   const [name, setName] = useState("");
@@ -266,13 +331,19 @@ function AddProductFormContent() {
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [isLeafCategory, setIsLeafCategory] = useState(false);
-  const [categoryAttributes, setCategoryAttributes] = useState<Attribute[]>([]);
-  const [requiredAttributes, setRequiredAttributes] = useState<Attribute[]>([]);
+  const [categoryAttributes, setCategoryAttributes] = useState<Attribute[]>(
+    []
+  );
+  const [requiredAttributes, setRequiredAttributes] = useState<Attribute[]>(
+    []
+  );
   const [images, setImages] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
   const [attributes, setAttributes] = useState<ProductAttributeInput[]>([]);
-  const [variantInputs, setVariantInputs] = useState<ProductVariantInput[]>([]);
+  const [variantInputs, setVariantInputs] = useState<ProductVariantInput[]>(
+    []
+  );
   const [variantNameParts, setVariantNameParts] = useState<
     Record<string, VariantNamePart>
   >({});
@@ -287,13 +358,15 @@ function AddProductFormContent() {
     CategorySuggestion[]
   >([]);
 
-  // ── VAT field ──────────────────────────────────────────────────────────────
+  /* ── Brand ─────────────────────────────────────────────────────────────── */
+  const [brandId, setBrandId] = useState<string | null>(null);
+
+  /* ── VAT ───────────────────────────────────────────────────────────────── */
   const [vatPercentage, setVatPercentage] = useState<string>("");
   const [vatError, setVatError] = useState<string>("");
 
-  // ── Warehouse & Rack ───────────────────────────────────────────────────────
-  const [warehouseRack, setWarehouseRack] =
-    useState<WarehouseRackSelection | null>(null);
+  /* ── Warehouse & Rack: REMOVED — stock/warehouse is assigned after
+     creation via the variant stock endpoint, not during add-product. ── */
 
   const [createProduct, { isLoading }] = useCreateProductMutation();
   const { data: categories } = useGetCategoriesQuery();
@@ -307,7 +380,14 @@ function AddProductFormContent() {
   const translationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const suggestionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ── Validation ──────────────────────────────────────────────────────────────
+  const [catalogModal, setCatalogModal] = useState<{
+    open: boolean;
+    flow: "CATEGORY" | "ATTRIBUTE" | null;
+    categoryId?: string;
+    categoryPath?: string;
+  }>({ open: false, flow: null });
+
+  /* ── Validation helpers ────────────────────────────────────────────────── */
 
   const validateNameLength = useCallback((value: string) => {
     if (value.length > 0 && value.length < 10)
@@ -321,8 +401,6 @@ function AddProductFormContent() {
     [name, validateNameLength]
   );
 
-  // ── VAT validation ─────────────────────────────────────────────────────────
-
   const handleVatChange = useCallback((value: string) => {
     if (value === "" || /^\d{0,3}(\.\d{0,2})?$/.test(value)) {
       setVatPercentage(value);
@@ -335,11 +413,15 @@ function AddProductFormContent() {
     }
   }, []);
 
-  // ── Category suggestions ────────────────────────────────────────────────────
+  /* ── Category suggestions ──────────────────────────────────────────────── */
 
   const findCategorySuggestions = useCallback(
     (productName: string) => {
-      if (!categories || !productName.trim() || productName.trim().length < 10) {
+      if (
+        !categories ||
+        !productName.trim() ||
+        productName.trim().length < 10
+      ) {
         setSuggestedCategories([]);
         return;
       }
@@ -406,7 +488,7 @@ function AddProductFormContent() {
     [findCategorySuggestions]
   );
 
-  // ── Translation ─────────────────────────────────────────────────────────────
+  /* ── Translation ───────────────────────────────────────────────────────── */
 
   useEffect(() => {
     if (name.trim()) {
@@ -452,11 +534,14 @@ function AddProductFormContent() {
   };
 
   const handleManualTranslate = async () => {
-    if (!name.trim()) return alert("Please enter an English name first");
+    if (!name.trim()) {
+      toast.warning("Please enter an English name first");
+      return;
+    }
     await translateName();
   };
 
-  // ── Category ────────────────────────────────────────────────────────────────
+  /* ── Category ──────────────────────────────────────────────────────────── */
 
   const findCategoryById = useCallback(
     (cats: Category[], targetId: string): Category | null => {
@@ -472,7 +557,10 @@ function AddProductFormContent() {
     []
   );
 
-  const handleCategorySuggestionSelect = (catId: string, _fullPath: string) => {
+  const handleCategorySuggestionSelect = (
+    catId: string,
+    _fullPath: string
+  ) => {
     const cat = findCategoryById((categories as Category[]) || [], catId);
     if (!cat) return;
     const isLeaf = !cat.children || !cat.children.length;
@@ -483,14 +571,20 @@ function AddProductFormContent() {
     setRequiredAttributes(attrs.filter((a) => a.isRequired));
     const parts: Record<string, VariantNamePart> = {};
     attrs.forEach((a) => {
-      if (a.id) parts[a.id] = { name: a.name || "", value: "", include: false };
+      if (a.id)
+        parts[a.id] = { name: a.name || "", value: "", include: false };
     });
     setVariantNameParts(parts);
     setShowCategorySuggestions(false);
   };
 
   const handleCategorySelect = useCallback(
-    (id: string, _path: string, isLeaf: boolean, attrs: Attribute[]) => {
+    (
+      id: string,
+      _path: string,
+      isLeaf: boolean,
+      attrs: Attribute[]
+    ) => {
       setCategoryId(id || null);
       setIsLeafCategory(isLeaf);
       setCategoryAttributes(attrs || []);
@@ -514,7 +608,11 @@ function AddProductFormContent() {
     ) => {
       setVariantNameParts((prev) => ({
         ...prev,
-        [fieldId]: { name: fieldName || "", value, include: includeInVariant },
+        [fieldId]: {
+          name: fieldName || "",
+          value,
+          include: includeInVariant,
+        },
       }));
     },
     []
@@ -529,21 +627,67 @@ function AddProductFormContent() {
     );
   }, [variantNameParts]);
 
-  // ── Submit ──────────────────────────────────────────────────────────────────
+  /* ── Submit ────────────────────────────────────────────────────────────── */
+
+  // ── Field/section IDs (must match the `id`s rendered below and inside
+  //    ShippingWarrantyForm) — order here determines which invalid field
+  //    the page scrolls to first when several are invalid at once.
+  const ERROR_SCROLL_ORDER = [
+    "productName",
+    "categorySelector",
+    "brandSelector",
+    "productImages",
+    "attributesSection",
+    "variantsSection",
+    "productDescriptionSection",
+    "packageWeight",
+    "packageDimensions",
+    "warrantyType",
+    "warrantyDetails",
+  ];
 
   const validateRequiredFields = useCallback(() => {
     const errors: Record<string, boolean> = {};
     if (!name) errors.productName = true;
     if (nameValidationError) errors.productNameLength = true;
     if (!categoryId || !isLeafCategory) errors.categorySelector = true;
+    if (!brandId) errors.brandSelector = true;
     if (images.length === 0) errors.productImages = true;
     requiredAttributes.forEach((attr) => {
       if (!attributes.find((a) => a.attributeId === attr.id))
         errors[`attribute-${attr.id}`] = true;
     });
+    if (requiredAttributes.some((a) => errors[`attribute-${a.id}`]))
+      errors.attributesSection = true;
     if (variantInputs.length === 0) errors.variantsSection = true;
-    // Warehouse is required
-    if (!warehouseRack?.warehouseId) errors.warehouseId = true;
+
+    // Description — was never validated before, so it never turned red
+    // or blocked submit even when empty.
+    if (!description || !description.trim()) {
+      errors.productDescriptionSection = true;
+    }
+
+    // Shipping & Warranty — same bug: ShippingWarrantyForm already knew
+    // how to render red borders/messages for these field ids
+    // (packageWeight, warrantyType, warrantyDetails), but nothing ever
+    // set them to `true` in validationErrors, so they never fired.
+    const sw = shippingWarranty;
+    const hasWeight = !!sw && sw.packageWeightValue > 0;
+    const hasDimensions =
+      !!sw && sw.packageLength > 0 && sw.packageWidth > 0 && sw.packageHeight > 0;
+    const hasWarrantyType =
+      !!sw && !!sw.warrantyType && String(sw.warrantyType).trim().length > 0;
+    const hasWarrantyDetails =
+      !!sw && !!sw.warrantyDetails && String(sw.warrantyDetails).trim().length > 0;
+
+    if (!hasWeight) errors.packageWeight = true;
+    if (!hasDimensions) errors.packageDimensions = true;
+    if (!hasWarrantyType) errors.warrantyType = true;
+    if (!hasWarrantyDetails) errors.warrantyDetails = true;
+    if (!hasWeight || !hasDimensions || !hasWarrantyType || !hasWarrantyDetails) {
+      errors.shippingWarrantySection = true;
+    }
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   }, [
@@ -551,25 +695,35 @@ function AddProductFormContent() {
     nameValidationError,
     categoryId,
     isLeafCategory,
+    brandId,
     images,
     requiredAttributes,
     attributes,
     variantInputs,
-    warehouseRack,
+    description,
+    shippingWarranty,
   ]);
 
   const scrollToFirstError = useCallback(() => {
-    const firstId = Object.keys(validationErrors)[0];
-    if (!firstId) return;
-    const el = document.getElementById(firstId);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("border-red-500", "ring-2", "ring-red-200");
-      setTimeout(
-        () => el.classList.remove("border-red-500", "ring-2", "ring-red-200"),
-        3000
-      );
+    let targetId: string | null = null;
+    for (const key of ERROR_SCROLL_ORDER) {
+      if (validationErrors[key]) {
+        targetId = key;
+        break;
+      }
     }
+    if (!targetId) targetId = Object.keys(validationErrors)[0] || null;
+    if (!targetId) return;
+
+    const el = document.getElementById(targetId);
+    if (!el) return;
+
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    setTimeout(() => {
+      el.classList.add(ERROR_GLOW_CLASS);
+      setTimeout(() => el.classList.remove(ERROR_GLOW_CLASS), 3800);
+    }, 350);
   }, [validationErrors]);
 
   const convertImages = useCallback(
@@ -583,30 +737,33 @@ function AddProductFormContent() {
   );
 
   const handleSubmit = async () => {
+    // The submit button is intentionally never `disabled` for a snappier
+    // feel, so this guard replaces the old disabled-attribute protection
+    // against double submits while a request is already in flight.
+    if (isLoading) {
+      toast.info("Already saving — please wait…");
+      return;
+    }
     if (nameValidationError) {
       setValidationErrors((p) => ({ ...p, productNameLength: true }));
-      alert(`⚠️ ${nameValidationError}`);
+      toast.error(nameValidationError);
       return;
     }
     if (vatError) {
-      alert(`⚠️ ${vatError}`);
+      toast.error(vatError);
       return;
     }
     if (!validateRequiredFields()) {
       scrollToFirstError();
-      alert("⚠️ Please fill in all required fields");
+      toast.warning("Please fill in all required fields");
       return;
     }
     if (!variantInputs.length) {
-      alert("⚠️ Please add at least one product variant");
+      toast.warning("Please add at least one product variant");
       return;
     }
-    if (variantInputs.some((v) => !v.sku || !v.price || v.price <= 0)) {
-      alert("⚠️ All variants must have a SKU and valid price");
-      return;
-    }
-    if (variantInputs.some((v) => v.specialPrice && v.specialPrice >= v.price)) {
-      alert("⚠️ Special price must be less than regular price");
+    if (variantInputs.some((v) => !v.sku)) {
+      toast.warning("All variants must have a SKU");
       return;
     }
 
@@ -615,6 +772,7 @@ function AddProductFormContent() {
       nameBn: nameBn || undefined,
       description: description || undefined,
       categoryId: categoryId || "",
+      brandId: brandId || undefined,
       vendorId: vendorId || "",
       images: convertImages(),
       videoUrl: videoUrl || undefined,
@@ -630,22 +788,21 @@ function AddProductFormContent() {
         }),
       })),
       shippingWarranty: shippingWarranty || undefined,
-      // VAT — include only if a value was entered
-      ...(vatPercentage !== "" && { vatPercentage: parseFloat(vatPercentage) }),
-      // Warehouse & Rack — always include warehouseId; rackId only when set
-      warehouseId: warehouseRack?.warehouseId || "",
-      ...(warehouseRack?.rackId && { rackId: warehouseRack.rackId }),
-    };
+      ...(vatPercentage !== "" && {
+        taxRate: parseFloat(vatPercentage),
+      }),
+      // warehouseId / rackId REMOVED from payload — assigned later
+    } as CreateProductData;
 
     try {
       const result = await createProduct(productData).unwrap();
-      alert("✅ Product created successfully!");
+      toast.success("Product created successfully!");
       console.log("Created product:", result);
       resetForm();
     } catch (err: any) {
-      console.error("❌ Error:", err);
-      alert(
-        `❌ ${err?.data?.message || err?.message || "Failed to create product"}`
+      console.error("Error:", err);
+      toast.error(
+        err?.data?.message || err?.message || "Failed to create product"
       );
     }
   };
@@ -670,9 +827,20 @@ function AddProductFormContent() {
     setSuggestedCategories([]);
     setVatPercentage("");
     setVatError("");
-    setWarehouseRack(null);
+    setBrandId(null);
     setResetKey((p) => p + 1);
   }, []);
+
+  const handleResetClick = useCallback(() => {
+    if (isLoading) {
+      toast.info("Please wait for the current save to finish");
+      return;
+    }
+    if (confirm("Reset all form data?")) {
+      resetForm();
+      toast.success("Form has been reset");
+    }
+  }, [isLoading, resetForm]);
 
   const formData = useMemo(
     () => ({
@@ -680,6 +848,7 @@ function AddProductFormContent() {
       nameBn: nameBn || "",
       categoryId: categoryId || "",
       isLeafCategory: isLeafCategory || false,
+      brandId: brandId || "",
       images: images || [],
       videoUrl: videoUrl || "",
       description: description || "",
@@ -693,6 +862,7 @@ function AddProductFormContent() {
       nameBn,
       categoryId,
       isLeafCategory,
+      brandId,
       images,
       videoUrl,
       description,
@@ -703,19 +873,9 @@ function AddProductFormContent() {
     ]
   );
 
-  // ── Derived state for step completeness ─────────────────────────────────────
-
-  const step1Done = name.length >= 10 && !nameValidationError;
-  const step2Done = !!categoryId && isLeafCategory;
-  const step3Done = images.length > 0;
-  const step4Done = isLeafCategory && attributes.length > 0;
-  const step5Done = variantInputs.length > 0;
-  const step6Done = !!shippingWarranty;
-  const step7Done = !!warehouseRack?.warehouseId;
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────────────────────────
+  /* ──────────────────────────────────────────────────────────────────────
+     RENDER
+     ────────────────────────────────────────────────────────────────────── */
 
   return (
     <div
@@ -725,14 +885,12 @@ function AddProductFormContent() {
         minHeight: "100vh",
       }}
     >
-      {/* ── Two-column layout ── */}
       <div
         ref={formRef}
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 13rem",
           gap: 16,
-          padding: "18px 20px",
           maxWidth: 1200,
           margin: "0 auto",
           alignItems: "start",
@@ -740,14 +898,15 @@ function AddProductFormContent() {
       >
         {/* ════ LEFT — form sections ════ */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-
           {/* ── 1. Basic Information ── */}
           <SectionCard
             id="productName"
             icon={
               <FileText
                 size={15}
-                color={validationErrors.productName ? "#DC2626" : "#1D4ED8"}
+                color={
+                  validationErrors.productName ? "#DC2626" : "#1D4ED8"
+                }
               />
             }
             title="Basic Information"
@@ -760,7 +919,6 @@ function AddProductFormContent() {
               )
             }
           >
-            {/* Name row — two equal columns */}
             <div
               style={{
                 display: "grid",
@@ -769,7 +927,6 @@ function AddProductFormContent() {
                 alignItems: "start",
               }}
             >
-              {/* English name */}
               <div>
                 <FieldLabel required hint="Minimum 10 characters, max 255">
                   Product Name (English)
@@ -779,7 +936,8 @@ function AddProductFormContent() {
                         marginLeft: 6,
                         fontSize: 10,
                         fontWeight: 500,
-                        color: name.length < 10 ? "#DC2626" : "#64748B",
+                        color:
+                          name.length < 10 ? "#DC2626" : "#64748B",
                       }}
                     >
                       {name.length}/255
@@ -808,15 +966,17 @@ function AddProductFormContent() {
                     style={{
                       paddingLeft: 32,
                       paddingRight:
-                        name.length >= 10 && !nameValidationError ? 32 : 12,
+                        name.length >= 10 && !nameValidationError
+                          ? 32
+                          : 12,
                       fontSize: 13,
                       borderColor:
                         validationErrors.productName ||
                         validationErrors.productNameLength
                           ? "#FCA5A5"
                           : name.length >= 10 && !nameValidationError
-                          ? "#6EE7B7"
-                          : undefined,
+                            ? "#6EE7B7"
+                            : undefined,
                     }}
                   />
                   {name.length >= 10 && !nameValidationError && (
@@ -854,7 +1014,6 @@ function AddProductFormContent() {
                 )}
               </div>
 
-              {/* Bengali name */}
               <div>
                 <FieldLabel hint="Auto-translated or enter manually">
                   Product Name (বাংলা)
@@ -862,14 +1021,18 @@ function AddProductFormContent() {
                     type="button"
                     onClick={handleManualTranslate}
                     disabled={
-                      isTranslating || !name.trim() || name.length < 10
+                      isTranslating ||
+                      !name.trim() ||
+                      name.length < 10
                     }
                     style={{
                       marginLeft: "auto",
                       background: "none",
                       border: "none",
                       cursor:
-                        isTranslating || !name.trim() || name.length < 10
+                        isTranslating ||
+                        !name.trim() ||
+                        name.length < 10
                           ? "not-allowed"
                           : "pointer",
                       fontSize: 10.5,
@@ -890,7 +1053,9 @@ function AddProductFormContent() {
                       <>
                         <Loader2
                           size={10}
-                          style={{ animation: "spin 1s linear infinite" }}
+                          style={{
+                            animation: "spin 1s linear infinite",
+                          }}
                         />
                         Translating…
                       </>
@@ -915,8 +1080,8 @@ function AddProductFormContent() {
                       opacity: isTranslating
                         ? 0.5
                         : name.length < 10
-                        ? 0.4
-                        : 1,
+                          ? 0.4
+                          : 1,
                       transition: "opacity 0.2s",
                     }}
                   />
@@ -934,7 +1099,13 @@ function AddProductFormContent() {
                     />
                   )}
                 </div>
-                <p style={{ fontSize: 10.5, color: "#9BAABB", marginTop: 4 }}>
+                <p
+                  style={{
+                    fontSize: 10.5,
+                    color: "#9BAABB",
+                    marginTop: 4,
+                  }}
+                >
                   {name.length >= 10
                     ? "Auto-translated from English. You can edit if needed."
                     : "Enter at least 10 characters in English to enable"}
@@ -942,7 +1113,7 @@ function AddProductFormContent() {
               </div>
             </div>
 
-            {/* ── VAT field ── */}
+            {/* VAT */}
             <div
               style={{
                 marginTop: 14,
@@ -955,7 +1126,7 @@ function AddProductFormContent() {
               }}
             >
               <div>
-                <FieldLabel hint="Enter the applicable VAT/tax rate for this product (0–100%)">
+                <FieldLabel hint="Enter the applicable VAT/tax rate (0–100%)">
                   VAT / Tax Rate
                   <span
                     style={{
@@ -979,8 +1150,12 @@ function AddProductFormContent() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      background: vatError ? "#FEF2F2" : "#F1F5F9",
-                      borderRight: `1px solid ${vatError ? "#FCA5A5" : "#E2E8F0"}`,
+                      background: vatError
+                        ? "#FEF2F2"
+                        : "#F1F5F9",
+                      borderRight: `1px solid ${
+                        vatError ? "#FCA5A5" : "#E2E8F0"
+                      }`,
                       borderRadius: "6px 0 0 6px",
                       pointerEvents: "none",
                     }}
@@ -1004,8 +1179,8 @@ function AddProductFormContent() {
                       borderColor: vatError
                         ? "#FCA5A5"
                         : vatPercentage !== "" && !vatError
-                        ? "#6EE7B7"
-                        : undefined,
+                          ? "#6EE7B7"
+                          : undefined,
                     }}
                   />
                   {vatPercentage !== "" && !vatError && (
@@ -1023,8 +1198,14 @@ function AddProductFormContent() {
                 </div>
                 {vatError && <FieldError message={vatError} />}
                 {!vatError && vatPercentage === "" && (
-                  <p style={{ fontSize: 10.5, color: "#9BAABB", marginTop: 4 }}>
-                    Leave blank if no VAT applies to this product
+                  <p
+                    style={{
+                      fontSize: 10.5,
+                      color: "#9BAABB",
+                      marginTop: 4,
+                    }}
+                  >
+                    Leave blank if no VAT applies
                   </p>
                 )}
                 {!vatError && vatPercentage !== "" && (
@@ -1042,8 +1223,6 @@ function AddProductFormContent() {
                   </p>
                 )}
               </div>
-
-              {/* Right column — VAT info hint card */}
               <div
                 style={{
                   background: "#F8FAFC",
@@ -1060,7 +1239,7 @@ function AddProductFormContent() {
                   What is VAT?
                 </strong>
                 <br />
-                VAT (Value Added Tax) will be displayed to buyers at checkout.
+                VAT (Value Added Tax) is displayed to buyers at checkout.
                 Standard rate in Bangladesh is{" "}
                 <strong style={{ color: "#0891B2" }}>15%</strong>. Enter{" "}
                 <strong>0</strong> for zero-rated items.
@@ -1075,12 +1254,14 @@ function AddProductFormContent() {
               <Tag
                 size={15}
                 color={
-                  validationErrors.categorySelector ? "#DC2626" : "#7C3AED"
+                  validationErrors.categorySelector
+                    ? "#DC2626"
+                    : "#7C3AED"
                 }
               />
             }
             title="Product Category"
-            subtitle="Select the most specific category that fits your product"
+            subtitle="Select the most specific category"
             badge="required"
             error={!!validationErrors.categorySelector}
           >
@@ -1109,6 +1290,14 @@ function AddProductFormContent() {
               productName={name}
               suggestedCategories={suggestedCategories}
               onSuggestionSelect={handleCategorySuggestionSelect}
+              onRequestMissing={(catId, catPath) => {
+                setCatalogModal({
+                  open: true,
+                  flow: "CATEGORY",
+                  categoryId: catId,
+                  categoryPath: catPath,
+                });
+              }}
             />
             {validationErrors.categorySelector && (
               <FieldError message="Please select a leaf category (final level)" />
@@ -1134,8 +1323,7 @@ function AddProductFormContent() {
                 />
                 <span>
                   Please select a <strong>leaf category</strong> to unlock
-                  attributes and variants. Leaf categories are the deepest
-                  level with no sub-categories.
+                  attributes and variants.
                 </span>
               </div>
             )}
@@ -1170,13 +1358,15 @@ function AddProductFormContent() {
             )}
           </SectionCard>
 
-          {/* ── 4. Attributes ── */}
+          {/* ── 4. Attributes + Brand ── */}
           {isLeafCategory && (
             <SectionCard
+              id="attributesSection"
               icon={<Layers size={15} color="#D97706" />}
-              title="Specifications & Attributes"
-              subtitle="Define product properties — toggle variant to generate listings"
+              title="Specifications, Brand & Attributes"
+              subtitle="Select brand and define product properties"
               badge="required"
+              error={!!validationErrors.attributesSection}
             >
               <SpecAttributeManager
                 categoryId={categoryId || ""}
@@ -1186,6 +1376,15 @@ function AddProductFormContent() {
                 requiredAttributes={requiredAttributes}
                 onVariantFieldChange={handleVariantFieldChange}
                 validationErrors={validationErrors}
+                brandId={brandId}
+                onBrandChange={setBrandId}
+                onRequestMissing={() => {
+                  setCatalogModal({
+                    open: true,
+                    flow: "ATTRIBUTE",
+                    categoryId: categoryId || undefined,
+                  });
+                }}
               />
             </SectionCard>
           )}
@@ -1198,12 +1397,14 @@ function AddProductFormContent() {
                 <Package
                   size={15}
                   color={
-                    validationErrors.variantsSection ? "#DC2626" : "#16A34A"
+                    validationErrors.variantsSection
+                      ? "#DC2626"
+                      : "#16A34A"
                   }
                 />
               }
               title="Product Variants"
-              subtitle="SKU, pricing, and stock per variant combination"
+              subtitle="SKU, pricing, and stock per variant"
               badge="required"
               error={!!validationErrors.variantsSection}
             >
@@ -1222,23 +1423,48 @@ function AddProductFormContent() {
 
           {/* ── 6. Description ── */}
           <SectionCard
-            icon={<FileText size={15} color="#64748B" />}
+            id="productDescriptionSection"
+            icon={
+              <FileText
+                size={15}
+                color={
+                  validationErrors.productDescriptionSection
+                    ? "#DC2626"
+                    : "#64748B"
+                }
+              />
+            }
             title="Product Description"
-            subtitle="Rich text description — supports headings, lists, and images"
-            badge="optional"
+            subtitle="Rich text — headings, lists, images"
+            badge="required"
+            error={!!validationErrors.productDescriptionSection}
           >
             <ProductDescriptionEditor
               value={description}
               onChange={setDescription}
             />
+            {validationErrors.productDescriptionSection && (
+              <FieldError message="Product description is required" />
+            )}
           </SectionCard>
 
           {/* ── 7. Shipping & Warranty ── */}
           <SectionCard
-            icon={<Truck size={15} color="#0891B2" />}
+            id="shippingWarrantySection"
+            icon={
+              <Truck
+                size={15}
+                color={
+                  validationErrors.shippingWarrantySection
+                    ? "#DC2626"
+                    : "#0891B2"
+                }
+              />
+            }
             title="Shipping & Warranty"
-            subtitle="Package dimensions, weight, and warranty terms"
+            subtitle="Package dimensions, weight, warranty terms"
             badge="required"
+            error={!!validationErrors.shippingWarrantySection}
           >
             <ShippingWarrantyForm
               key={resetKey}
@@ -1248,31 +1474,10 @@ function AddProductFormContent() {
             />
           </SectionCard>
 
-          {/* ── 8. Warehouse & Rack ── */}
-          <SectionCard
-            id="warehouseId"
-            icon={
-              <Warehouse
-                size={15}
-                color={validationErrors.warehouseId ? "#DC2626" : "#15803D"}
-              />
-            }
-            title="Warehouse & Storage"
-            subtitle="Assign a warehouse and optional rack/shelf for this product"
-            badge="required"
-            error={!!validationErrors.warehouseId}
-          >
-            <WarehouseRackSelector
-              key={resetKey}
-              vendorId={vendorId}
-              value={warehouseRack}
-              onChange={setWarehouseRack}
-              validationErrors={validationErrors}
-            />
-            {validationErrors.warehouseId && (
-              <FieldError message="Please select a warehouse" />
-            )}
-          </SectionCard>
+          {/* ── Warehouse & Rack section REMOVED ──
+               Stock/warehouse assignment now happens after the product
+               is created and approved, via the per-variant stock screen
+               (uses useUpdateProductStockMutation). ── */}
 
           {/* ── Bottom submit row ── */}
           <div
@@ -1287,9 +1492,7 @@ function AddProductFormContent() {
             }}
           >
             <button
-              onClick={() => {
-                if (confirm("Reset all form data?")) resetForm();
-              }}
+              onClick={handleResetClick}
               disabled={isLoading}
               style={{
                 padding: "9px 20px",
@@ -1299,63 +1502,44 @@ function AddProductFormContent() {
                 fontSize: 13,
                 fontWeight: 600,
                 color: "#64748B",
-                cursor: "pointer",
+                cursor: isLoading ? "not-allowed" : "pointer",
+                opacity: isLoading ? 0.6 : 1,
                 fontFamily: "inherit",
               }}
             >
               Reset Form
             </button>
-            <button
-              onClick={handleSubmit}
-              disabled={
-                isLoading || !!nameValidationError || name.length < 10
-              }
-              style={{
-                padding: "9px 28px",
-                borderRadius: 9,
-                border: "none",
-                background:
-                  isLoading || !!nameValidationError || name.length < 10
-                    ? "#CBD5E1"
-                    : "linear-gradient(135deg,#1D4ED8,#0891B2)",
-                color: "#fff",
-                fontSize: 13,
-                fontWeight: 700,
-                cursor:
-                  isLoading || !!nameValidationError || name.length < 10
-                    ? "not-allowed"
-                    : "pointer",
-                fontFamily: "inherit",
-                display: "flex",
-                alignItems: "center",
-                gap: 7,
-                transition: "all 0.15s",
-              }}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2
-                    size={14}
-                    style={{ animation: "spin 1s linear infinite" }}
-                  />
-                  Saving…
-                </>
-              ) : (
-                "Create Product"
-              )}
-            </button>
+
+            <SubmitProductButton isLoading={isLoading} onClick={handleSubmit} />
           </div>
         </div>
 
         {/* ════ RIGHT — sticky sidebar ════ */}
         <div style={{ position: "sticky", top: 64 }}>
           <RightSidebar
-            wizardComponent={<ProductCreationWizard formData={formData} />}
+            wizardComponent={
+              <ProductCreationWizard formData={formData} />
+            }
           />
         </div>
       </div>
 
-      {/* Spinner keyframe */}
+      <CatalogRequestModal
+        open={catalogModal.open}
+        onClose={() =>
+          setCatalogModal({ open: false, flow: null })
+        }
+        forceFlow={catalogModal.flow}
+        initialCategoryId={catalogModal.categoryId ?? null}
+        initialCategoryPath={catalogModal.categoryPath}
+        onSuccess={() => {
+          toast.success(
+            "Request submitted — our team will review it shortly"
+          );
+          setCatalogModal({ open: false, flow: null });
+        }}
+      />
+
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @media (max-width: 900px) {
@@ -1367,8 +1551,6 @@ function AddProductFormContent() {
     </div>
   );
 }
-
-// ─── Export ───────────────────────────────────────────────────────────────────
 
 export default function AddProductForm() {
   return (

@@ -9,6 +9,10 @@ import { ConfigurationForm } from "./ConfigurationForm";
 import { ChevronRight, ChevronLeft, Loader2, AlertTriangle, X, Trash2 } from "lucide-react";
 import { ModulesGallery } from "./ModulesGallery";
 import { TopBar } from "./TopBar";
+// Renamed on import — this file already has a local `toast` state variable
+// (the existing custom toast UI, `const [toast, setToast] = useState<...>`)
+// which would otherwise shadow this and silently break at the type level.
+import { toast as sonnerToast } from "sonner";
 import {
   useGetDecorationQuery,
   useListDecorationsQuery,
@@ -16,6 +20,7 @@ import {
   useAddComponentMutation,
   useDeleteComponentMutation,
   useReorderComponentsMutation,
+  usePublishDecorationMutation,
   ComponentType,
 } from "@/features/storeEditorApi";
 import { RootState } from "@/store/store";
@@ -46,31 +51,29 @@ export interface ActiveModule {
 
 // ─── Type mappings ────────────────────────────────────────────────────────────
 
-const TYPE_TO_COMPONENT_TYPE: Record<string, ComponentType> = {
-  categoryBar:              ComponentType.STORE_BANNER,
-  graphicCarousel:          ComponentType.BANNER,
-  graphicThreeImages:       ComponentType.BANNER,
-  graphicOneImage:          ComponentType.BANNER,
-  countdownProduct:         ComponentType.COUNTDOWN_TIMER,
-  carouselProductRecommend: ComponentType.PRODUCT_CAROUSEL,
-  productRecommendation:    ComponentType.PRODUCT_GRID,
-  voucher:                  ComponentType.VOUCHER_PROMOTION,
-  brandList:                ComponentType.CATEGORY_SLIDER,
-  categoryAuto:             ComponentType.CATEGORY_GRID,
-};
+import {
+  TYPE_TO_COMPONENT_TYPE,
+  COMPONENT_TYPE_TO_MODULE,
+  MODULE_META,
+  DEFAULT_HEADER_FORM_DATA,
+  resolveModuleMeta,
+  productsToFormData,
+  categoriesToFormData,
+  componentToFormData,
+} from "./decorationShared";
 
-const COMPONENT_TYPE_TO_MODULE: Record<ComponentType, { type: string; name: string; icon: string }> = {
-  [ComponentType.STORE_BANNER]:      { type: "categoryBar",              name: "Category bar",             icon: "//id-live.slatic.net/original/7075aee0e853ad8e1042f3a3cfcccdaa.png" },
-  [ComponentType.BANNER]:            { type: "graphicCarousel",          name: "Banner Carousel",           icon: "https://img.alicdn.com/imgextra/i1/O1CN01jXJ1ln1XYHH3YYADF_!!6000000002935-2-tps-72-73.png" },
-  [ComponentType.COUNTDOWN_TIMER]:   { type: "countdownProduct",         name: "Countdown Products",        icon: "https://img.alicdn.com/imgextra/i1/O1CN01rPIhBB29LrwPfWVjR_!!6000000008052-2-tps-72-72.png" },
-  [ComponentType.PRODUCT_CAROUSEL]:  { type: "carouselProductRecommend", name: "Products Carousel",         icon: "https://img.alicdn.com/imgextra/i2/O1CN01dWvm7F1lwvCeEJVm3_!!6000000004884-2-tps-72-72.png" },
-  [ComponentType.PRODUCT_GRID]:      { type: "productRecommendation",    name: "Product Recommendation",    icon: "https://img.alicdn.com/imgextra/i1/O1CN01yA59ze1UDGFbMnQpX_!!6000000002483-2-tps-72-72.png" },
-  [ComponentType.VOUCHER_PROMOTION]: { type: "voucher",                  name: "Voucher",                   icon: "https://img.alicdn.com/imgextra/i4/O1CN01uP1UbS1Jx67M1QR0L_!!6000000001094-2-tps-72-72.png" },
-  [ComponentType.CATEGORY_SLIDER]:   { type: "brandList",                name: "Category List",             icon: "https://img.alicdn.com/imgextra/i2/O1CN01uaqewq1m3KkZnwwrP_!!6000000004898-2-tps-72-73.png" },
-  [ComponentType.CATEGORY_GRID]:     { type: "categoryAuto",             name: "Smart Category Navigation", icon: "https://img.alicdn.com/imgextra/i4/O1CN01TEAeTy1x10VqTecnr_!!6000000006382-2-tps-72-72.png" },
-  [ComponentType.FEATURED_PRODUCTS]: { type: "productRecommendation",    name: "Featured Products",         icon: "https://img.alicdn.com/imgextra/i1/O1CN01yA59ze1UDGFbMnQpX_!!6000000002483-2-tps-72-72.png" },
-};
+// ─── Type mappings ──────────────────────────────────────────────────────
+// (TYPE_TO_COMPONENT_TYPE, COMPONENT_TYPE_TO_MODULE, MODULE_META,
+// DEFAULT_HEADER_FORM_DATA, resolveModuleMeta, productsToFormData,
+// categoriesToFormData, componentToFormData now live in
+// ./decorationShared.ts — the public storefront page needs the exact same
+// conversion logic, so it's no longer duplicated here. See that file's
+// header comment.)
 
+// Seed modules for a brand-new, never-before-opened decoration — purely an
+// editor-scaffolding concept (a fresh store starts with these four already
+// on the canvas), so unlike the constants above this stays local to the
+// editor rather than moving into decorationShared.ts.
 const INITIAL_MODULES: ActiveModule[] = [
   { id: "categoryBar_25723109",        name: "Category bar",       icon: "//id-live.slatic.net/original/7075aee0e853ad8e1042f3a3cfcccdaa.png",                           type: "categoryBar" },
   { id: "graphicThreeImages_26179633", name: "Three banners",      icon: "https://img.alicdn.com/imgextra/i3/O1CN01jm3FKE1rlMuQPP8cj_!!6000000005671-2-tps-72-73.png", type: "graphicThreeImages" },
@@ -78,37 +81,6 @@ const INITIAL_MODULES: ActiveModule[] = [
   { id: "graphicCarousel_26212860",    name: "Banner Carousel",    icon: "https://img.alicdn.com/imgextra/i1/O1CN01jXJ1ln1XYHH3YYADF_!!6000000002935-2-tps-72-73.png", type: "graphicCarousel" },
 ];
 
-// ─── Helper: build formData from a backend component ─────────────────────────
-
-function componentToFormData(c: {
-  isVisible: boolean;
-  config?: {
-    autoSlide?: boolean;
-    slideInterval?: number | null;
-    countdownEndDate?: string | null;
-    showProductPrice?: boolean;
-    showProductRating?: boolean;
-    showAddToCart?: boolean;
-    bannerImage?: string | null;
-    settings?: Record<string, unknown> | null;
-  } | null;
-}): Record<string, any> {
-  const cfg      = c.config ?? {};
-  const settings = (cfg.settings as Record<string, unknown>) ?? {};
-  return {
-    isVisible:         c.isVisible ?? true,
-    autoSlide:         cfg.autoSlide,
-    slideInterval:     cfg.slideInterval,
-    countdownEndDate:  cfg.countdownEndDate,
-    showProductPrice:  cfg.showProductPrice,
-    showProductRating: cfg.showProductRating,
-    showAddToCart:     cfg.showAddToCart,
-    bannerImage:       cfg.bannerImage,
-    // Spreads everything from settings:
-    // headerBgColor, storeNameColor, chatButtonColor, bannerImages, etc.
-    ...settings,
-  };
-}
 
 // ─── Delete Confirmation Modal ────────────────────────────────────────────────
 
@@ -212,7 +184,22 @@ const StoreLayoutEditor = () => {
   const [showConfigForm, setShowConfigForm]             = useState(false);
   const [selectedActiveModule, setSelectedActiveModule] = useState<ActiveModule | null>(null);
   const [currentView, setCurrentView]                   = useState<"mobile" | "desktop">("mobile");
-  const [formDataMap, setFormDataMap]                   = useState<Record<string, any>>({});
+
+  // Seed formDataMap with sane defaults for the locked header so it always
+  // renders fully styled, even before any backend config has loaded.
+  const [formDataMap, setFormDataMap] = useState<Record<string, any>>({
+    [INITIAL_MODULES[0].id]: { ...DEFAULT_HEADER_FORM_DATA },
+  });
+
+  // Tracks which formDataMap entries are real user edits (so they should
+  // never be clobbered by an incoming backend sync) vs. entries that are
+  // still just our local seeded defaults (which SHOULD be replaced once
+  // real backend config arrives). Without this distinction, the seeded
+  // header defaults above looked indistinguishable from a "user edit"
+  // (both are non-empty objects), which permanently blocked saved header
+  // config from ever loading in from the backend.
+  const userEditedRef = useRef<Set<string>>(new Set());
+
   const [activeModules, setActiveModules]               = useState<ActiveModule[]>([]);
   const [decorationId, setDecorationId]                 = useState<string | undefined>(urlDecorationId);
   const [isBootstrapping, setIsBootstrapping]           = useState(false);
@@ -224,10 +211,15 @@ const StoreLayoutEditor = () => {
 
   // Toast
   const [toast, setToast]   = useState<ToastState | null>(null);
-  const toastTimerRef       = useRef<ReturnType<typeof setTimeout>>();
-  const reorderTimerRef     = useRef<ReturnType<typeof setTimeout>>();
+  const toastTimerRef       = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const reorderTimerRef     = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const syncedRef           = useRef<string | null>(null);
   const sidebarRef          = useRef<HTMLDivElement>(null);
+
+  // Tracks whether INITIAL_MODULES has been seeded for this decoration,
+  // independent of the data-fetch lifecycle, so the sync effect can react
+  // to it on its own render pass instead of reading a stale closure value.
+  const [seededInitial, setSeededInitial] = useState(false);
 
   const showToast = useCallback((msg: string, type: ToastState["type"] = "success") => {
     setToast({ msg, type });
@@ -246,6 +238,7 @@ const StoreLayoutEditor = () => {
   const [addComponent]                                = useAddComponentMutation();
   const [deleteComponent]                             = useDeleteComponentMutation();
   const [reorderComponents]                           = useReorderComponentsMutation();
+  const [publishDecoration, { isLoading: isPublishing }] = usePublishDecorationMutation();
 
   const { data: decorationDetail, isLoading: isDetailLoading } =
     useGetDecorationQuery(decorationId!, { skip: !decorationId });
@@ -269,23 +262,50 @@ const StoreLayoutEditor = () => {
       .finally(() => setIsBootstrapping(false));
   }, [urlDecorationId, decorationList]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Step 2: Hydrate canvas + formDataMap ───────────────────────────────────
+  // ── Step 2a: Seed local canvas with INITIAL_MODULES immediately ────────────
+  // This is intentionally NOT gated on decorationId or decorationDetail.
+  // For the default-decoration flow (no ?decorationId= in the URL), the user
+  // should see the Store Header and the rest of the starter layout the
+  // instant the page mounts — not after a network round trip resolves.
+  //
+  // Previously this seeding step waited on `decorationDetail?.data`, which
+  // meant the header (and every other starter module) stayed invisible for
+  // the full duration of the GET /decoration request on every single new
+  // store, every time. That was the actual cause of "header not showing at
+  // top" — it wasn't missing, it just hadn't appeared yet, and on a slow or
+  // failed request it could appear to never show up at all.
+  //
+  // Path A (?decorationId= present) is unaffected: it intentionally starts
+  // with an empty canvas and waits for Step 2b below to hydrate real saved
+  // components, since blindly showing INITIAL_MODULES for an existing store
+  // would be wrong.
+  useEffect(() => {
+    if (urlDecorationId) return; // Path A handles its own hydration in Step 2b
+    if (seededInitial) return;
+
+    setActiveModules(INITIAL_MODULES);
+    setSeededInitial(true);
+  }, [urlDecorationId, seededInitial]);
+
+  // ── Step 2b: Hydrate canvas from backend + formDataMap ─────────────────────
   useEffect(() => {
     if (!decorationId) return;
     if (!decorationDetail?.data) return;
     if (syncedRef.current === decorationId) return;
-    syncedRef.current = decorationId;
 
     const backendComponents = decorationDetail.data.components ?? [];
 
     // ── Path A: opened via ?decorationId= URL param ─────────────────────────
     if (urlDecorationId && !hydrated && backendComponents.length > 0) {
+      syncedRef.current = decorationId;
+      setHydrated(true);
+
       const sorted = backendComponents
         .slice()
         .sort((a, b) => a.sortOrder - b.sortOrder);
 
       const hydratedModules: ActiveModule[] = sorted.map((c) => {
-        const meta = COMPONENT_TYPE_TO_MODULE[c.type];
+        const meta = resolveModuleMeta(c);
         return {
           id:            `${meta?.type ?? c.type}_${c.id.slice(-8)}`,
           name:          meta?.name ?? c.type,
@@ -297,21 +317,58 @@ const StoreLayoutEditor = () => {
 
       // Restore saved config into formDataMap so StoreHeader (and other
       // components) immediately reflect the persisted colours/settings.
+      // Skip any module the user has already actively edited this session.
       const restoredFormData: Record<string, any> = {};
       sorted.forEach((c, i) => {
-        restoredFormData[hydratedModules[i].id] = componentToFormData(c);
+        const localId = hydratedModules[i].id;
+        if (userEditedRef.current.has(localId)) return;
+        const meta = resolveModuleMeta(c);
+        const base = meta?.type === "categoryBar" ? DEFAULT_HEADER_FORM_DATA : {};
+        restoredFormData[localId] = { ...base, ...componentToFormData(c) };
       });
 
       setActiveModules(hydratedModules);
-      setFormDataMap(restoredFormData);
+      setFormDataMap((prev) => ({ ...prev, ...restoredFormData }));
+      return;
+    }
+
+    // ── Path A2: opened via ?decorationId= but the decoration has NO saved
+    // components yet (e.g. just created, or never had anything added). ────
+    // Seed the same starter layout used for the default-decoration flow,
+    // then fall through to the shared `runSync` logic below so the seeded
+    // modules actually get created as real backend components — instead of
+    // just rendering locally and never persisting.
+    //
+    // This was the actual remaining gap: a decoration reached via
+    // ?decorationId= with components: [] previously matched neither Path A
+    // above (which required backendComponents.length > 0) nor Step 2a's
+    // seeding effect (which explicitly skips whenever urlDecorationId is
+    // present) — so the canvas, and the header with it, stayed empty.
+    if (urlDecorationId && !hydrated && backendComponents.length === 0 && activeModules.length === 0) {
       setHydrated(true);
+      setActiveModules(INITIAL_MODULES);
+      // Don't touch formDataMap here — it's already seeded with
+      // DEFAULT_HEADER_FORM_DATA for INITIAL_MODULES[0].id from initial
+      // state. Return without marking syncedRef yet, so this same effect
+      // re-runs on the next render (once activeModules reflects the seed)
+      // and proceeds into the shared runSync block below to persist them.
       return;
     }
 
     // ── Path B: default decoration (no URL param) ────────────────────────────
+    // INITIAL_MODULES seeding now happens unconditionally in Step 2a above,
+    // on mount, with no network dependency. By the time this effect's data
+    // dependency (decorationDetail) resolves, activeModules is already
+    // populated. This block purely reconciles/creates backend components —
+    // it never gates what's visible on screen.
     if (!urlDecorationId && activeModules.length === 0) {
-      setActiveModules(INITIAL_MODULES);
+      // Extremely defensive fallback: should be unreachable since Step 2a
+      // runs unconditionally on mount, but guards against any future
+      // reordering of effects leaving activeModules empty here.
+      return;
     }
+
+    syncedRef.current = decorationId;
 
     const runSync = async () => {
       const claimedIds = new Set<string>(
@@ -324,11 +381,21 @@ const StoreLayoutEditor = () => {
         if (mod.dbComponentId) continue;
 
         const componentType = TYPE_TO_COMPONENT_TYPE[mod.type];
-        if (!componentType) continue;
+        if (!componentType) {
+          console.error(`No ComponentType mapping for module type "${mod.type}" — add it to TYPE_TO_COMPONENT_TYPE.`);
+          showToast(`"${mod.name}" isn't wired up to save yet — tell support the type is "${mod.type}".`, "error");
+          continue;
+        }
 
-        const match = backendComponents.find(
-          (c) => c.type === componentType && !claimedIds.has(c.id)
-        );
+        // Prefer matching by exact variant (moduleVariant) when several
+        // frontend types share one backend ComponentType (see
+        // resolveModuleMeta's comment above) — falls back to a plain type
+        // match for older components saved before moduleVariant existed.
+        const match = backendComponents.find((c) => {
+          if (claimedIds.has(c.id) || c.type !== componentType) return false;
+          const variant = c.config?.settings?.moduleVariant as string | undefined;
+          return variant ? variant === mod.type : true;
+        });
         if (match) {
           claimedIds.add(match.id);
           updates.push({ localId: mod.id, dbComponentId: match.id });
@@ -338,12 +405,18 @@ const StoreLayoutEditor = () => {
         try {
           const res = await addComponent({
             decorationId,
-            data: { type: componentType, sortOrder: i, isVisible: true },
+            data: {
+              type: componentType,
+              sortOrder: i,
+              isVisible: true,
+              config: { settings: { moduleVariant: mod.type } },
+            },
           }).unwrap();
           claimedIds.add(res.data.id);
           updates.push({ localId: mod.id, dbComponentId: res.data.id });
         } catch (err) {
           console.error(`Failed to create backend component for "${mod.id}":`, err);
+          showToast(`Failed to sync "${mod.name}" to server.`, "error");
         }
       }
 
@@ -356,14 +429,19 @@ const StoreLayoutEditor = () => {
         );
 
         // Restore saved config for each matched/created component.
-        // Only fills entries that don't already have user edits.
+        // Skip any module the user has already actively edited this
+        // session — but a seeded *default* (like the header's initial
+        // DEFAULT_HEADER_FORM_DATA) is not a user edit, so it's safe to
+        // overwrite once real backend config arrives.
         setFormDataMap((prev) => {
           const next = { ...prev };
           updates.forEach(({ localId, dbComponentId }) => {
-            if (next[localId] && Object.keys(next[localId]).length > 0) return; // keep user edits
+            if (userEditedRef.current.has(localId)) return; // keep real user edits
             const c = backendComponents.find((bc) => bc.id === dbComponentId);
             if (!c) return;
-            next[localId] = componentToFormData(c);
+            const mod = activeModules.find((m) => m.id === localId);
+            const base = mod?.type === "categoryBar" ? DEFAULT_HEADER_FORM_DATA : {};
+            next[localId] = { ...base, ...componentToFormData(c) };
           });
           return next;
         });
@@ -371,7 +449,7 @@ const StoreLayoutEditor = () => {
     };
 
     runSync();
-  }, [decorationId, decorationDetail]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [decorationId, decorationDetail, activeModules, urlDecorationId, hydrated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Debounced reorder sync ─────────────────────────────────────────────────
   const syncReorder = useCallback((modules: ActiveModule[]) => {
@@ -392,6 +470,26 @@ const StoreLayoutEditor = () => {
       }
     }, 600);
   }, [decorationId, reorderComponents, showToast]);
+
+  // ── Publish ──────────────────────────────────────────────────────────────
+  // Previously the Publish button was wired to `() => alert(...)` — it never
+  // actually called the backend at all, so clicking "Publish" did nothing
+  // but pop a browser alert. This now actually publishes the decoration
+  // (POST /store-decoration/:id/publish) and reports success/failure via
+  // sonner, matching the rest of the app's toast style (see AddProductForm's
+  // `import { toast } from "sonner"`), instead of a blocking `alert()`.
+  const handlePublish = useCallback(async () => {
+    if (!decorationId) {
+      sonnerToast.error("Nothing to publish yet — the store hasn't been created.");
+      return;
+    }
+    try {
+      await publishDecoration(decorationId).unwrap();
+      sonnerToast.success("Store published! Your changes are now live.");
+    } catch (err: any) {
+      sonnerToast.error(err?.data?.message ?? "Failed to publish. Please try again.");
+    }
+  }, [decorationId, publishDecoration]);
 
   // Cleanup timers on unmount
   useEffect(() => () => {
@@ -416,6 +514,7 @@ const StoreLayoutEditor = () => {
   const handleInputChange = useCallback((field: string, value: any) => {
     setSelectedActiveModule((current) => {
       if (!current) return current;
+      userEditedRef.current.add(current.id);
       setFormDataMap((prev) => ({
         ...prev,
         [current.id]: { ...(prev[current.id] ?? DEFAULT_FORM_DATA), [field]: value },
@@ -497,12 +596,21 @@ const StoreLayoutEditor = () => {
 
     if (!decorationId) return;
     const componentType = TYPE_TO_COMPONENT_TYPE[item.id];
-    if (!componentType) return;
+    if (!componentType) {
+      console.error(`No ComponentType mapping for module type "${item.id}" — add it to TYPE_TO_COMPONENT_TYPE.`);
+      showToast(`"${item.name}" isn't wired up to save yet — tell support the type is "${item.id}".`, "error");
+      return;
+    }
 
     try {
       const res = await addComponent({
         decorationId,
-        data: { type: componentType, sortOrder: position, isVisible: true },
+        data: {
+          type: componentType,
+          sortOrder: position,
+          isVisible: true,
+          config: { settings: { moduleVariant: item.id } },
+        },
       }).unwrap();
       setActiveModules((prev) =>
         prev.map((m) => m.id === localId ? { ...m, dbComponentId: res.data.id } : m)
@@ -608,12 +716,23 @@ const StoreLayoutEditor = () => {
 
     if (!decorationId) return;
     const componentType = TYPE_TO_COMPONENT_TYPE[src.type];
-    if (!componentType) return;
+    if (!componentType) {
+      console.error(`No ComponentType mapping for module type "${src.type}" — add it to TYPE_TO_COMPONENT_TYPE.`);
+      setActiveModules((prev) => prev.filter((m) => m.id !== localId));
+      setFormDataMap((prev) => { const n = { ...prev }; delete n[localId]; return n; });
+      showToast(`"${src.name}" isn't wired up to save yet — tell support the type is "${src.type}".`, "error");
+      return;
+    }
 
     try {
       const res = await addComponent({
         decorationId,
-        data: { type: componentType, sortOrder: idx + 1, isVisible: true },
+        data: {
+          type: componentType,
+          sortOrder: idx + 1,
+          isVisible: true,
+          config: { settings: { moduleVariant: src.type } },
+        },
       }).unwrap();
       setActiveModules((prev) =>
         prev.map((m) => m.id === localId ? { ...m, dbComponentId: res.data.id } : m)
@@ -647,7 +766,8 @@ const StoreLayoutEditor = () => {
         <TopBar
           currentView={currentView}
           onViewChange={setCurrentView}
-          onPublish={() => alert(`Publishing ${currentView} view...`)}
+          onPublish={handlePublish}
+          isPublishing={isPublishing}
         />
       </div>
 

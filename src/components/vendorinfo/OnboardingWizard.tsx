@@ -5,9 +5,7 @@ import { useForm } from "react-hook-form";
 import {
   useGetVendorByIdQuery,
   useUpdateVendorProfileMutation,
-  useCreateOrUpdatePersonalInfoMutation,
   useCreateOrUpdateAddressMutation,
-  useCreateOrUpdateBankInfoMutation,
   useGetOnboardingStatusQuery,
   useGetCompleteVendorProfileQuery,
 } from "@/features/vendorManageApi";
@@ -15,7 +13,6 @@ import type {
   UpdateVendorProfileRequest,
   VendorPersonalInfoRequest,
   VendorAddressRequest,
-  VendorBankInfoRequest,
   CompleteVendorProfile,
 } from "../../features/vendorManageApi";
 import LoadingState from "./LoadingState";
@@ -110,9 +107,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   } = useGetCompleteVendorProfileQuery(vendorId);
 
   const [updateVendorProfile] = useUpdateVendorProfileMutation();
-  const [updatePersonalInfo] = useCreateOrUpdatePersonalInfoMutation();
   const [updateAddress] = useCreateOrUpdateAddressMutation();
-  const [updateBankInfo] = useCreateOrUpdateBankInfoMutation();
 
   const profileData = useMemo(
     () => completeProfile?.data || completeProfile,
@@ -141,15 +136,6 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       companyName: "",
       businessRegNo: "",
       taxIdNumber: "",
-    },
-  });
-  const bankInfoForm = useForm<VendorBankInfoRequest>({
-    mode: "onChange",
-    defaultValues: {
-      accountName: "",
-      accountNumber: "",
-      bankName: "",
-      branchName: "",
     },
   });
 
@@ -181,17 +167,6 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             companyName: profileData.personalInfo.companyName || "",
             businessRegNo: profileData.personalInfo.businessRegNo || "",
             taxIdNumber: profileData.personalInfo.taxIdNumber || "",
-          },
-          { keepDefaultValues: false }
-        );
-      }
-      if (profileData.bankInfo) {
-        bankInfoForm.reset(
-          {
-            accountName: profileData.bankInfo.accountName || "",
-            accountNumber: profileData.bankInfo.accountNumber || "",
-            bankName: profileData.bankInfo.bankName || "",
-            branchName: profileData.bankInfo.branchName || "",
           },
           { keepDefaultValues: false }
         );
@@ -315,11 +290,8 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
   const handleAccountTypeNext = async () => {
     await refetchProfile();
-    if (editMode["account-type"]) {
-      setEditMode((prev) => ({ ...prev, "account-type": false }));
-    } else {
-      setCurrentStep("documents");
-    }
+    setEditMode((prev) => ({ ...prev, "account-type": false }));
+    setCurrentStep("documents");
   };
 
   const handleDocumentsSubmit = async (payload: {
@@ -351,16 +323,12 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     }
   };
 
-  const handleFinalSubmit = async () => {
-    const bankData = bankInfoForm.getValues();
-    if (!bankData.accountName || !bankData.accountNumber || !bankData.bankName || !bankData.branchName) {
-      setErrors({ submit: "Please complete all bank information fields" });
-      return;
-    }
+  // BankInfoStep now owns its own API calls (personal info + bank account
+  // creation), so this just refreshes wizard state once it reports done.
+  const handleBankInfoComplete = async () => {
     setIsSubmitting(true);
     setErrors({});
     try {
-      await updateBankInfo({ vendorId, data: bankData }).unwrap();
       await Promise.all([refetchOnboarding(), refetchProfile(), refetchVendor()]);
       if (editMode["bank-info"]) {
         setEditMode((prev) => ({ ...prev, "bank-info": false }));
@@ -368,7 +336,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         onComplete?.();
       }
     } catch (error: any) {
-      setErrors({ submit: error?.data?.message || "Failed to update bank information." });
+      setErrors({ submit: error?.data?.message || "Failed to refresh onboarding status." });
     } finally {
       setIsSubmitting(false);
     }
@@ -422,7 +390,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         break;
 
       case "address":
-        title = "Pickup Address";
+        title = "Vendor Address";
         const addr = profileData.pickupAddress;
         content = addr ? (
           <div className="space-y-2">
@@ -469,32 +437,41 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
       case "bank-info":
         title = "Bank Information";
-        const bank = profileData.bankInfo;
-        content = bank ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <p className="text-xs text-[#6d28d9] font-medium mb-0.5">Account Name</p>
-              <p className="text-sm font-semibold text-[#1e1b4b]">{bank.accountName}</p>
+        const bankAccounts = profileData.bankAccounts || [];
+        const defaultAccount =
+          bankAccounts.find((a) => a.isDefault) || bankAccounts[0];
+        content = defaultAccount ? (
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <p className="text-xs text-[#6d28d9] font-medium mb-0.5">Account Name</p>
+                <p className="text-sm font-semibold text-[#1e1b4b]">{defaultAccount.accountName}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#6d28d9] font-medium mb-0.5">Bank</p>
+                <p className="text-sm text-[#3730a3]">{defaultAccount.bank?.name}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#6d28d9] font-medium mb-0.5">Account Number</p>
+                <p className="text-sm text-[#3730a3]">****{defaultAccount.accountNumber?.slice(-4)}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-[#6d28d9] font-medium mb-0.5">Bank Name</p>
-              <p className="text-sm text-[#3730a3]">{bank.bankName}</p>
-            </div>
-            <div>
-              <p className="text-xs text-[#6d28d9] font-medium mb-0.5">Account Number</p>
-              <p className="text-sm text-[#3730a3]">****{bank.accountNumber?.slice(-4)}</p>
-            </div>
+            {bankAccounts.length > 1 && (
+              <p className="text-xs text-[#6d28d9]">
+                +{bankAccounts.length - 1} additional account(s)
+              </p>
+            )}
           </div>
         ) : null;
         break;
     }
 
     return (
-      <div className="relative mb-6 rounded-xl border border-[#c7d2fe] bg-[#eef2ff] p-5 overflow-hidden">
+      <div className="relative mb-6 rounded-2xl border border-[#c7d2fe] bg-[#eef2ff] p-5 overflow-hidden shadow-sm">
         {/* Decorative left accent bar */}
         <div
-          className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
-          style={{ background: "linear-gradient(180deg,#4f46e5,#7c3aed)" }}
+          className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl"
+          style={{ background: "linear-gradient(180deg,#2563eb,#7c3aed)" }}
         />
 
         <div className="flex items-start justify-between pl-3">
@@ -503,8 +480,8 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             <div className="flex items-center gap-2 mb-3">
               {/* Checkmark circle */}
               <div
-                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full"
-                style={{ background: "linear-gradient(135deg,#4f46e5,#7c3aed)" }}
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full shadow-sm"
+                style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)" }}
               >
                 <svg
                   className="h-4 w-4 text-white"
@@ -533,7 +510,7 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           <button
             type="button"
             onClick={() => toggleEditMode(step)}
-            className="ml-4 flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-[#c7d2fe] bg-white px-3.5 py-2 text-xs font-medium text-[#4338ca] transition-all hover:border-[#4f46e5] hover:bg-[#eef2ff] active:scale-95"
+            className="ml-4 flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-[#c7d2fe] bg-white px-3.5 py-2 text-xs font-medium text-[#4338ca] transition-all hover:border-[#2563eb] hover:bg-[#eef2ff] active:scale-95"
           >
             {editMode[step] ? (
               <>
@@ -559,150 +536,157 @@ const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   if (isLoading) return <LoadingState />;
 
   return (
-    <div className="mx-auto max-w-7xl p-6">
-      {/* Page background card */}
-      <div className="rounded-2xl border border-[#e0e0f0] bg-white shadow-[0_2px_24px_rgba(79,70,229,0.07)]">
+    <div
+      className="min-h-screen py-10 px-4"
+      style={{ background: "radial-gradient(1200px 500px at 50% -10%, #eef2ff 0%, #faf8ff 55%, #faf8ff 100%)" }}
+    >
+      <div className="mx-auto max-w-7xl">
+        {/* Page background card */}
+        <div className="relative rounded-3xl border border-[#e0e0f0] bg-white shadow-[0_8px_40px_rgba(79,70,229,0.10)] overflow-hidden">
 
-        {/* Wizard Progress */}
-        <div className="px-6 pt-6">
-          <WizardProgress
-            progress={progress}
-            currentStep={currentStep}
-            getStepStatus={getStepStatus}
-            onStepClick={handleStepNavigation}
-          />
-        </div>
+          {/* Decorative corner blobs (subtle, matches WizardProgress header) */}
+          <div className="pointer-events-none absolute -top-16 -right-10 h-56 w-56 rounded-full opacity-[0.04]" style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)" }} />
+          <div className="pointer-events-none absolute -bottom-20 -left-10 h-48 w-48 rounded-full opacity-[0.04]" style={{ background: "linear-gradient(135deg,#7c3aed,#2563eb)" }} />
 
-        {/* Error banner */}
-        {errors.submit && (
-          <div className="mx-6 mb-5 flex items-start gap-3 rounded-xl border border-[#fca5a5] bg-[#fef2f2] p-4">
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#fee2e2]">
-              <svg
-                className="h-4 w-4 text-[#dc2626]"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-[#991b1b]">Something went wrong</p>
-              <p className="mt-0.5 text-xs text-[#dc2626]">{errors.submit}</p>
-            </div>
+          {/* Wizard Progress */}
+          <div className="relative px-6 pt-6">
+            <WizardProgress
+              progress={progress}
+              currentStep={currentStep}
+              getStepStatus={getStepStatus}
+              onStepClick={handleStepNavigation}
+            />
           </div>
-        )}
 
-        {/* Step content area */}
-        <div className="border-t border-[#e0e0f0] px-6 pb-6 pt-6">
-
-          {/* ── Store Info ── */}
-          {currentStep === "store-info" && (
-            <>
-              {isStepCompleted("store-info") && !editMode["store-info"]
-                ? renderStepSummary("store-info")
-                : (
-                  <StoreInfoStep
-                    form={storeInfoForm}
-                    onSubmit={handleStep1Submit}
-                    isSubmitting={isSubmitting}
-                    vendor={profileData}
-                    onClearError={clearError}
-                    onAvatarChange={handleAvatarChange}
-                    avatarPreview={profileData?.avatar}
+          {/* Error banner */}
+          {errors.submit && (
+            <div className="relative mx-6 mb-5 flex items-start gap-3 rounded-xl border border-[#fca5a5] bg-[#fef2f2] p-4 shadow-sm">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#fee2e2]">
+                <svg
+                  className="h-4 w-4 text-[#dc2626]"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
-                )}
-            </>
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-[#991b1b]">Something went wrong</p>
+                <p className="mt-0.5 text-xs text-[#dc2626]">{errors.submit}</p>
+              </div>
+            </div>
           )}
 
-          {/* ── Address ── */}
-          {currentStep === "address" && (
-            <>
-              {isStepCompleted("address") && !editMode["address"]
-                ? renderStepSummary("address")
-                : (
-                  <AddressStep
-                    form={addressForm}
-                    onSubmit={handleStep2Submit}
-                    isSubmitting={isSubmitting}
-                    onBack={() => setCurrentStep("store-info")}
-                    onClearError={clearError}
-                    onLocationSelected={setSelectedLocation}
-                    selectedLocation={selectedLocation}
-                    existingAddress={profileData?.pickupAddress}
-                  />
-                )}
-            </>
-          )}
+          {/* Step content area */}
+          <div className="relative border-t border-[#e0e0f0] px-6 pb-8 pt-8">
 
-          {/* ── Account Type ── */}
-          {currentStep === "account-type" && (
-            <>
-              {isStepCompleted("account-type") && !editMode["account-type"]
-                ? renderStepSummary("account-type")
-                : (
-                  <AccountTypeStep
-                    accountType={accountType}
-                    onAccountTypeChange={setAccountType}
-                    onNext={handleAccountTypeNext}
-                    onBack={() => setCurrentStep("address")}
-                    showBackButton={true}
-                    vendorId={vendorId}
-                    completeProfile={profileData}
-                  />
-                )}
-            </>
-          )}
+            {/* ── Store Info ── */}
+            {currentStep === "store-info" && (
+              <>
+                {isStepCompleted("store-info") && !editMode["store-info"]
+                  ? renderStepSummary("store-info")
+                  : (
+                    <StoreInfoStep
+                      form={storeInfoForm}
+                      onSubmit={handleStep1Submit}
+                      isSubmitting={isSubmitting}
+                      vendor={profileData}
+                      onClearError={clearError}
+                      onAvatarChange={handleAvatarChange}
+                      avatarPreview={profileData?.avatar}
+                    />
+                  )}
+              </>
+            )}
 
-          {/* ── Documents ── */}
-          {currentStep === "documents" && (
-            <>
-              {isStepCompleted("documents") && !editMode["documents"]
-                ? renderStepSummary("documents")
-                : (
-                  <DocumentsStep
-                    accountType={accountType}
-                    businessType={businessType}
-                    vendorId={vendorId}
-                    onDocumentsChange={setDocuments}
-                    onBusinessTypeChange={setBusinessType}
-                    onSubmit={handleDocumentsSubmit}
-                    isSubmitting={isSubmitting}
-                    onBack={() => setCurrentStep("account-type")}
-                    onClearError={clearError}
-                    existingPersonalInfo={profileData?.personalInfo}
-                    existingBankInfo={profileData?.bankInfo}
-                    completeProfile={profileData}
-                  />
-                )}
-            </>
-          )}
+            {/* ── Address ── */}
+            {currentStep === "address" && (
+              <>
+                {isStepCompleted("address") && !editMode["address"]
+                  ? renderStepSummary("address")
+                  : (
+                    <AddressStep
+                      form={addressForm}
+                      onSubmit={handleStep2Submit}
+                      isSubmitting={isSubmitting}
+                      onBack={() => setCurrentStep("store-info")}
+                      onClearError={clearError}
+                      onLocationSelected={setSelectedLocation}
+                      selectedLocation={selectedLocation}
+                      existingAddress={profileData?.pickupAddress}
+                    />
+                  )}
+              </>
+            )}
 
-          {/* ── Bank Info ── */}
-          {currentStep === "bank-info" && (
-            <>
-              {isStepCompleted("bank-info") && !editMode["bank-info"]
-                ? renderStepSummary("bank-info")
-                : (
-                  <BankInfoStep
-                    personalForm={personalInfoForm}
-                    bankForm={bankInfoForm}
-                    onSubmit={handleFinalSubmit}
-                    isSubmitting={isSubmitting}
-                    onBack={() => setCurrentStep("documents")}
-                    onClearError={clearError}
-                    accountType={accountType}
-                    existingPersonalInfo={profileData?.personalInfo}
-                    existingBankInfo={profileData?.bankInfo}
-                  />
-                )}
-            </>
-          )}
+            {/* ── Account Type ── */}
+            {currentStep === "account-type" && (
+              <>
+                {isStepCompleted("account-type") && !editMode["account-type"]
+                  ? renderStepSummary("account-type")
+                  : (
+                    <AccountTypeStep
+                      accountType={accountType}
+                      onAccountTypeChange={setAccountType}
+                      onNext={handleAccountTypeNext}
+                      onBack={() => setCurrentStep("address")}
+                      showBackButton={true}
+                      vendorId={vendorId}
+                      completeProfile={profileData}
+                    />
+                  )}
+              </>
+            )}
+
+            {/* ── Documents ── */}
+            {currentStep === "documents" && (
+              <>
+                {isStepCompleted("documents") && !editMode["documents"]
+                  ? renderStepSummary("documents")
+                  : (
+                    <DocumentsStep
+                      accountType={accountType}
+                      businessType={businessType}
+                      vendorId={vendorId}
+                      onDocumentsChange={setDocuments}
+                      onBusinessTypeChange={setBusinessType}
+                      onSubmit={handleDocumentsSubmit}
+                      isSubmitting={isSubmitting}
+                      onBack={() => setCurrentStep("account-type")}
+                      onClearError={clearError}
+                      existingPersonalInfo={profileData?.personalInfo}
+                      completeProfile={profileData}
+                    />
+                  )}
+              </>
+            )}
+
+            {/* ── Bank Info ── */}
+            {currentStep === "bank-info" && (
+              <>
+                {isStepCompleted("bank-info") && !editMode["bank-info"]
+                  ? renderStepSummary("bank-info")
+                  : (
+                    <BankInfoStep
+                      vendorId={vendorId}
+                      personalForm={personalInfoForm}
+                      onComplete={handleBankInfoComplete}
+                      isSubmitting={isSubmitting}
+                      onBack={() => setCurrentStep("documents")}
+                      onClearError={clearError}
+                      accountType={accountType}
+                      existingPersonalInfo={profileData?.personalInfo}
+                    />
+                  )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

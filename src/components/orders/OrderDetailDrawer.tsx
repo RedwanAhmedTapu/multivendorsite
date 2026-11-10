@@ -54,9 +54,12 @@ function formatDate(iso?: string | null) {
   }).format(new Date(iso));
 }
 
-function formatCurrency(n?: number) {
+// 1C-8: backend Decimal money values arrive as strings — accept both and
+// normalize for formatting (no behavioral change for existing number inputs).
+function formatCurrency(n?: number | string) {
   if (n === undefined) return "—";
-  return `৳${n.toLocaleString("en-BD", { minimumFractionDigits: 0 })}`;
+  const v = typeof n === "string" ? Number(n) : n;
+  return `৳${v.toLocaleString("en-BD", { minimumFractionDigits: 0 })}`;
 }
 
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
@@ -101,8 +104,8 @@ export function OrderDetailDrawer({ orderId, onClose }: Props) {
     try {
       await updateOrderStatus({ id: order.id, status }).unwrap();
       toast.success(`Order status updated to ${status}`);
-    } catch {
-      toast.error("Failed to update order status");
+    } catch (err: any) {
+      toast.error(err?.data?.message || "Failed to update order status");
     }
   };
 
@@ -111,8 +114,8 @@ export function OrderDetailDrawer({ orderId, onClose }: Props) {
     try {
       await updateVendorStatus({ id: order.id, vendorOrderId, status }).unwrap();
       toast.success("Vendor order updated");
-    } catch {
-      toast.error("Failed to update vendor order");
+    } catch (err: any) {
+      toast.error(err?.data?.message || "Failed to update vendor order");
     }
   };
 
@@ -178,7 +181,9 @@ export function OrderDetailDrawer({ orderId, onClose }: Props) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {(Object.keys(ORDER_STATUS_CONFIG) as OrderStatus[]).map((s) => (
+                        {/* Phase 3: the order-level override only cancels (through the
+                            guarded cancellation); the current status is listed for display. */}
+                        {([...new Set([order.status, "CANCELLED"])] as OrderStatus[]).map((s) => (
                           <SelectItem key={s} value={s} className="text-xs">
                             <span className="flex items-center gap-2">
                               <span
@@ -307,14 +312,13 @@ export function OrderDetailDrawer({ orderId, onClose }: Props) {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
+                              {/* Phase 3: only the vendor's preparation steps
+                                  (CONFIRMED → PROCESSING → PACKAGING); shipping and
+                                  delivery come from the courier workflow. */}
                               {(
                                 [
-                                  "CONFIRMED",
-                                  "PROCESSING",
-                                  "PACKAGING",
-                                  "SHIPPED",
-                                  "DELIVERED",
-                                  "CANCELLED",
+                                  vo.status,
+                                  ...(vo.status === "CONFIRMED" ? ["PROCESSING"] : vo.status === "PROCESSING" ? ["PACKAGING"] : []),
                                 ] as OrderStatus[]
                               ).map((s) => (
                                 <SelectItem key={s} value={s} className="text-xs">

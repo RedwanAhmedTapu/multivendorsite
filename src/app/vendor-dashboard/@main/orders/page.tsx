@@ -4,13 +4,12 @@ import { useState, useCallback } from "react";
 import { ShoppingBag, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
-import { useGetVendorOrdersQuery } from "@/features/vendorOrderApi";
+import { useGetVendorOrdersQuery, type VendorOrder } from "@/features/vendorOrderApi";
 import { useVendorOrderFilters } from "./components/useVendorOrderFilters";
 import { VendorOrderStatsBar } from "./components/VendorOrderStatsBar";
 import { VendorOrderFiltersBar } from "./components/VendorOrderFiltersBar";
 import { VendorOrdersTable } from "./components/VendorOrdersTable";
 import { VendorOrderDetailDrawer } from "./components/VendorOrderDetailDrawer";
-import type { VendorOrderRow } from "@/types/vendorOrderTypes";
 
 export default function VendorOrdersPage() {
   const {
@@ -18,7 +17,7 @@ export default function VendorOrdersPage() {
     setFilter,
     resetFilters,
     activeFilterCount,
-    queryString,
+    apiFilters,
   } = useVendorOrderFilters();
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -29,12 +28,12 @@ export default function VendorOrdersPage() {
     isError,
     isFetching,
     refetch,
-  } = useGetVendorOrdersQuery(queryString);
+  } = useGetVendorOrdersQuery(apiFilters);
 
   const orders = data?.data || [];
   const pagination = data?.pagination;
 
-  const handleViewOrder = useCallback((order: VendorOrderRow) => {
+  const handleViewOrder = useCallback((order: VendorOrder) => {
     setSelectedOrderId(order.id);
   }, []);
 
@@ -109,7 +108,6 @@ export default function VendorOrdersPage() {
           onRefresh={handleRefresh}
         />
 
-        {/* Updating indicator */}
         {isFetching && !isLoading && (
           <div className="flex items-center gap-2 text-xs text-slate-500 -mt-3">
             <div className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
@@ -126,6 +124,7 @@ export default function VendorOrdersPage() {
           filters={filters}
           setFilter={setFilter}
           onViewOrder={handleViewOrder}
+          onRetry={() => refetch()}
         />
 
         {/* ── Detail Drawer ───────────────────────────────────────────── */}

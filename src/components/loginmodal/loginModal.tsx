@@ -172,6 +172,14 @@ export function LoginModal({
             router.push("/vendor-dashboard");
           } else if (userRole === "ADMIN") {
             router.push("/admin-dashboard");
+          } else if (userRole === "EMPLOYEE") {
+            // Employees have no standalone dashboard — send them to their HR
+            // self-service page on the side their account belongs to.
+            router.push(
+              response.user?.employee?.vendorId
+                ? "/vendor-dashboard/hrm/my-profile"
+                : "/admin-dashboard/employees/hrm/my-profile"
+            );
           } else {
             router.push("/dashboard");
           }

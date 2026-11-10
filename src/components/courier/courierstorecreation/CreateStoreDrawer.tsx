@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
@@ -10,13 +10,6 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -27,7 +20,6 @@ import {
   Loader2,
   AlertCircle,
   ChevronRight,
-  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,6 +41,7 @@ import { StoreFormFields } from "./StoreFormFields";
 import { PathaoLocationFields } from "./PathaoLocationFields";
 import { RedxLocationFields } from "./RedxLocationFields";
 import { useStoreFormPrefill } from "./useStoreFormPrefill";
+import { validatePathaoStoreForm, validateRedxStoreForm, hasErrors } from "@/lib/validation/store-validation";
 import type { VendorRow } from "@/types/courier-store";
 
 interface Props {
@@ -61,6 +54,7 @@ interface Props {
 
 export function CreateStoreDrawer({ open, vendor, environment, onClose, onSuccess }: Props) {
   const [selectedProvider, setSelectedProvider] = useState<CourierProvider | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   // Courier providers
   const { data: providersData, isLoading: providersLoading } = useGetCourierProvidersQuery({
@@ -101,7 +95,8 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
     warehouseLocationHint,
   } = useStoreFormPrefill(defaultWarehouse, courierSlug);
 
-  // Mutations
+  // Mutations — these are wired to environment-scoped tags in courierApi.ts,
+  // so creating a Sandbox store never clobbers the Production list and vice versa.
   const [createPathaoStore, { isLoading: creatingPathao }] = usePathaoCreateStoreMutation();
   const [createRedxStore, { isLoading: creatingRedx }] = useRedxCreatePickupStoreMutation();
   const isCreating = creatingPathao || creatingRedx;
@@ -110,30 +105,37 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
   useEffect(() => {
     if (!open) {
       setSelectedProvider(null);
+      setSubmitAttempted(false);
       resetAll();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, vendor?.id]);
 
-  // Reset location when provider switches
+  // Reset location + validation state when provider switches
   useEffect(() => {
     setPathaoLoc({ cityId: null, cityName: "", zoneId: null, zoneName: "", areaId: null, areaName: "" });
     setRedxLoc({ areaId: null, areaName: "", districtFilter: "" });
+    setSubmitAttempted(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProvider?.id]);
 
-  // Validation
-  const isFormValid = Boolean(
-    form.storeName &&
-    form.contactPhone &&
-    form.address &&
-    (isPathao ? form.contactName : true) &&
-    (isPathao ? pathaoLoc.cityId && pathaoLoc.zoneId && pathaoLoc.areaId : true) &&
-    (isRedx ? redxLoc.areaId : true)
-  );
+  // ---- Validation (matches Pathao / RedX API field constraints) ----
+  const errors = useMemo(() => {
+    if (isPathao) return validatePathaoStoreForm(form, pathaoLoc);
+    if (isRedx) return validateRedxStoreForm(form, redxLoc);
+    return {};
+  }, [isPathao, isRedx, form, pathaoLoc, redxLoc]);
+
+  const isFormValid = selectedProvider !== null && !hasErrors(errors);
 
   const handleSubmit = async () => {
     if (!selectedProvider || !vendor) return;
+
+    if (!isFormValid) {
+      setSubmitAttempted(true);
+      toast.error("Please fix the highlighted fields before creating the store.");
+      return;
+    }
 
     try {
       if (isPathao) {
@@ -153,7 +155,7 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
         }).unwrap();
 
         toast.success("Pathao store created!", {
-          description: `${form.storeName} registered in ${pathaoLoc.cityName} → ${pathaoLoc.zoneName} → ${pathaoLoc.areaName}`,
+          description: `${form.storeName} registered in ${pathaoLoc.cityName} → ${pathaoLoc.zoneName} → ${pathaoLoc.areaName} (${environment})`,
         });
       } else if (isRedx) {
         await createRedxStore({
@@ -168,10 +170,9 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
         }).unwrap();
 
         toast.success("RedX store created!", {
-          description: `${form.storeName} registered in ${redxLoc.areaName}`,
+          description: `${form.storeName} registered in ${redxLoc.areaName} (${environment})`,
         });
       } else {
-        // Generic/other couriers — show info
         toast.info("Store registration submitted", {
           description: "Provider-specific API not yet integrated.",
         });
@@ -187,28 +188,28 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
   };
 
   const providerColor = isPathao
-    ? { ring: "ring-teal-500", bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200" }
+    ? { bg: "bg-indigo-50", text: "text-indigo-700", border: "border-indigo-200" }
     : isRedx
-    ? { ring: "ring-red-500", bg: "bg-red-50", text: "text-red-700", border: "border-red-200" }
-    : { ring: "ring-slate-300", bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200" };
+    ? { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" }
+    : { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200" };
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-xl flex flex-col gap-0 p-0 overflow-hidden"
+        className="w-full sm:max-w-lg flex flex-col gap-0 p-0 overflow-hidden"
       >
         {/* Header */}
-        <SheetHeader className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-teal-50/60 to-slate-50 flex-shrink-0">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <SheetTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-teal-600 text-white">
+        <SheetHeader className="px-4 sm:px-5 py-4 border-b border-[#E5EAF2] bg-[#FAFBFD] flex-shrink-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <SheetTitle className="text-base font-bold text-[#0D1B2E] flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-white shrink-0">
                   <Store className="w-4 h-4" />
                 </div>
                 Create Pickup Store
               </SheetTitle>
-              <SheetDescription className="mt-1 text-slate-500 text-sm">
+              <SheetDescription className="mt-1 text-[#7A90AB] text-xs truncate">
                 {vendor ? (
                   <>
                     Registering for{" "}
@@ -221,7 +222,7 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
             </div>
             <Badge
               variant="outline"
-              className={`mt-1 text-xs flex-shrink-0 ${providerColor.bg} ${providerColor.text} ${providerColor.border}`}
+              className={`text-xs flex-shrink-0 ${providerColor.bg} ${providerColor.text} ${providerColor.border}`}
             >
               {environment}
             </Badge>
@@ -229,10 +230,10 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
         </SheetHeader>
 
         {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-4">
           {/* Courier Provider Selector */}
           <div className="space-y-2">
-            <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+            <Label className="text-[11px] font-bold text-[#3D5068] uppercase tracking-wide">
               Courier Provider <span className="text-red-500">*</span>
             </Label>
             {providersLoading ? (
@@ -249,15 +250,17 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
                 {providers.map((p) => {
                   const isSelected = selectedProvider?.id === p.id;
                   const slug = p.name.toUpperCase();
-                  const color = slug === "PATHAO"
-                    ? "teal"
-                    : slug === "REDX"
-                    ? "red"
-                    : "slate";
+                  const color = slug === "PATHAO" ? "indigo" : slug === "REDX" ? "rose" : "slate";
                   const colorCls = {
-                    teal: isSelected ? "border-teal-500 bg-teal-50 ring-2 ring-teal-200" : "border-slate-200 hover:border-teal-300",
-                    red: isSelected ? "border-red-500 bg-red-50 ring-2 ring-red-200" : "border-slate-200 hover:border-red-300",
-                    slate: isSelected ? "border-slate-400 bg-slate-50 ring-2 ring-slate-200" : "border-slate-200 hover:border-slate-400",
+                    indigo: isSelected
+                      ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200"
+                      : "border-[#E5EAF2] hover:border-indigo-300",
+                    rose: isSelected
+                      ? "border-rose-500 bg-rose-50 ring-2 ring-rose-200"
+                      : "border-[#E5EAF2] hover:border-rose-300",
+                    slate: isSelected
+                      ? "border-slate-400 bg-slate-50 ring-2 ring-slate-200"
+                      : "border-[#E5EAF2] hover:border-slate-400",
                   }[color];
 
                   return (
@@ -265,11 +268,11 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
                       key={p.id}
                       type="button"
                       onClick={() => setSelectedProvider(p)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-150 text-left ${colorCls}`}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 transition-all duration-150 text-left ${colorCls}`}
                     >
-                      <div className={`p-2 rounded-lg flex-shrink-0 ${
-                        color === "teal" ? "bg-teal-100 text-teal-700"
-                        : color === "red" ? "bg-red-100 text-red-700"
+                      <div className={`p-1.5 rounded-lg flex-shrink-0 ${
+                        color === "indigo" ? "bg-indigo-100 text-indigo-700"
+                        : color === "rose" ? "bg-rose-100 text-rose-700"
                         : "bg-slate-100 text-slate-600"
                       }`}>
                         <Building2 className="w-4 h-4" />
@@ -286,7 +289,7 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
                         </Badge>
                         {isSelected && (
                           <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                            color === "teal" ? "bg-teal-600" : color === "red" ? "bg-red-600" : "bg-slate-600"
+                            color === "indigo" ? "bg-indigo-600" : color === "rose" ? "bg-rose-600" : "bg-slate-600"
                           }`}>
                             <Check className="w-3 h-3 text-white" />
                           </div>
@@ -301,7 +304,7 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
 
           {selectedProvider && (
             <>
-              <Separator />
+              <Separator className="bg-[#E5EAF2]" />
 
               {/* Warehouse auto-fill */}
               <WarehouseAutoFill
@@ -314,22 +317,24 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
 
               {/* Store details */}
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+                <p className="text-[11px] font-bold text-[#3D5068] uppercase tracking-wide flex items-center gap-1.5">
                   <Store className="w-3.5 h-3.5" /> Store Details
                 </p>
                 <StoreFormFields
                   form={form}
                   autoFilledFields={autoFilledFields}
                   isPathao={isPathao}
+                  errors={errors}
+                  showErrors={submitAttempted}
                   onChange={updateForm}
                 />
               </div>
 
-              <Separator />
+              <Separator className="bg-[#E5EAF2]" />
 
               {/* Location fields */}
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+                <p className="text-[11px] font-bold text-[#3D5068] uppercase tracking-wide flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5" />
                   {isPathao ? "Pathao Coverage Area" : isRedx ? "RedX Delivery Area" : "Pickup Area"}
                 </p>
@@ -365,7 +370,7 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
 
               {/* Final summary when ready */}
               {isFormValid && (
-                <div className="p-4 bg-green-50 rounded-xl border border-green-200 space-y-2">
+                <div className="p-3 bg-green-50 rounded-xl border border-green-200 space-y-2">
                   <p className="text-xs font-semibold text-green-800 flex items-center gap-1.5">
                     <Check className="w-3.5 h-3.5" /> Ready to Create
                   </p>
@@ -391,24 +396,31 @@ export function CreateStoreDrawer({ open, vendor, environment, onClose, onSucces
                   </div>
                 </div>
               )}
+
+              {submitAttempted && !isFormValid && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 rounded-xl border border-red-200 text-xs text-red-700">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  Please fix the highlighted fields above before creating the store.
+                </div>
+              )}
             </>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex-shrink-0 px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between gap-3">
+        <div className="flex-shrink-0 px-4 sm:px-5 py-3 border-t border-[#E5EAF2] bg-white flex items-center justify-between gap-3">
           <Button variant="outline" onClick={onClose} size="sm" disabled={isCreating}>
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!isFormValid || isCreating}
+            disabled={isCreating || !selectedProvider}
             size="sm"
-            className={`gap-2 min-w-32 ${
+            className={`gap-2 min-w-32 text-white border-0 ${
               isPathao
-                ? "bg-teal-600 hover:bg-teal-700"
+                ? "bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700"
                 : isRedx
-                ? "bg-red-600 hover:bg-red-700"
+                ? "bg-rose-600 hover:bg-rose-700"
                 : "bg-slate-700 hover:bg-slate-800"
             }`}
           >

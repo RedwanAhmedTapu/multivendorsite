@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { useGetCategoriesQuery } from "@/features/apiSlice";
 import {
   useGetProductsQuery,
-  useFilterProductsMutation,
-} from "@/features/productApi";
+  useFilterProductsQuery,
+} from "@/features/productapi/commonProductApi"; 
 
 import ProductCategories from "@/components/product/productcategory/ProductCategories";
 import { ProductCard } from "@/components/product/productcard/ProductCard";
@@ -27,7 +27,7 @@ import { Container } from "@/components/Container";
 
 interface ProductsPageProps {
   initialCategories?: any[];
-  initialProducts?: any[];
+  initialProducts?: any[]; // This is now a plain array from server
   staticPaths?: any[];
 }
 
@@ -39,43 +39,28 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Use RTK queries with initial data from server
+  // ============================================
+  // 1. RTK QUERY HOOKS
+  // ============================================
+  
   const {
     data: categoriesData,
     isLoading: categoriesLoading,
-    error: categoriesError,
   } = useGetCategoriesQuery(undefined, {
     skip: initialCategories.length > 0,
   });
 
   const {
-    data: productsData,
+    data: productsData, // CursorPage<Product>
     isLoading: productsLoading,
-    error: productsError,
   } = useGetProductsQuery({}, {
     skip: initialProducts.length > 0,
   });
 
-  const [
-    filterProducts,
-    { data: filteredProductsResponse, isLoading: filterLoading },
-  ] = useFilterProductsMutation();
-
-  // Use initial data or fetched data
-  const categories = categoriesData || initialCategories;
-
-  // Extract products from the response structure
-  const allProducts = useMemo(() => {
-    if (productsData) return productsData;
-    if (initialProducts.length > 0) return initialProducts;
-    return [];
-  }, [productsData, initialProducts]);
-
-  const filteredProducts = useMemo(() => {
-    if (filteredProductsResponse) return filteredProductsResponse;
-    return null;
-  }, [filteredProductsResponse]);
-
+  // ============================================
+  // 2. LOCAL STATE (MUST be defined before useMemo that uses them)
+  // ============================================
+  
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [selectedCategorySlug, setSelectedCategorySlug] = useState<string>("");
@@ -89,26 +74,137 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     availability: [],
   });
 
-  // Use refs to track if we're in the middle of an update
   const isInitialMount = useRef(true);
 
-  // Check if this is the base products page (no query params)
+  // ============================================
+  // 3. URL-DERIVED STATE
+  // ============================================
+  
+  const categorySlugFromUrl = useMemo(() => {
+    return searchParams.get("category");
+  }, [searchParams]);
+
   const isBaseProductsPage = useMemo(() => {
     const hasQueryParams = searchParams.toString().length > 0;
     const hasCategoryParam = searchParams.has("category");
     const hasOtherParams = Array.from(searchParams.keys()).some(
       (key) => key !== "category"
     );
-
     return !hasQueryParams || (!hasCategoryParam && !hasOtherParams);
   }, [searchParams]);
 
-  // Get category from URL
-  const categorySlugFromUrl = useMemo(() => {
-    return searchParams.get("category");
-  }, [searchParams]);
+  // ============================================
+  // 4. FILTER QUERY PARAMS (Uses currentFilters - now safely defined)
+  // ============================================
+  
+  const filterQueryParams = useMemo((): Record<string, any> | undefined => {
+    const hasActiveFilters =
+      currentFilters.priceRange[0] > 1 ||
+      currentFilters.priceRange[1] < 100000 ||
+      Object.values(currentFilters.attributes).some((arr) => arr.length > 0) ||
+      currentFilters.ratings.length > 0 ||
+      currentFilters.availability.length > 0 ||
+      currentFilters.brands.length > 0 ||
+      currentFilters.vendors.length > 0;
 
-  // Initialize from URL on first mount
+    // Skip query if no filters and no category
+    if (!hasActiveFilters && !selectedCategorySlug) {
+      return undefined;
+    }
+
+    // Build unified attributes structure
+    const unifiedAttributes: Record<string, string | string[] | number | number[] | boolean> = {};
+
+    Object.entries(currentFilters.attributes).forEach(([key, values]) => {
+      if (Array.isArray(values) && values.length > 0) {
+        const firstValue = values[0];
+
+        if (typeof firstValue === "number") {
+          unifiedAttributes[key] = values.length === 1 ? firstValue : values;
+        } else if (typeof firstValue === "boolean") {
+          unifiedAttributes[key] = firstValue;
+        } else {
+          unifiedAttributes[key] = values.length === 1 ? String(firstValue) : values.map(String);
+        }
+      }
+    });
+
+    const params: Record<string, any> = {};
+
+    if (selectedCategorySlug) {
+      params.categorySlug = selectedCategorySlug;
+    }
+    if (currentFilters.priceRange[0] > 1) {
+      params.minPrice = currentFilters.priceRange[0];
+    }
+    if (currentFilters.priceRange[1] < 100000) {
+      params.maxPrice = currentFilters.priceRange[1];
+    }
+    if (Object.keys(unifiedAttributes).length > 0) {
+      params.attributes = unifiedAttributes;
+    }
+    if (currentFilters.ratings.length > 0) {
+      params.ratings = currentFilters.ratings;
+    }
+    if (currentFilters.brands.length > 0) {
+      params.brandNames = currentFilters.brands;
+    }
+    if (currentFilters.vendors.length > 0) {
+      params.vendorNames = currentFilters.vendors;
+    }
+    if (currentFilters.availability.includes("inStock")) {
+      params.inStock = true;
+    }
+    if (currentFilters.availability.includes("onSale")) {
+      params.onSale = true;
+    }
+    if (currentFilters.availability.includes("newArrivals")) {
+      params.newArrivals = true;
+    }
+
+    return params;
+  }, [currentFilters, selectedCategorySlug]);
+
+  // ============================================
+  // 5. FILTERED PRODUCTS QUERY
+  // ============================================
+  
+  const {
+    data: filteredProductsData, // CursorPage<Product>
+    isLoading: filterLoading,
+  } = useFilterProductsQuery(filterQueryParams as any, {
+    skip: !filterQueryParams,
+  });
+
+  // ============================================
+  // 6. DATA EXTRACTION
+  // ============================================
+  
+  const categories = categoriesData || initialCategories;
+
+  // Extract items from CursorPage OR use initial products
+  const allProducts = useMemo(() => {
+    if (productsData?.items) {
+      return productsData.items;
+    }
+    if (initialProducts.length > 0) {
+      return initialProducts;
+    }
+    return [];
+  }, [productsData, initialProducts]);
+
+  // Extract items from filtered CursorPage
+  const filteredProducts = useMemo(() => {
+    if (filteredProductsData?.items) {
+      return filteredProductsData.items;
+    }
+    return null;
+  }, [filteredProductsData]);
+
+  // ============================================
+  // 7. URL SYNC EFFECTS
+  // ============================================
+  
   useEffect(() => {
     if (isInitialMount.current) {
       if (categorySlugFromUrl) {
@@ -118,155 +214,78 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     }
   }, [categorySlugFromUrl]);
 
-  // Handle URL parameter changes (only after initial mount)
   useEffect(() => {
-    if (isInitialMount.current) {
-      return;
-    }
+    if (isInitialMount.current) return;
 
     if (categorySlugFromUrl && categorySlugFromUrl !== selectedCategorySlug) {
-      console.log("Category slug from URL changed:", categorySlugFromUrl);
       setSelectedCategorySlug(categorySlugFromUrl);
     } else if (!categorySlugFromUrl && selectedCategorySlug) {
-      console.log("Clearing category selection - no category in URL");
       setSelectedCategorySlug("");
     }
   }, [categorySlugFromUrl, selectedCategorySlug]);
 
-  // Find selected category ID from slug (for UI display only)
+  // ============================================
+  // 8. CATEGORY HELPERS
+  // ============================================
+  
+  const findCategoryBySlug = useCallback((categoriesList: any[], targetSlug: string): any => {
+    for (const category of categoriesList) {
+      if (category.slug === targetSlug) return category;
+      if (category.children?.length > 0) {
+        const found = findCategoryBySlug(category.children, targetSlug);
+        if (found) return found;
+      }
+    }
+    return null;
+  }, []);
+
+  const findCategoryById = useCallback((categoriesList: any[], targetId: string): any => {
+    for (const category of categoriesList) {
+      if (category.id === targetId) return category;
+      if (category.children?.length > 0) {
+        const found = findCategoryById(category.children, targetId);
+        if (found) return found;
+      }
+    }
+    return null;
+  }, []);
+
+  // ============================================
+  // 9. DERIVED CATEGORY STATE
+  // ============================================
+  
   const selectedCategoryId = useMemo(() => {
     if (!selectedCategorySlug || !categories.length) return "";
-    
-    // Find category by slug (this is just for UI - server handles the real filtering)
-    const findCategoryBySlug = (categoriesList: any[], targetSlug: string): any => {
-      for (const category of categoriesList) {
-        if (category.slug === targetSlug) {
-          return category;
-        }
-        
-        if (category.children && category.children.length > 0) {
-          const foundInChildren = findCategoryBySlug(category.children, targetSlug);
-          if (foundInChildren) {
-            return foundInChildren;
-          }
-        }
-      }
-      return null;
-    };
-    
     const category = findCategoryBySlug(categories, selectedCategorySlug);
     return category?.id || "";
-  }, [selectedCategorySlug, categories]);
+  }, [selectedCategorySlug, categories, findCategoryBySlug]);
 
-  // Find selected category name (for UI display)
   const selectedCategoryName = useMemo(() => {
     if (!selectedCategorySlug || !categories.length) return "";
-    
-    const findCategoryNameBySlug = (categoriesList: any[], targetSlug: string): string => {
-      for (const category of categoriesList) {
-        if (category.slug === targetSlug) {
-          return category.name;
-        }
-        
-        if (category.children && category.children.length > 0) {
-          const foundInChildren = findCategoryNameBySlug(category.children, targetSlug);
-          if (foundInChildren) {
-            return foundInChildren;
-          }
-        }
-      }
-      return "";
-    };
-    
-    return findCategoryNameBySlug(categories, selectedCategorySlug);
-  }, [selectedCategorySlug, categories]);
+    const category = findCategoryBySlug(categories, selectedCategorySlug);
+    return category?.name || "";
+  }, [selectedCategorySlug, categories, findCategoryBySlug]);
 
-  // Filter products based on current filters - with debouncing
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      const hasActiveFilters =
-        currentFilters.priceRange[0] > 1 ||
-        currentFilters.priceRange[1] < 100000 ||
-        Object.values(currentFilters.attributes).some(
-          (arr) => arr.length > 0
-        ) ||
-        currentFilters.ratings.length > 0 ||
-        currentFilters.availability.length > 0 ||
-        currentFilters.brands.length > 0 ||
-        currentFilters.vendors.length > 0;
+  const breadcrumbPath = useMemo(
+    () => selectedCategoryId ? getCategoryPath(categories, selectedCategoryId) : [],
+    [selectedCategoryId, categories]
+  );
 
-      // Always filter when there's a category slug or other filters
-      if (hasActiveFilters || selectedCategorySlug) {
-        // Unified attributes structure
-        const unifiedAttributes: {
-          [key: string]: string | string[] | number | number[] | boolean;
-        } = {};
+  const isLeafCategory = useMemo(() => {
+    if (!selectedCategoryId || !categories.length) return false;
+    const category = findCategoryById(categories, selectedCategoryId);
+    return category && (!category.children || category.children.length === 0);
+  }, [selectedCategoryId, categories, findCategoryById]);
 
-        Object.entries(currentFilters.attributes).forEach(([key, values]) => {
-          if (Array.isArray(values) && values.length > 0) {
-            const firstValue = values[0];
+  const truncatedCategories = useMemo(
+    () => truncateCategories(categories, 3),
+    [categories]
+  );
 
-            if (typeof firstValue === "number") {
-              if (values.length === 1) {
-                unifiedAttributes[key] = firstValue;
-              } else {
-                unifiedAttributes[key] = values;
-              }
-            } else if (typeof firstValue === "boolean") {
-              unifiedAttributes[key] = firstValue;
-            } else {
-              if (values.length === 1) {
-                unifiedAttributes[key] = String(firstValue);
-              } else {
-                unifiedAttributes[key] = values.map((v) => String(v));
-              }
-            }
-          }
-        });
-
-        // Build filter data - send categorySlug directly to server
-        const filterData = {
-          categorySlug: selectedCategorySlug || undefined, // Send slug to server
-          minPrice: currentFilters.priceRange[0],
-          maxPrice: currentFilters.priceRange[1],
-          attributes:
-            Object.keys(unifiedAttributes).length > 0
-              ? unifiedAttributes
-              : undefined,
-          ratings:
-            currentFilters.ratings.length > 0
-              ? currentFilters.ratings
-              : undefined,
-          brands:
-            currentFilters.brands.length > 0
-              ? currentFilters.brands
-              : undefined,
-          vendors:
-            currentFilters.vendors.length > 0
-              ? currentFilters.vendors
-              : undefined,
-          inStock: currentFilters.availability.includes("inStock")
-            ? true
-            : undefined,
-          onSale: currentFilters.availability.includes("onSale")
-            ? true
-            : undefined,
-          newArrivals: currentFilters.availability.includes("newArrivals")
-            ? true
-            : undefined,
-        };
-
-        console.log("Applying filters with category slug:", filterData);
-
-        // Call filter API - server will handle category matching
-        filterProducts(filterData as any);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [currentFilters, selectedCategorySlug, filterProducts]);
-
-  // Determine which products to display
+  // ============================================
+  // 10. DISPLAY LOGIC
+  // ============================================
+  
   const displayedProducts = useMemo(() => {
     const hasActiveFilters =
       currentFilters.priceRange[0] > 1 ||
@@ -280,58 +299,63 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
     if ((hasActiveFilters || selectedCategorySlug) && filteredProducts) {
       return filteredProducts;
     }
-
     return allProducts;
   }, [allProducts, filteredProducts, currentFilters, selectedCategorySlug]);
 
-  // Limit nested categories to first 3 levels
-  const truncatedCategories = useMemo(
-    () => truncateCategories(categories, 3),
-    [categories]
-  );
+  const totalProductCount = useMemo(() => {
+    // Use pagination total if available (from filtered query)
+    if (filteredProductsData?.pagination?.total !== undefined) {
+      return filteredProductsData.pagination.total;
+    }
+    // Use pagination total from base query
+    if (productsData?.pagination?.total !== undefined) {
+      return productsData.pagination.total;
+    }
+    // Fallback to displayed items count
+    return displayedProducts.length;
+  }, [filteredProductsData, productsData, displayedProducts]);
 
-  // Compute breadcrumb path
-  const breadcrumbPath = useMemo(
-    () =>
-      selectedCategoryId ? getCategoryPath(categories, selectedCategoryId) : [],
-    [selectedCategoryId, categories]
-  );
+  // ============================================
+  // 11. LOADING & COUNT STATES
+  // ============================================
+  
+  const isLoading =
+    (initialProducts.length === 0 && productsLoading) ||
+    (initialCategories.length === 0 && categoriesLoading) ||
+    filterLoading;
 
-  // Check if selected category is a leaf category
-  const isLeafCategory = useMemo(() => {
-    if (!selectedCategoryId || !categories.length) return false;
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (currentFilters.priceRange[0] > 1 || currentFilters.priceRange[1] < 100000) count++;
+    count += Object.values(currentFilters.attributes).flat().length;
+    count += currentFilters.ratings.length;
+    count += currentFilters.availability.length;
+    count += currentFilters.brands.length;
+    count += currentFilters.vendors.length;
+    if (selectedCategorySlug) count++;
+    return count;
+  }, [currentFilters, selectedCategorySlug]);
 
-    const category = categories.find((c: any) => c.id === selectedCategoryId);
-    return category && (!category.children || category.children.length === 0);
-  }, [selectedCategoryId, categories]);
-
+  // ============================================
+  // 12. HANDLERS
+  // ============================================
+  
   const handleProductClick = useCallback(
     (data: { slug: string; id: string }) => {
-      router.push(`/products/${data.id}`);
+      router.push(`/products/${data.slug || data.id}`);
     },
     [router]
   );
 
-  const handleCategorySelect = useCallback(
+ const handleCategorySelect = useCallback(
     (categorySlug: string) => {
-      console.log("Category selected via slug:", categorySlug);
-      
-      // Update URL
-      const params = new URLSearchParams(searchParams.toString());
-      
       if (categorySlug) {
-        params.set("category", categorySlug);
+        router.push(`/category/${categorySlug}`);  
       } else {
-        params.delete("category");
+        router.push('/products');
       }
       
-      // Remove other filter params when changing category
-      const filterParams = ["minPrice", "maxPrice", "brands", "ratings", "availability"];
-      filterParams.forEach(param => params.delete(param));
-      
-      router.replace(`/products?${params.toString()}`, { scroll: false });
-      
-      // Reset filters when category changes
+      // Filter reset korun
       setCurrentFilters({
         categories: [],
         priceRange: [1, 100000],
@@ -342,25 +366,16 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
         availability: [],
       });
     },
-    [searchParams, router]
+    [router]
   );
 
   const handleFiltersChange = useCallback((filters: ProductFilters) => {
     setCurrentFilters(filters);
   }, []);
 
-  const clearAllFilters = useCallback(() => {
-    // Update URL
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("category");
+ const clearAllFilters = useCallback(() => {
+    router.replace('/products', { scroll: false });
     
-    // Clear all filter params
-    const filterParams = ["minPrice", "maxPrice", "brands", "ratings", "availability"];
-    filterParams.forEach(param => params.delete(param));
-    
-    router.replace(`/products?${params.toString()}`, { scroll: false });
-    
-    // Reset state
     setSelectedCategorySlug("");
     setCurrentFilters({
       categories: [],
@@ -371,44 +386,20 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
       ratings: [],
       availability: [],
     });
-  }, [searchParams, router]);
+  }, [router]);
 
-  // Loading states
-  const isLoading =
-    (initialProducts.length === 0 && productsLoading) ||
-    (initialCategories.length === 0 && categoriesLoading) ||
-    filterLoading;
-
-  // Count active filters
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (
-      currentFilters.priceRange[0] > 1 ||
-      currentFilters.priceRange[1] < 100000
-    )
-      count++;
-    count += Object.values(currentFilters.attributes).flat().length;
-    count += currentFilters.ratings.length;
-    count += currentFilters.availability.length;
-    count += currentFilters.brands.length;
-    count += currentFilters.vendors.length;
-    if (selectedCategorySlug) count++; // Count category as an active filter
-    return count;
-  }, [currentFilters, selectedCategorySlug]);
-
-  // Generate structured data for SEO
+  // ============================================
+  // 13. SEO STRUCTURED DATA
+  // ============================================
+  
   const structuredData = useMemo(() => {
-    const productsArray = Array.isArray(displayedProducts) 
-      ? displayedProducts 
-      : displayedProducts?.data || [];
-    
     return {
       "@context": "https://schema.org",
       "@type": "ItemList",
       name: "Products",
       description: "Browse our collection of products",
-      numberOfItems: productsArray.length,
-      itemListElement: productsArray
+      numberOfItems: displayedProducts.length,
+      itemListElement: displayedProducts
         .slice(0, 10)
         .map((product: any, index: number) => ({
           "@type": "ListItem",
@@ -420,33 +411,34 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
             image: product.images?.[0]?.url,
             offers: {
               "@type": "Offer",
-              price:
-                product.variants?.[0]?.specialPrice ||
-                product.variants?.[0]?.price ||
-                0,
-              priceCurrency: "USD",
+              price: product.variants?.[0]?.specialPrice || product.variants?.[0]?.price || 0,
+              priceCurrency: "BDT",
             },
           },
         })),
     };
   }, [displayedProducts]);
 
-  // Determine grid columns based on whether it's base products page
+  // ============================================
+  // 14. GRID COLUMNS HELPER
+  // ============================================
+  
   const getGridColumns = useCallback(() => {
     if (viewMode === "list") {
       return "space-y-2";
     }
-
     if (isBaseProductsPage) {
       return "grid gap-1 sm:gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6";
-    } else {
-      return "grid gap-1 sm:gap-2 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
     }
+    return "grid gap-1 sm:gap-2 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
   }, [viewMode, isBaseProductsPage]);
 
+  // ============================================
+  // 15. RENDER
+  // ============================================
+  
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Structured Data for SEO */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
@@ -457,8 +449,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
           <ProductCategories
             categories={truncatedCategories}
             onSelectCategory={(categoryId) => {
-              // Find category by ID to get slug
-              const category = categories.find((c: any) => c.id === categoryId);
+              const category = findCategoryById(categories, categoryId);
               handleCategorySelect(category?.slug || "");
             }}
             selectedCategory={selectedCategoryId}
@@ -471,14 +462,13 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
                 : [{ id: "", name: "All Products" }]
             }
             onCategoryClick={(categoryId) => {
-              // Find category by ID to get slug
-              const category = categories.find((c: any) => c.id === categoryId);
+              const category = findCategoryById(categories, categoryId);
               handleCategorySelect(category?.slug || "");
             }}
           />
 
           <ProductHeader
-            totalResults={Array.isArray(displayedProducts) ? displayedProducts.length : (displayedProducts?.data?.length || 0)}
+            totalResults={totalProductCount}
             viewMode={viewMode}
             setViewMode={setViewMode}
             onFilterClick={() => setIsMobileFilterOpen(true)}
@@ -488,7 +478,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
         </div>
 
         <div className="flex gap-6">
-          {/* Sidebar with new filter API */}
+          {/* Sidebar */}
           <FilterSidebar
             isMobileOpen={isMobileFilterOpen}
             onMobileClose={() => setIsMobileFilterOpen(false)}
@@ -504,7 +494,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
                 isBaseProductsPage={isBaseProductsPage}
                 viewMode={viewMode}
               />
-            ) : (Array.isArray(displayedProducts) ? displayedProducts.length : displayedProducts?.data?.length || 0) === 0 ? (
+            ) : displayedProducts.length === 0 ? (
               <div className="text-center py-10">
                 <div className="text-gray-400 text-6xl mb-4">😔</div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -523,9 +513,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
               </div>
             ) : (
               <>
-                {/* Products Grid */}
                 <div className={getGridColumns()}>
-                  {(Array.isArray(displayedProducts) ? displayedProducts : displayedProducts?.data || []).map((product: any) => (
+                  {displayedProducts.map((product: any) => (
                     <div
                       key={product.id}
                       onClick={() =>
@@ -540,6 +529,20 @@ const ProductsPage: React.FC<ProductsPageProps> = ({
                     </div>
                   ))}
                 </div>
+
+                {/* Load More for Cursor Pagination */}
+                {(filteredProductsData?.pagination?.hasMore ||
+                  (!filteredProductsData && productsData?.pagination?.hasMore)) && (
+                  <div className="flex justify-center mt-8">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="px-12"
+                    >
+                      Load More Products
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </div>

@@ -1,426 +1,186 @@
-// features/employeeApi.ts
+// src/redux/employeeApi.ts
+//
+// Talks to the ORIGINAL employee module (src/routes/employee.routes.ts,
+// mounted at /api/employees) — account creation, activate/deactivate,
+// and the permission checkboxes. This is intentionally separate from
+// hrmApi.ts, which only manages the richer HrEmployeeProfile data
+// (branch/department/designation, attendance, leave, payroll...).
+//
+// Creating a new staff member is a two-step flow in the UI:
+//   1) employeeApi.createAdminEmployee / createVendorEmployee — makes the
+//      login account (User + Employee + permissions)
+//   2) An HrEmployeeProfile is auto-created server-side right after step 1
+//      (see the employee.service.ts hook from the HRM module README) —
+//      the UI then immediately calls hrmApi.useUpdateEmployeeMutation to
+//      fill in branch/department/designation/personal info.
+
 import { createApi } from "@reduxjs/toolkit/query/react";
 import baseQueryWithReauth from "./baseQueryWithReauth";
+import type { PermissionKey } from "./authApi";
 
-// =============================
-// REQUEST TYPES
-// =============================
-
-export interface CreateEmployeeRequest {
-  name: string;
-  email: string;
-  phone?: string;
-  password: string;
-  designation: string;
-  department: string;
-  permissions: {
-    productManagement?: boolean;
-    orderManagement?: boolean;
-    customerSupport?: boolean;
-    analytics?: boolean;
-    offerManagement?: boolean;
-    inventoryManagement?: boolean;
-  };
+export interface EmployeePermissions {
+  productManagement?: boolean;
+  orderManagement?: boolean;
+  customerSupport?: boolean;
+  analytics?: boolean;
+  offerManagement?: boolean;
+  inventoryManagement?: boolean;
+  hrManagement?: boolean;
+  /** Marketing Center admin side — admin-only grant. */
+  marketingManagement?: boolean;
+  /** Admin-only grant: manage vendor POS subscriptions (never vendor POS access). */
+  posSubscriptionManagement?: boolean;
+  /** Admin-only grant: the Agent Commission admin area. */
+  agentManagement?: boolean;
+  /** Admin-only grant: theme palette management (Part 3). */
+  themeManagement?: boolean;
+  /** Vendor-only grant: use this vendor's POS terminal. */
+  posAccess?: boolean;
+  /** Vendor-only POS action grants. */
+  posDiscount?: boolean;
+  posCredit?: boolean;
+  posRefund?: boolean;
+  posReports?: boolean;
+  /** Granular HR permissions (P0) — hrManagement umbrella overrides all. */
+  hrEmployeeView?: boolean;
+  hrEmployeeCreate?: boolean;
+  hrEmployeeEdit?: boolean;
+  hrEmployeeDelete?: boolean;
+  hrSalaryView?: boolean;
+  hrSalaryEdit?: boolean;
+  hrDocsUpload?: boolean;
+  hrDocsVerify?: boolean;
+  hrDocsDownload?: boolean;
+  hrDocsDelete?: boolean;
+  hrBankView?: boolean;
+  hrOrgEdit?: boolean;
+  hrLeaveTypesEdit?: boolean;
 }
-
-export interface UpdateEmployeeRequest {
-  name?: string;
-  email?: string;
-  phone?: string;
-  designation?: string;
-  department?: string;
-  permissions?: {
-    productManagement?: boolean;
-    orderManagement?: boolean;
-    customerSupport?: boolean;
-    analytics?: boolean;
-    offerManagement?: boolean;
-    inventoryManagement?: boolean;
-  };
-  isActive?: boolean;
-}
-
-export interface EmployeeFilters {
-  search?: string;
-  department?: string;
-  designation?: string;
-  isActive?: boolean;
-  page?: number;
-  limit?: number;
-}
-
-export interface UpdatePermissionsRequest {
-  permissions: {
-    productManagement?: boolean;
-    orderManagement?: boolean;
-    customerSupport?: boolean;
-    analytics?: boolean;
-    offerManagement?: boolean;
-    inventoryManagement?: boolean;
-  };
-}
-
-// =============================
-// RESPONSE TYPES
-// =============================
 
 export interface Employee {
   id: string;
-  designation: string;
-  department: string;
-  permissions: any;
+  // Present only on the response from createAdminEmployee/createVendorEmployee
+  // — the auto-created HrEmployeeProfile's id (see the HRM module README's
+  // employee.service.ts hook). Use THIS id when opening EmployeeProfileDrawer,
+  // not `id` above (that one is for permissions/toggle-status calls).
+  hrProfileId?: string;
+  designation?: string | null;
+  department?: string | null;
+  permissions: EmployeePermissions;
   isActive: boolean;
+  vendorId?: string | null;
   createdAt: string;
-  updatedAt: string;
-  user?: {
-    id: string;
-    name: string;
-    email: string;
-    phone?: string;
-    isActive: boolean;
-  };
-  createdBy?: {
-    id: string;
-    name: string;
-    email: string;
-  };
-  vendor?: {
-    id: string;
-    storeName: string;
-  };
+  user: { id: string; name: string | null; email: string | null; phone: string | null; isActive: boolean };
 }
 
-export interface EmployeeStats {
-  totalEmployees: number;
-  activeEmployees: number;
-  inactiveEmployees: number;
-  byDepartment: Record<string, number>;
-  byDesignation: Record<string, number>;
+export interface CreateEmployeeInput {
+  name: string;
+  email?: string;
+  phone?: string;
+  password: string;
+  designation?: string;
+  department?: string;
+  permissions: EmployeePermissions;
 }
 
-export interface ToggleStatusResponse {
-  message: string;
-  isActive: boolean;
+export interface UpdateEmployeeInput {
+  designation?: string;
+  department?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
 }
-
-export interface PermissionsResponse {
-  id: string;
-  permissions: any;
-  user?: {
-    name: string;
-    email: string;
-  };
-}
-
-export interface ApiResponse<T> {
-  success: boolean;
-  message?: string;
-  data?: T;
-  errors?: Array<{ field: string; message: string }>;
-}
-
-export interface PaginatedResponse<T> {
-  success: boolean;
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-// =============================
-// EMPLOYEE API
-// =============================
 
 export const employeeApi = createApi({
   reducerPath: "employeeApi",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Employee", "VendorEmployee", "EmployeeStats", "Permissions"],
+  tagTypes: ["Employee", "EmployeePermissions", "EmployeeStats"],
+
   endpoints: (builder) => ({
-    // =============================
-    // ADMIN ENDPOINTS
-    // =============================
-    
-    createAdminEmployee: builder.mutation<ApiResponse<Employee>, CreateEmployeeRequest>({
-      query: (body) => ({
-        url: "/employees/admin/employees",
-        method: "POST",
-        body,
-      }),
+    // ------- Admin employees -------
+    createAdminEmployee: builder.mutation<{ success: boolean; data: Employee }, CreateEmployeeInput>({
+      query: (body) => ({ url: "/employees/admin/employees", method: "POST", body }),
       invalidatesTags: ["Employee", "EmployeeStats"],
     }),
-
-    getAdminEmployees: builder.query<PaginatedResponse<Employee>, EmployeeFilters>({
-      query: (params) => ({
-        url: "/employees/admin/employees",
-        method: "GET",
-        params,
-      }),
+    getAdminEmployees: builder.query<{ success: boolean; data: Employee[] }, void>({
+      query: () => "/employees/admin/employees",
       providesTags: ["Employee"],
     }),
-
-    updateAdminEmployee: builder.mutation<
-      ApiResponse<Employee>,
-      { employeeId: string; data: UpdateEmployeeRequest }
-    >({
-      query: ({ employeeId, data }) => ({
-        url: `/employees/admin/employees/${employeeId}`,
-        method: "PUT",
-        body: data,
-      }),
-      invalidatesTags: ["Employee", "EmployeeStats"],
-    }),
-
-    toggleAdminEmployeeStatus: builder.mutation<
-      ApiResponse<ToggleStatusResponse>,
-      string
-    >({
-      query: (employeeId) => ({
-        url: `/employees/admin/employees/${employeeId}/toggle-status`,
-        method: "PATCH",
-      }),
-      invalidatesTags: ["Employee", "EmployeeStats"],
-    }),
-
-    // =============================
-    // VENDOR ENDPOINTS
-    // =============================
-
-    createVendorEmployee: builder.mutation<ApiResponse<Employee>, CreateEmployeeRequest>({
-      query: (body) => ({
-        url: "/employees/vendor/employees",
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: ["VendorEmployee", "EmployeeStats"],
-    }),
-
-    getVendorEmployees: builder.query<PaginatedResponse<Employee>, EmployeeFilters>({
-      query: (params) => ({
-        url: "/employees/vendor/employees",
-        method: "GET",
-        params,
-      }),
-      providesTags: ["VendorEmployee"],
-    }),
-
-    updateVendorEmployee: builder.mutation<
-      ApiResponse<Employee>,
-      { employeeId: string; data: UpdateEmployeeRequest }
-    >({
-      query: ({ employeeId, data }) => ({
-        url: `/employees/vendor/employees/${employeeId}`,
-        method: "PUT",
-        body: data,
-      }),
-      invalidatesTags: ["VendorEmployee", "EmployeeStats"],
-    }),
-
-    toggleVendorEmployeeStatus: builder.mutation<
-      ApiResponse<ToggleStatusResponse>,
-      string
-    >({
-      query: (employeeId) => ({
-        url: `/employees/vendor/employees/${employeeId}/toggle-status`,
-        method: "PATCH",
-      }),
-      invalidatesTags: ["VendorEmployee", "EmployeeStats"],
-    }),
-
-    // =============================
-    // EMPLOYEE PERMISSION ENDPOINTS
-    // =============================
-
-    updateEmployeePermissions: builder.mutation<
-      ApiResponse<Employee>,
-      { employeeId: string; data: UpdatePermissionsRequest }
-    >({
-      query: ({ employeeId, data }) => ({
-        url: `/employees/employees/${employeeId}/permissions`,
-        method: "PUT",
-        body: data,
-      }),
-      invalidatesTags: ["Employee", "VendorEmployee", "Permissions"],
-    }),
-
-    getEmployeePermissions: builder.query<
-      ApiResponse<PermissionsResponse>,
-      string
-    >({
-      query: (employeeId) => ({
-        url: `/employees/employees/${employeeId}/permissions`,
-        method: "GET",
-      }),
-      providesTags: (result, error, id) => [{ type: "Permissions", id }],
-    }),
-
-    // =============================
-    // EMPLOYEE STATISTICS ENDPOINTS
-    // =============================
-
-    getAdminEmployeeStats: builder.query<ApiResponse<EmployeeStats>, void>({
-      query: () => ({
-        url: "/employees/admin/stats",
-        method: "GET",
-      }),
-      providesTags: ["EmployeeStats"],
-    }),
-
-    getVendorEmployeeStats: builder.query<ApiResponse<EmployeeStats>, void>({
-      query: () => ({
-        url: "/employees/vendor/stats",
-        method: "GET",
-      }),
-      providesTags: ["EmployeeStats"],
-    }),
-
-    // =============================
-    // COMMON ENDPOINTS
-    // =============================
-
-    getEmployeeById: builder.query<ApiResponse<Employee>, string>({
-      query: (employeeId) => ({
-        url: `/employees/employees/${employeeId}`,
-        method: "GET",
-      }),
-      providesTags: (result, error, id) => [{ type: "Employee", id }],
-    }),
-
-    // =============================
-    // EMPLOYEE SELF-SERVICE ENDPOINTS
-    // =============================
-
-    getMyProfile: builder.query<ApiResponse<Employee>, void>({
-      query: () => ({
-        url: "/employees/me/profile",
-        method: "GET",
-      }),
-      providesTags: ["Employee"],
-    }),
-
-    updateMyProfile: builder.mutation<
-      ApiResponse<Employee>,
-      { name?: string; phone?: string }
-    >({
-      query: (data) => ({
-        url: "/employees/me/profile",
-        method: "PUT",
-        body: data,
-      }),
+    updateAdminEmployee: builder.mutation<{ success: boolean; data: Employee }, { employeeId: string; data: UpdateEmployeeInput }>({
+      query: ({ employeeId, data }) => ({ url: `/employees/admin/employees/${employeeId}`, method: "PUT", body: data }),
       invalidatesTags: ["Employee"],
     }),
+    toggleAdminEmployeeStatus: builder.mutation<{ success: boolean; data: Employee }, string>({
+      query: (employeeId) => ({ url: `/employees/admin/employees/${employeeId}/toggle-status`, method: "PATCH" }),
+      invalidatesTags: ["Employee", "EmployeeStats"],
+    }),
+    getAdminEmployeeStats: builder.query<{ success: boolean; data: any }, void>({
+      query: () => "/employees/admin/stats",
+      providesTags: ["EmployeeStats"],
+    }),
 
-    changeMyPassword: builder.mutation<
-      ApiResponse<{ message: string }>,
-      { currentPassword: string; newPassword: string }
+    // ------- Vendor employees -------
+    createVendorEmployee: builder.mutation<{ success: boolean; data: Employee }, CreateEmployeeInput>({
+      query: (body) => ({ url: "/employees/vendor/employees", method: "POST", body }),
+      invalidatesTags: ["Employee", "EmployeeStats"],
+    }),
+    getVendorEmployees: builder.query<{ success: boolean; data: Employee[] }, void>({
+      query: () => "/employees/vendor/employees",
+      providesTags: ["Employee"],
+    }),
+    updateVendorEmployee: builder.mutation<{ success: boolean; data: Employee }, { employeeId: string; data: UpdateEmployeeInput }>({
+      query: ({ employeeId, data }) => ({ url: `/employees/vendor/employees/${employeeId}`, method: "PUT", body: data }),
+      invalidatesTags: ["Employee"],
+    }),
+    toggleVendorEmployeeStatus: builder.mutation<{ success: boolean; data: Employee }, string>({
+      query: (employeeId) => ({ url: `/employees/vendor/employees/${employeeId}/toggle-status`, method: "PATCH" }),
+      invalidatesTags: ["Employee", "EmployeeStats"],
+    }),
+    getVendorEmployeeStats: builder.query<{ success: boolean; data: any }, void>({
+      query: () => "/employees/vendor/stats",
+      providesTags: ["EmployeeStats"],
+    }),
+
+    // ------- Permissions (ADMIN/VENDOR only — see the security fix note) -------
+    getEmployeePermissions: builder.query<{ success: boolean; data: EmployeePermissions }, string>({
+      query: (employeeId) => `/employees/employees/${employeeId}/permissions`,
+      providesTags: ["EmployeePermissions"],
+    }),
+    updateEmployeePermissions: builder.mutation<
+      { success: boolean; data: Employee },
+      { employeeId: string; permissions: EmployeePermissions }
     >({
-      query: (data) => ({
-        url: "/employees/me/change-password",
-        method: "PATCH",
-        body: data,
+      query: ({ employeeId, permissions }) => ({
+        url: `/employees/employees/${employeeId}/permissions`,
+        method: "PUT",
+        body: { permissions },
       }),
+      invalidatesTags: ["Employee", "EmployeePermissions"],
     }),
 
-    // =============================
-    // BULK OPERATIONS
-    // =============================
-
-    bulkToggleEmployeeStatus: builder.mutation<
-      ApiResponse<{ updated: number; failed: string[] }>,
-      { employeeIds: string[]; activate: boolean }
-    >({
-      query: (body) => ({
-        url: "/employees/admin/employees/bulk-toggle-status",
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: ["Employee", "VendorEmployee", "EmployeeStats"],
-    }),
-
-    bulkUpdatePermissions: builder.mutation<
-      ApiResponse<{ updated: number; failed: string[] }>,
-      { employeeIds: string[]; permissions: any }
-    >({
-      query: (body) => ({
-        url: "/employees/admin/employees/bulk-permissions",
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: ["Employee", "VendorEmployee", "Permissions"],
-    }),
-
-    // =============================
-    // SEARCH AND FILTER ENDPOINTS
-    // =============================
-
-    searchEmployees: builder.query<
-      ApiResponse<Employee[]>,
-      { query: string; limit?: number }
-    >({
-      query: ({ query, limit = 10 }) => ({
-        url: "/employees/search",
-        method: "GET",
-        params: { query, limit },
-      }),
-    }),
-
-    getDepartments: builder.query<ApiResponse<string[]>, void>({
-      query: () => ({
-        url: "/employees/departments",
-        method: "GET",
-      }),
-    }),
-
-    getDesignations: builder.query<ApiResponse<string[]>, void>({
-      query: () => ({
-        url: "/employees/designations",
-        method: "GET",
-      }),
+    // ------- Common -------
+    getEmployeeById: builder.query<{ success: boolean; data: Employee }, string>({
+      query: (employeeId) => `/employees/employees/${employeeId}`,
+      providesTags: ["Employee"],
     }),
   }),
 });
 
-// =============================
-// EXPORT HOOKS
-// =============================
-
 export const {
-  // Admin endpoints
   useCreateAdminEmployeeMutation,
   useGetAdminEmployeesQuery,
   useUpdateAdminEmployeeMutation,
   useToggleAdminEmployeeStatusMutation,
+  useGetAdminEmployeeStatsQuery,
 
-  // Vendor endpoints
   useCreateVendorEmployeeMutation,
   useGetVendorEmployeesQuery,
   useUpdateVendorEmployeeMutation,
   useToggleVendorEmployeeStatusMutation,
-
-  // Permission endpoints
-  useUpdateEmployeePermissionsMutation,
-  useGetEmployeePermissionsQuery,
-
-  // Statistics endpoints
-  useGetAdminEmployeeStatsQuery,
   useGetVendorEmployeeStatsQuery,
 
-  // Common endpoints
+  useGetEmployeePermissionsQuery,
+  useUpdateEmployeePermissionsMutation,
+
   useGetEmployeeByIdQuery,
-
-  // Employee self-service
-  useGetMyProfileQuery,
-  useUpdateMyProfileMutation,
-  useChangeMyPasswordMutation,
-
-  // Bulk operations
-  useBulkToggleEmployeeStatusMutation,
-  useBulkUpdatePermissionsMutation,
-
-  // Search and filter
-  useSearchEmployeesQuery,
-  useGetDepartmentsQuery,
-  useGetDesignationsQuery,
 } = employeeApi;

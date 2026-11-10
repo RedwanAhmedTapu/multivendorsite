@@ -14,6 +14,20 @@ interface StoreInfoStepProps {
   onEditClick?: () => void;
 }
 
+/* ── Shared visual helpers ── */
+const SpinnerIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg className={`animate-spin ${className}`} fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+  </svg>
+);
+
+const StoreIcon = ({ className = 'w-4 h-4 text-white' }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9.5L4.5 4h15L21 9.5M3 9.5v9a1.5 1.5 0 001.5 1.5h15a1.5 1.5 0 001.5-1.5v-9M3 9.5h18M9 20v-5a2 2 0 012-2h2a2 2 0 012 2v5" />
+  </svg>
+);
+
 const StoreInfoStep: React.FC<StoreInfoStepProps> = ({
   form,
   onSubmit,
@@ -105,8 +119,13 @@ const StoreInfoStep: React.FC<StoreInfoStepProps> = ({
           style={{ backgroundColor: '#f2f3ff' }}
         >
           {/* Header strip */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div
+            className="relative overflow-hidden px-8 py-5 flex items-center justify-between"
+            style={{ background: 'linear-gradient(135deg,#2563eb,#7c3aed)' }}
+          >
+            <div className="pointer-events-none absolute -top-6 -right-4 h-24 w-24 rounded-full bg-white/10" />
+            <div className="pointer-events-none absolute -bottom-8 right-16 h-16 w-16 rounded-full bg-white/[0.06]" />
+            <div className="relative flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
                 <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -117,7 +136,7 @@ const StoreInfoStep: React.FC<StoreInfoStepProps> = ({
             <button
               type="button"
               onClick={onEditClick}
-              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/30 text-white text-sm font-semibold rounded-lg transition-all"
+              className="relative flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/30 text-white text-sm font-semibold rounded-lg transition-all"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -136,10 +155,8 @@ const StoreInfoStep: React.FC<StoreInfoStepProps> = ({
                   className="w-20 h-20 rounded-2xl object-cover border-4 border-white shadow-md"
                 />
               ) : (
-                <div className="w-20 h-20 rounded-2xl bg-blue-100 flex items-center justify-center border-4 border-white shadow-md">
-                  <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
+                <div className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center border-4 border-white shadow-md">
+                  <StoreIcon className="w-8 h-8 text-blue-400" />
                 </div>
               )}
               <div>
@@ -165,6 +182,12 @@ const StoreInfoStep: React.FC<StoreInfoStepProps> = ({
     <form onSubmit={handleSubmit(handleFormSubmit)} className="max-w-2xl mx-auto space-y-8">
       {/* Title */}
       <div className="text-center">
+        <div
+          className="mx-auto mb-3 w-11 h-11 rounded-2xl flex items-center justify-center shadow-md"
+          style={{ background: 'linear-gradient(135deg,#2563eb,#7c3aed)' }}
+        >
+          <StoreIcon className="w-5 h-5 text-white" />
+        </div>
         <h2 className="text-2xl font-black text-slate-900 tracking-tight">Store Information</h2>
         <p className="text-slate-500 mt-1 text-sm">Tell us about your business</p>
       </div>
@@ -212,7 +235,10 @@ const StoreInfoStep: React.FC<StoreInfoStepProps> = ({
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3">
-            <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-sm"
+              style={{ background: 'linear-gradient(135deg,#dbeafe,#ede9fe)' }}
+            >
               <svg className="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
@@ -228,36 +254,47 @@ const StoreInfoStep: React.FC<StoreInfoStepProps> = ({
       </div>
 
       {/* Store Name */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-2">
-        <label htmlFor="storeName" className="block text-xs font-black uppercase tracking-widest text-slate-500">
-          Store Name <span className="text-red-500 normal-case">*</span>
-        </label>
-        <input
-          type="text"
-          id="storeName"
-          {...register('storeName', {
-            required: 'Store name is required',
-            minLength: { value: 2, message: 'Minimum 2 characters' },
-            maxLength: { value: 100, message: 'Maximum 100 characters' },
-          })}
-          className={`w-full px-4 py-3 rounded-xl border-2 text-slate-900 font-medium text-sm placeholder-slate-300 focus:outline-none transition-all ${
-            errors.storeName
-              ? 'border-red-300 bg-red-50 focus:border-red-400'
-              : 'border-slate-200 focus:border-blue-500 focus:bg-white'
-          }`}
-          placeholder="e.g. Nordic Goods Co."
-          style={{ backgroundColor: errors.storeName ? undefined : '#faf8ff' }}
-        />
-        {errors.storeName ? (
-          <p className="flex items-center gap-1.5 text-xs text-red-500 font-semibold pt-1">
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            {errors.storeName.message as string}
-          </p>
-        ) : vendor?.storeName ? (
-          <p className="text-xs text-blue-600 font-semibold pt-1">✓ Current: {vendor.storeName}</p>
-        ) : null}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100" style={{ backgroundColor: '#f2f3ff' }}>
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg,#2563eb,#7c3aed)' }}
+          >
+            <StoreIcon />
+          </div>
+          <h3 className="text-sm font-black uppercase tracking-wider text-slate-700">Store Details</h3>
+        </div>
+        <div className="p-6 space-y-2">
+          <label htmlFor="storeName" className="block text-xs font-black uppercase tracking-widest text-slate-500">
+            Store Name <span className="text-red-500 normal-case">*</span>
+          </label>
+          <input
+            type="text"
+            id="storeName"
+            {...register('storeName', {
+              required: 'Store name is required',
+              minLength: { value: 2, message: 'Minimum 2 characters' },
+              maxLength: { value: 100, message: 'Maximum 100 characters' },
+            })}
+            className={`w-full px-4 py-3 rounded-xl border-2 text-slate-900 font-medium text-sm placeholder-slate-300 focus:outline-none transition-all ${
+              errors.storeName
+                ? 'border-red-300 bg-red-50 focus:border-red-400'
+                : 'border-slate-200 focus:border-blue-500 focus:bg-white'
+            }`}
+            placeholder="e.g. Nordic Goods Co."
+            style={{ backgroundColor: errors.storeName ? undefined : '#faf8ff' }}
+          />
+          {errors.storeName ? (
+            <p className="flex items-center gap-1.5 text-xs text-red-500 font-semibold pt-1">
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              {errors.storeName.message as string}
+            </p>
+          ) : vendor?.storeName ? (
+            <p className="text-xs text-blue-600 font-semibold pt-1">✓ Current: {vendor.storeName}</p>
+          ) : null}
+        </div>
       </div>
 
       {/* Submit */}
@@ -267,12 +304,7 @@ const StoreInfoStep: React.FC<StoreInfoStepProps> = ({
           disabled={isSubmitting || !isValid}
           className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all"
         >
-          {isSubmitting ? (
-            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-          ) : (
+          {isSubmitting ? <SpinnerIcon /> : (
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>

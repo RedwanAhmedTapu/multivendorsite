@@ -1,6 +1,47 @@
 // features/themeApi.ts
 import { createApi } from "@reduxjs/toolkit/query/react";
 import baseQueryWithReauth from "./baseQueryWithReauth";
+import type { RootState } from "@/store/store";
+
+/**
+ * Expires the storefront's server cache for the given scope (active layout,
+ * homepage config or the global product card design) so a change shows up
+ * on the next request instead of after the cache window. Calls our own Next
+ * route, which re-checks ADMIN with the backend. Best-effort: resolves to
+ * false on any failure (the old cache then lives until it expires).
+ */
+export async function refreshStorefrontCache(token: string | null | undefined, scope: "layout" | "config" | "card" | "all"): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const res = await fetch("/api/revalidate-homepage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ scope }),
+    });
+    if (!res.ok) console.warn(`Storefront cache refresh failed (${res.status})`);
+    return res.ok;
+  } catch (error) {
+    console.warn("Storefront cache refresh failed:", error);
+    return false;
+  }
+}
+
+async function refreshHomepageCache(getState: () => unknown, scope: "layout" | "config" | "all") {
+  await refreshStorefrontCache((getState() as RootState).auth.accessToken, scope);
+}
+
+/** onQueryStarted hook: after a successful layout change, refresh the homepage cache. */
+const refreshLayoutCacheAfterSuccess = async (
+  _arg: unknown,
+  { queryFulfilled, getState }: { queryFulfilled: Promise<unknown>; getState: () => unknown },
+) => {
+  try {
+    await queryFulfilled;
+  } catch {
+    return; // the mutation failed — nothing changed, nothing to refresh
+  }
+  await refreshHomepageCache(getState, "layout");
+};
 
 // --------- Types ---------
 export type LayoutType = 'layout_1' | 'layout_2' | 'layout_3';
@@ -112,6 +153,7 @@ export const themeApi = createApi({
         method: "POST",
       }),
       invalidatesTags: ["Theme"],
+      onQueryStarted: refreshLayoutCacheAfterSuccess,
     }),
 
     // Deactivate theme
@@ -132,6 +174,7 @@ export const themeApi = createApi({
         method: "POST",
       }),
       invalidatesTags: ["Theme"],
+      onQueryStarted: refreshLayoutCacheAfterSuccess,
     }),
 
     // Initialize themes (for admin)
@@ -142,6 +185,7 @@ export const themeApi = createApi({
         method: "POST",
       }),
       invalidatesTags: ["Theme"],
+      onQueryStarted: refreshLayoutCacheAfterSuccess,
     }),
   }),
 });

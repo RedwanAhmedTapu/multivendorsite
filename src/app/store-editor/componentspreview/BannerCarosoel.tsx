@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ComponentHandler } from "../ComponentHandler";
 
+export interface BannerCarouselFormData {
+  bannerImages?: string[];
+  autoSlide?:    boolean;
+  slideInterval?: number; // ms
+}
+
 interface BannerCarouselProps {
   isActive?: boolean;
   onDragOver?: (e: React.DragEvent) => void;
@@ -10,6 +16,8 @@ interface BannerCarouselProps {
   onCopy?: () => void;
   onDelete?: () => void;
   viewMode?: 'mobile' | 'desktop';
+  // ← live form data passed from PreviewArea, mirrors CountdownProducts pattern
+  formData?: BannerCarouselFormData;
 }
 
 export const BannerCarousel = ({
@@ -20,41 +28,47 @@ export const BannerCarousel = ({
   onMoveDown,
   onCopy,
   onDelete,
-  viewMode = 'desktop'
+  viewMode = 'desktop',
+  formData = {},
 }: BannerCarouselProps) => {
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  const slides = [
-    {
-      id: 1,
-      bgColor: "bg-gray-100"
-    },
-    {
-      id: 2,
-      bgColor: "bg-gray-100"
-    },
-    {
-      id: 3,
-      bgColor: "bg-gray-100"
-    },
-    {
-      id: 4,
-      bgColor: "bg-gray-100"
-    }
-  ];
+  // Live values — fall back to 4 placeholder slides so the preview always looks good
+  const images = formData.bannerImages && formData.bannerImages.length > 0
+    ? formData.bannerImages
+    : [undefined, undefined, undefined, undefined];
+  const autoSlide     = formData.autoSlide !== false;
+  const slideInterval = formData.slideInterval ?? 4000;
 
-  // Auto-advance carousel
+  const slides = images.map((src, i) => ({ id: i, src }));
+
+  // Auto-advance carousel — restarts whenever slide count, autoplay, or interval changes
   useEffect(() => {
+    if (!autoSlide || slides.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
-    }, 4000);
+    }, slideInterval);
 
     return () => clearInterval(interval);
-  }, [slides.length]);
+  }, [slides.length, autoSlide, slideInterval]);
+
+  // Clamp currentSlide if the slide count shrinks
+  useEffect(() => {
+    if (currentSlide >= slides.length) setCurrentSlide(0);
+  }, [slides.length, currentSlide]);
 
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
   };
+
+  const renderSlideContent = (src: string | undefined, iconSize: string) =>
+    src ? (
+      <img src={src} alt="" className="w-full h-full object-cover" />
+    ) : (
+      <svg className={`${iconSize} text-gray-400`} fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+      </svg>
+    );
 
   // Mobile View Design
   const renderMobileView = () => (
@@ -68,10 +82,8 @@ export const BannerCarousel = ({
               index === currentSlide ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            <div className={`w-full h-full ${slide.bgColor} flex items-center justify-center`}>
-              <svg className="w-16 h-16 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-              </svg>
+            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+              {renderSlideContent(slide.src, 'w-16 h-16')}
             </div>
           </div>
         ))}
@@ -107,10 +119,8 @@ export const BannerCarousel = ({
               index === currentSlide ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            <div className={`w-full h-full ${slide.bgColor} flex items-center justify-center`}>
-              <svg className="w-20 h-20 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-              </svg>
+            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+              {renderSlideContent(slide.src, 'w-20 h-20')}
             </div>
           </div>
         ))}

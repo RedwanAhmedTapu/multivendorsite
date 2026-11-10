@@ -1,6 +1,27 @@
 import React, { useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { ComponentHandler } from "../ComponentHandler";
+import { useAutoProducts, ProductSortBy } from "./useAutoProducts";
+
+export interface SliderProductItem {
+  name?: string;
+  image?: string;
+  price?: string;
+  originalPrice?: string;
+  discount?: string;
+  rating?: number;
+  reviews?: number;
+}
+
+export interface SliderProductFormData {
+  title?: string;
+  products?: SliderProductItem[];
+  isVisible?: boolean;
+  showTitle?: boolean;
+  showProductName?: boolean;
+  productCount?: number;
+  sortBy?: ProductSortBy;
+}
 
 interface SliderProductProps {
   isActive?: boolean;
@@ -11,7 +32,28 @@ interface SliderProductProps {
   onCopy?: () => void;
   onDelete?: () => void;
   viewMode?: 'mobile' | 'desktop';
+  formData?: SliderProductFormData;
 }
+
+const DEFAULT_PRODUCTS: SliderProductItem[] = [
+  { name: "Lancome Advanced Genifique Youth Activating Serum", price: "৳11,520", originalPrice: "৳14,400", discount: "-20%", rating: 4.5, reviews: 2 },
+  { name: "Estee Lauder Advanced Night Repair Serum", price: "৳8,640", originalPrice: "৳10,800", discount: "-20%", rating: 4.8, reviews: 15 },
+  { name: "L'Oreal Paris Revitalift Hyaluronic Acid Serum", price: "৳2,880", originalPrice: "৳3,600", discount: "-20%", rating: 4.3, reviews: 8 },
+  { name: "Olay Regenerist Micro-Sculpting Cream", price: "৳4,320", originalPrice: "৳5,400", discount: "-20%", rating: 4.6, reviews: 12 },
+  { name: "Skincare Set Premium", price: "৳6,500", originalPrice: "৳8,000", discount: "-19%", rating: 4.7, reviews: 23 },
+  { name: "Anti-Aging Cream", price: "৳3,200", originalPrice: "৳4,000", discount: "-20%", rating: 4.4, reviews: 7 },
+  { name: "Vitamin C Brightening Serum", price: "৳5,800", originalPrice: "৳7,200", discount: "-19%", rating: 4.6, reviews: 18 },
+  { name: "Hydrating Face Moisturizer", price: "৳3,600", originalPrice: "৳4,500", discount: "-20%", rating: 4.3, reviews: 11 },
+];
+
+const ProductImage = ({ src, iconClass }: { src?: string; iconClass: string }) =>
+  src ? (
+    <img src={src} alt="" className="w-full h-full object-cover" />
+  ) : (
+    <svg className={iconClass} fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+    </svg>
+  );
 
 export const SliderProduct = ({
   isActive = false,
@@ -21,77 +63,22 @@ export const SliderProduct = ({
   onMoveDown,
   onCopy,
   onDelete,
-  viewMode = 'mobile'
+  viewMode = 'mobile',
+  formData = {},
 }: SliderProductProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const products = [
-    { 
-      name: "Lancome Advanced Genifique Youth Activating Serum", 
-      price: "৳11,520", 
-      originalPrice: "৳14,400",
-      discount: "-20%",
-      rating: 4.5,
-      reviews: 2
-    },
-    { 
-      name: "Estee Lauder Advanced Night Repair Serum", 
-      price: "৳8,640", 
-      originalPrice: "৳10,800",
-      discount: "-20%",
-      rating: 4.8,
-      reviews: 15
-    },
-    { 
-      name: "L'Oreal Paris Revitalift Hyaluronic Acid Serum", 
-      price: "৳2,880", 
-      originalPrice: "৳3,600",
-      discount: "-20%",
-      rating: 4.3,
-      reviews: 8
-    },
-    { 
-      name: "Olay Regenerist Micro-Sculpting Cream", 
-      price: "৳4,320", 
-      originalPrice: "৳5,400",
-      discount: "-20%",
-      rating: 4.6,
-      reviews: 12
-    },
-    { 
-      name: "Skincare Set Premium", 
-      price: "৳6,500", 
-      originalPrice: "৳8,000",
-      discount: "-19%",
-      rating: 4.7,
-      reviews: 23
-    },
-    { 
-      name: "Anti-Aging Cream", 
-      price: "৳3,200", 
-      originalPrice: "৳4,000",
-      discount: "-20%",
-      rating: 4.4,
-      reviews: 7
-    },
-    { 
-      name: "Vitamin C Brightening Serum", 
-      price: "৳5,800", 
-      originalPrice: "৳7,200",
-      discount: "-19%",
-      rating: 4.6,
-      reviews: 18
-    },
-    { 
-      name: "Hydrating Face Moisturizer", 
-      price: "৳3,600", 
-      originalPrice: "৳4,500",
-      discount: "-20%",
-      rating: 4.3,
-      reviews: 11
-    }
-  ];
+  const title    = formData.title ?? 'Drag Module';
+
+  const hasManualProducts = !!formData.products && formData.products.length > 0;
+  const productCount = Math.min(Math.max(formData.productCount ?? 8, 1), 54);
+  const { items: autoProducts } = useAutoProducts(formData.sortBy, productCount, !hasManualProducts);
+  const products = hasManualProducts
+    ? formData.products!
+    : autoProducts.length > 0
+      ? autoProducts.slice(0, productCount)
+      : DEFAULT_PRODUCTS;
 
   // Always show 4 products per slide
   const itemsPerView = 4;
@@ -101,7 +88,6 @@ export const SliderProduct = ({
     if (scrollContainerRef.current) {
       const container = scrollContainerRef.current;
       const scrollWidth = container.scrollWidth;
-      const containerWidth = container.clientWidth;
       const scrollPosition = (scrollWidth / totalSlides) * index;
       
       container.scrollTo({
@@ -141,7 +127,9 @@ export const SliderProduct = ({
       <div className="w-full bg-white p-3">
         {/* Title */}
         <div className="mb-3">
-          <h3 className="text-sm font-semibold text-gray-900">Drag Module</h3>
+          {formData.showTitle !== false && (
+          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+        )}
         </div>
 
         {/* Carousel Container */}
@@ -170,9 +158,7 @@ export const SliderProduct = ({
                       {/* Product Image */}
                       <div className="relative bg-gray-100 p-2">
                         <div className="w-full h-20 flex items-center justify-center">
-                          <svg className="w-12 h-12 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                          </svg>
+                          <ProductImage src={product.image} iconClass="w-12 h-12 text-gray-400" />
                         </div>
                         {/* Discount Badge */}
                         {product.discount && (
@@ -184,9 +170,11 @@ export const SliderProduct = ({
 
                       {/* Product Info */}
                       <div className="p-2">
+{formData.showProductName !== false && (
                         <h4 className="text-[10px] text-gray-800 mb-1 line-clamp-2 leading-tight h-8">
                           {product.name}
                         </h4>
+                        )}
 
                         {/* Rating */}
                         <div className="flex items-center gap-0.5 mb-1">
@@ -195,14 +183,14 @@ export const SliderProduct = ({
                               <Star 
                                 key={i} 
                                 className={`w-2 h-2 ${
-                                  i < Math.floor(product.rating) 
+                                  i < Math.floor(product.rating ?? 0) 
                                     ? 'fill-yellow-400 text-yellow-400' 
                                     : 'fill-gray-200 text-gray-200'
                                 }`}
                               />
                             ))}
                           </div>
-                          <span className="text-[8px] text-gray-500">({product.reviews})</span>
+                          <span className="text-[8px] text-gray-500">({product.reviews ?? 0})</span>
                         </div>
 
                         {/* Prices */}
@@ -279,9 +267,7 @@ export const SliderProduct = ({
                       {/* Product Image */}
                       <div className="relative bg-gray-100 p-4">
                         <div className="w-full h-32 flex items-center justify-center">
-                          <svg className="w-16 h-16 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                          </svg>
+                          <ProductImage src={product.image} iconClass="w-16 h-16 text-gray-400" />
                         </div>
                         {/* Discount Badge */}
                         {product.discount && (
@@ -293,9 +279,11 @@ export const SliderProduct = ({
 
                       {/* Product Info */}
                       <div className="p-3 border-t border-gray-100">
+{formData.showProductName !== false && (
                         <h4 className="text-sm text-gray-800 mb-2 line-clamp-2 leading-tight h-12">
                           {product.name}
                         </h4>
+                        )}
 
                         {/* Rating */}
                         <div className="flex items-center gap-1 mb-2">
@@ -304,14 +292,14 @@ export const SliderProduct = ({
                               <Star 
                                 key={i} 
                                 className={`w-3 h-3 ${
-                                  i < Math.floor(product.rating) 
+                                  i < Math.floor(product.rating ?? 0) 
                                     ? 'fill-yellow-400 text-yellow-400' 
                                     : 'fill-gray-200 text-gray-200'
                                 }`}
                               />
                             ))}
                           </div>
-                          <span className="text-xs text-gray-500">({product.reviews})</span>
+                          <span className="text-xs text-gray-500">({product.reviews ?? 0})</span>
                         </div>
 
                         {/* Prices */}
@@ -359,6 +347,8 @@ export const SliderProduct = ({
       </div>
     );
   };
+
+  if (formData.isVisible === false) return null;
 
   return (
     <div

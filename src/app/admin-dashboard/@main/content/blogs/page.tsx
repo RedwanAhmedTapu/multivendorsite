@@ -1,9 +1,6 @@
-import React from 'react'
 
-const page = () => {
-  return (
-    <div>blog</div>
-  )
+import BlogAdminPanel from "@/components/blogadmin/BlogAdminPanel";
+
+export default function BlogAdminPage() {
+  return <BlogAdminPanel />;
 }
-
-export default page

@@ -7,11 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useGetCategoryFiltersBySlugQuery } from "@/features/apiSlice";
-import { useSearchParams } from "next/navigation";
-
-// ============================================
-// TYPE DEFINITIONS
-// ============================================
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 export interface ProductFilters {
   categories: string[];
@@ -24,12 +20,8 @@ export interface ProductFilters {
 }
 
 interface FilterSidebarProps {
-  isMobileOpen: boolean;
-  onMobileClose: () => void;
   categorySlug?: string;
   selectedVendor?: string;
-  onFiltersChange: (filters: ProductFilters) => void;
-  currentFilters?: ProductFilters;
 }
 
 interface FilterAttributeValue {
@@ -54,77 +46,80 @@ interface CategoryFilterResponse {
       id: string;
       name: string;
       slug: string;
-      breadcrumb: Array<{
-        id: string;
-        name: string;
-        slug: string;
-        level: number;
-      }>;
+      breadcrumb: Array<{ id: string; name: string; slug: string; level: number }>;
     };
     filters: {
       attributes: FilterAttribute[];
-      priceRange: {
-        min: number;
-        max: number;
-      };
+      priceRange: { min: number; max: number };
     };
-    meta: {
-      totalProducts: number;
-      hasFilters: boolean;
-    };
+    meta: { totalProducts: number; hasFilters: boolean };
   };
   message: string;
 }
 
-// ============================================
-// FILTER SIDEBAR COMPONENT
-// ============================================
-
 export const FilterSidebar: React.FC<FilterSidebarProps> = ({
-  isMobileOpen,
-  onMobileClose,
   categorySlug,
   selectedVendor,
-  onFiltersChange,
-  currentFilters: externalFilters,
 }) => {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  
-  // REMOVED: The check for URL parameters that was hiding the sidebar
-  // This is what was causing your issue:
-  // const hasUrlParams = useMemo(() => {
-  //   return searchParams.toString().length > 0;
-  // }, [searchParams]);
 
-  // Fetch filter data from API
-  const { 
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  const {
     data: filterResponse,
     isLoading: filterLoading,
-    isSuccess: filterSuccess,
-    error: filterError 
+    error: filterError
   } = useGetCategoryFiltersBySlugQuery(categorySlug || '', {
     skip: !categorySlug,
   });
-  
-  // Extract filter data from response
+
   const filterData: CategoryFilterResponse['data'] | undefined = filterResponse?.data;
-  
-  // Initialize filters with proper defaults
-  const [internalFilters, setInternalFilters] = useState<ProductFilters>({
-    categories: categorySlug ? [categorySlug] : [],
-    priceRange: [0, 100000], // Default range
-    attributes: {},
-    brands: [],
-    vendors: selectedVendor ? [selectedVendor] : [],
-    ratings: [],
-    availability: [],
+  const apiPriceMin = filterData?.filters?.priceRange?.min;
+  const apiPriceMax = filterData?.filters?.priceRange?.max;
+  const priceBoundsPending = Boolean(categorySlug) && filterLoading && !filterError;
+
+  const [filters, setFilters] = useState<ProductFilters>(() => {
+    const hasUrlMin = searchParams.has("minPrice");
+    const hasUrlMax = searchParams.has("maxPrice");
+    const urlMin = hasUrlMin ? parseInt(searchParams.get("minPrice") || "0") : 0;
+    const urlMax = hasUrlMax ? parseInt(searchParams.get("maxPrice") || "100000") : 100000;
+    const urlRatings = searchParams.get("ratings")?.split(",").map(Number).filter(n => !isNaN(n)) || [];
+    const urlAvail = searchParams.get("availability")?.split(",") || [];
+    const urlBrands = searchParams.get("brands")?.split(",") || [];
+
+    const attrs: Record<string, string[]> = {};
+    const urlAttrs = searchParams.get("attrs")?.split(",") || [];
+    urlAttrs.forEach(attr => {
+      const [key, vals] = attr.split(":");
+      if (key && vals) attrs[key] = vals.split("-");
+    });
+
+    return {
+      categories: categorySlug ? [categorySlug] : [],
+      priceRange: [urlMin, urlMax],
+      attributes: attrs,
+      brands: urlBrands,
+      vendors: selectedVendor ? [selectedVendor] : [],
+      ratings: urlRatings,
+      availability: urlAvail,
+    };
   });
 
-  // Price input states
-  const [minPriceInput, setMinPriceInput] = useState<string>("0");
-  const [maxPriceInput, setMaxPriceInput] = useState<string>("100000");
+  // ✅ text input state — শুধু টাইপ করার সময় এখানে আপডেট হয়, updateFilters()
+  // এখান থেকে কল হয় না, তাই নিচের sync effect কখনো টাইপ করার মাঝপথে
+  // ওভাররাইট করবে না (আগের bug এখানেই ছিল)।
+  const [minPriceInput, setMinPriceInput] = useState<string>(filters.priceRange[0].toString());
+  const [maxPriceInput, setMaxPriceInput] = useState<string>(filters.priceRange[1].toString());
 
-  // All sections expanded by default
+  // filters.priceRange শুধু commit (blur/enter), API load, বা clear-এর সময় বদলায় —
+  // তাই এই effect শুধু তখনই fire করবে, keystroke-এ না।
+  useEffect(() => {
+    setMinPriceInput(filters.priceRange[0].toString());
+    setMaxPriceInput(filters.priceRange[1].toString());
+  }, [filters.priceRange]);
+
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     price: true,
     attributes: true,
@@ -134,53 +129,51 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
   const [showAllItems, setShowAllItems] = useState<Record<string, boolean>>({});
 
-  // Use external filters if provided, otherwise use internal state
-  const filters = externalFilters || internalFilters;
-
-  // Sync price inputs with filters
+  // API থেকে price bounds এলে, URL-এ আগে থেকে min/maxPrice না থাকলে সেট করো
   useEffect(() => {
-    setMinPriceInput(filters.priceRange[0].toString());
-    setMaxPriceInput(filters.priceRange[1].toString());
-  }, [filters.priceRange]);
-
-  // Update price range when filter data loads
-  useEffect(() => {
-    if (filterData?.filters?.priceRange && !externalFilters) {
-      const apiMin = filterData.filters.priceRange.min;
-      const apiMax = filterData.filters.priceRange.max;
-      
-      setInternalFilters((prev) => {
-        // Only update if we're still using defaults
-        if (prev.priceRange[0] === 0 && prev.priceRange[1] === 100000) {
-          return {
-            ...prev,
-            priceRange: [apiMin, apiMax],
-          };
-        }
-        return prev;
-      });
-      
-      // Update input values
-      setMinPriceInput(apiMin.toString());
-      setMaxPriceInput(apiMax.toString());
+    if (apiPriceMin !== undefined && apiPriceMax !== undefined) {
+      if (!searchParams.get("minPrice") && !searchParams.get("maxPrice")) {
+        setFilters((prev) => ({
+          ...prev,
+          priceRange: [apiPriceMin, apiPriceMax],
+        }));
+      }
     }
-  }, [filterData, externalFilters]);
+  }, [apiPriceMin, apiPriceMax, searchParams]);
 
-  // Memoized filter update to prevent unnecessary re-renders
   const updateFilters = useCallback((newFilters: ProductFilters) => {
-    if (externalFilters) {
-      onFiltersChange(newFilters);
-    } else {
-      setInternalFilters(newFilters);
-      onFiltersChange(newFilters);
-    }
-  }, [externalFilters, onFiltersChange]);
+    setFilters(newFilters);
+
+    const params = new URLSearchParams(searchParams.toString());
+
+    const defaultMin = apiPriceMin ?? 0;
+    const defaultMax = apiPriceMax ?? 100000;
+    if (newFilters.priceRange[0] > defaultMin) params.set("minPrice", String(newFilters.priceRange[0]));
+    else params.delete("minPrice");
+
+    if (newFilters.priceRange[1] < defaultMax) params.set("maxPrice", String(newFilters.priceRange[1]));
+    else params.delete("maxPrice");
+
+    if (newFilters.ratings.length > 0) params.set("ratings", newFilters.ratings.join(","));
+    else params.delete("ratings");
+
+    if (newFilters.availability.length > 0) params.set("availability", newFilters.availability.join(","));
+    else params.delete("availability");
+
+    if (newFilters.brands.length > 0) params.set("brands", newFilters.brands.join(","));
+    else params.delete("brands");
+
+    const attrStrings = Object.entries(newFilters.attributes)
+      .map(([key, vals]) => `${key}:${vals.join("-")}`)
+      .filter(Boolean);
+    if (attrStrings.length > 0) params.set("attrs", attrStrings.join(","));
+    else params.delete("attrs");
+
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [searchParams, router, apiPriceMin, apiPriceMax, pathname]);
 
   const toggleSection = useCallback((section: string) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [section]: !prev[section],
-    }));
+    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   }, []);
 
   const toggleArrayFilter = useCallback((
@@ -207,66 +200,52 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     });
   }, [filters, updateFilters]);
 
-  // Handle price input changes with auto-apply
+  // ✅ টাইপ করার সময় শুধু local string state আপডেট হয় — router.push/updateFilters
+  // এখানে কল হচ্ছে না, তাই বার বার entry দেওয়ার bug টা আর ঘটবে না
   const handleMinPriceChange = (value: string) => {
-    setMinPriceInput(value);
-    
-    // Convert string to number, handle empty string as 0
-    const numValue = value === "" ? 0 : parseInt(value.replace(/\D/g, "")) || 0;
-    
-    // Apply filter if valid
-    if (numValue >= 0 && numValue <= filters.priceRange[1]) {
-      updateFilters({
-        ...filters,
-        priceRange: [numValue, filters.priceRange[1]],
-      });
-    }
+    setMinPriceInput(value.replace(/\D/g, ""));
   };
 
   const handleMaxPriceChange = (value: string) => {
-    setMaxPriceInput(value);
-    
-    // Convert string to number, handle empty string as max
-    const numValue = value === "" ? 100000 : parseInt(value.replace(/\D/g, "")) || 100000;
-    
-    // Apply filter if valid
-    if (numValue >= filters.priceRange[0] && numValue <= 100000) {
-      updateFilters({
-        ...filters,
-        priceRange: [filters.priceRange[0], numValue],
-      });
+    setMaxPriceInput(value.replace(/\D/g, ""));
+  };
+
+  // ✅ commit শুধু blur/Enter-এ হয়
+  const commitMinPrice = useCallback(() => {
+    const priceMin = apiPriceMin ?? 0;
+    const numValue = parseInt(minPriceInput, 10);
+    const safeValue = isNaN(numValue) ? priceMin : numValue;
+    const validMin = Math.max(priceMin, Math.min(safeValue, filters.priceRange[1]));
+    setMinPriceInput(validMin.toString());
+    if (validMin !== filters.priceRange[0]) {
+      updateFilters({ ...filters, priceRange: [validMin, filters.priceRange[1]] });
+    }
+  }, [minPriceInput, filters, apiPriceMin, updateFilters]);
+
+  const commitMaxPrice = useCallback(() => {
+    const priceMax = apiPriceMax ?? 100000;
+    const numValue = parseInt(maxPriceInput, 10);
+    const safeValue = isNaN(numValue) ? priceMax : numValue;
+    const validMax = Math.min(priceMax, Math.max(safeValue, filters.priceRange[0]));
+    setMaxPriceInput(validMax.toString());
+    if (validMax !== filters.priceRange[1]) {
+      updateFilters({ ...filters, priceRange: [filters.priceRange[0], validMax] });
+    }
+  }, [maxPriceInput, filters, apiPriceMax, updateFilters]);
+
+  const handlePriceKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, commit: () => void) => {
+    if (e.key === "Enter") {
+      commit();
+      (e.target as HTMLInputElement).blur();
     }
   };
 
-  // Handle blur to ensure valid values
-  const handleMinPriceBlur = () => {
-    const numValue = parseInt(minPriceInput.replace(/\D/g, "")) || 0;
-    const validMin = Math.max(0, Math.min(numValue, filters.priceRange[1]));
-    setMinPriceInput(validMin.toString());
-    updateFilters({
-      ...filters,
-      priceRange: [validMin, filters.priceRange[1]],
-    });
-  };
-
-  const handleMaxPriceBlur = () => {
-    const numValue = parseInt(maxPriceInput.replace(/\D/g, "")) || 100000;
-    const validMax = Math.min(100000, Math.max(numValue, filters.priceRange[0]));
-    setMaxPriceInput(validMax.toString());
-    updateFilters({
-      ...filters,
-      priceRange: [filters.priceRange[0], validMax],
-    });
-  };
-
   const clearAllFilters = useCallback(() => {
-    const defaultPriceRange = filterData?.filters?.priceRange
-      ? [filterData.filters.priceRange.min, filterData.filters.priceRange.max]
-      : [0, 100000];
+    const defaultPriceRange: [number, number] = [apiPriceMin ?? 0, apiPriceMax ?? 100000];
 
-    const clearedFilters = {
+    const clearedFilters: ProductFilters = {
       categories: categorySlug ? [categorySlug] : [],
-      priceRange: defaultPriceRange as [number, number],
+      priceRange: defaultPriceRange,
       attributes: {},
       brands: [],
       vendors: selectedVendor ? [selectedVendor] : [],
@@ -275,127 +254,70 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     };
 
     updateFilters(clearedFilters);
-    setMinPriceInput(defaultPriceRange[0].toString());
-    setMaxPriceInput(defaultPriceRange[1].toString());
-  }, [filterData, categorySlug, selectedVendor, updateFilters]);
+  }, [apiPriceMin, apiPriceMax, categorySlug, selectedVendor, updateFilters]);
 
   const getActiveFilterCount = useCallback(() => {
     let count = 0;
-    const defaultMin = filterData?.filters?.priceRange?.min || 0;
-    const defaultMax = filterData?.filters?.priceRange?.max || 100000;
-    
-    if (filters.priceRange[0] > defaultMin || filters.priceRange[1] < defaultMax) {
-      count += 1;
-    }
+    const defaultMin = apiPriceMin ?? 0;
+    const defaultMax = apiPriceMax ?? 100000;
+
+    if (filters.priceRange[0] > defaultMin || filters.priceRange[1] < defaultMax) count += 1;
     count += Object.values(filters.attributes).flat().length;
     count += filters.brands.length;
     if (!selectedVendor) count += filters.vendors.length;
     count += filters.ratings.length;
     count += filters.availability.length;
     return count;
-  }, [filters, filterData, selectedVendor]);
+  }, [filters, apiPriceMin, apiPriceMax, selectedVendor]);
 
-  // Fixed removeFilter function
   const removeFilter = useCallback((
     type: string,
     key?: string,
     value?: string | number
   ) => {
-    const defaultPriceRange = filterData?.filters?.priceRange
-      ? [filterData.filters.priceRange.min, filterData.filters.priceRange.max]
-      : [0, 100000];
+    const defaultPriceRange: [number, number] = [apiPriceMin ?? 0, apiPriceMax ?? 100000];
 
     switch (type) {
       case "price":
-        updateFilters({
-          ...filters,
-          priceRange: defaultPriceRange as [number, number],
-        });
-        setMinPriceInput(defaultPriceRange[0].toString());
-        setMaxPriceInput(defaultPriceRange[1].toString());
+        updateFilters({ ...filters, priceRange: defaultPriceRange });
         break;
-      
       case "attribute":
         if (key && value) {
-          const currentValues = filters.attributes[key] || [];
-          const newValues = currentValues.filter(v => v !== value);
           updateFilters({
             ...filters,
-            attributes: {
-              ...filters.attributes,
-              [key]: newValues,
-            },
+            attributes: { ...filters.attributes, [key]: (filters.attributes[key] || []).filter(v => v !== value) },
           });
         }
         break;
-      
       case "brand":
-        if (value) {
-          const newBrands = filters.brands.filter(b => b !== value);
-          updateFilters({
-            ...filters,
-            brands: newBrands,
-          });
-        }
+        if (value) updateFilters({ ...filters, brands: filters.brands.filter(b => b !== value) });
         break;
-      
       case "vendor":
-        if (value) {
-          const newVendors = filters.vendors.filter(v => v !== value);
-          updateFilters({
-            ...filters,
-            vendors: newVendors,
-          });
-        }
+        if (value) updateFilters({ ...filters, vendors: filters.vendors.filter(v => v !== value) });
         break;
-      
       case "rating":
-        if (value !== undefined) {
-          const newRatings = filters.ratings.filter(r => r !== value);
-          updateFilters({
-            ...filters,
-            ratings: newRatings,
-          });
-        }
+        if (value !== undefined) updateFilters({ ...filters, ratings: filters.ratings.filter(r => r !== value) });
         break;
-      
       case "availability":
-        if (value) {
-          const newAvailability = filters.availability.filter(a => a !== value);
-          updateFilters({
-            ...filters,
-            availability: newAvailability,
-          });
-        }
+        if (value) updateFilters({ ...filters, availability: filters.availability.filter(a => a !== value) });
         break;
     }
-  }, [filters, filterData, updateFilters]);
+  }, [filters, apiPriceMin, apiPriceMax, updateFilters]);
 
-  // Get filterable attributes from API response
   const filterableAttributes = useMemo(() => {
     if (!filterData?.filters?.attributes) return [];
-    
-    // All attributes from API are filterable
-    return filterData.filters.attributes.filter((attr: FilterAttribute) => 
-      attr.values && attr.values.length > 0
-    );
+    return filterData.filters.attributes.filter((attr: FilterAttribute) => attr.values && attr.values.length > 0);
   }, [filterData]);
 
-  // Check if we have category-specific filters
   const hasCategoryFilters = useMemo(() => {
     return filterData?.meta?.hasFilters && filterableAttributes.length > 0;
   }, [filterData, filterableAttributes]);
 
-  // Helper function to get display value with unit
   const getDisplayValueWithUnit = (attribute: FilterAttribute, value: FilterAttributeValue): string => {
     const valueStr = String(value.value);
-    if (attribute.unit) {
-      return `${valueStr} ${attribute.unit}`;
-    }
-    return valueStr;
+    return attribute.unit ? `${valueStr} ${attribute.unit}` : valueStr;
   };
 
-  // FilterSection component
   const FilterSection: React.FC<{
     title: string;
     sectionKey: string;
@@ -417,93 +339,73 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             </Badge>
           )}
         </div>
-        {expandedSections[sectionKey] ? (
-          <Minus size={14} className="text-gray-500" />
-        ) : (
-          <Plus size={14} className="text-gray-500" />
-        )}
+        {expandedSections[sectionKey] ? <Minus size={14} className="text-gray-500" /> : <Plus size={14} className="text-gray-500" />}
       </div>
       {expandedSections[sectionKey] && <div className="mt-2">{children}</div>}
     </div>
   ), [expandedSections, toggleSection]);
 
-  // Render common filters (price, ratings, availability)
   const renderCommonFilters = useCallback(() => {
+    const priceMin = apiPriceMin ?? 0;
+    const priceMax = apiPriceMax ?? 100000;
+
     return (
       <>
-        {/* Price Range with Auto-Apply Input Fields */}
-        <FilterSection
-          title="Price Range"
-          sectionKey="price"
-          count={
-            (filters.priceRange[0] > 0 || filters.priceRange[1] < 100000) ? 1 : 0
-          }
-        >
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="text-xs text-gray-500 block mb-1">Min Price</label>
-                <Input
-                  type="text"
-                  value={minPriceInput}
-                  onChange={(e) => handleMinPriceChange(e.target.value)}
-                  onBlur={handleMinPriceBlur}
-                  className="h-8 text-sm px-2"
-                  placeholder="0"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-xs text-gray-500 block mb-1">Max Price</label>
-                <Input
-                  type="text"
-                  value={maxPriceInput}
-                  onChange={(e) => handleMaxPriceChange(e.target.value)}
-                  onBlur={handleMaxPriceBlur}
-                  className="h-8 text-sm px-2"
-                  placeholder="100000"
-                />
+        <FilterSection title="Price Range" sectionKey="price" count={(filters.priceRange[0] > priceMin || filters.priceRange[1] < priceMax) ? 1 : 0}>
+          {priceBoundsPending ? (
+            <div className="space-y-2 animate-pulse">
+              <div className="flex gap-2">
+                <div className="h-8 flex-1 bg-gray-200 rounded"></div>
+                <div className="h-8 flex-1 bg-gray-200 rounded"></div>
               </div>
             </div>
-            <div className="flex justify-between text-xs text-gray-500 px-1">
-              <span>৳{filterData?.filters?.priceRange?.min || 0}</span>
-              <span>৳{filterData?.filters?.priceRange?.max || 100000}</span>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-xs text-gray-500 block mb-1">Min Price</label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={minPriceInput}
+                    onChange={(e) => handleMinPriceChange(e.target.value)}
+                    onBlur={commitMinPrice}
+                    onKeyDown={(e) => handlePriceKeyDown(e, commitMinPrice)}
+                    className="h-8 text-sm px-2"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs text-gray-500 block mb-1">Max Price</label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={maxPriceInput}
+                    onChange={(e) => handleMaxPriceChange(e.target.value)}
+                    onBlur={commitMaxPrice}
+                    onKeyDown={(e) => handlePriceKeyDown(e, commitMaxPrice)}
+                    className="h-8 text-sm px-2"
+                    placeholder="100000"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between text-xs text-gray-500 px-1">
+                <span>৳{priceMin}</span>
+                <span>৳{priceMax}</span>
+              </div>
             </div>
-          </div>
+          )}
         </FilterSection>
 
-        {/* Customer Ratings */}
-        <FilterSection
-          title="Ratings"
-          sectionKey="ratings"
-          count={filters.ratings.length}
-        >
+        <FilterSection title="Ratings" sectionKey="ratings" count={filters.ratings.length}>
           <div className="space-y-1.5">
             {[5, 4, 3, 2, 1].map((rating) => (
-              <div
-                key={rating}
-                className="flex items-center space-x-2 hover:bg-gray-50 p-1.5 rounded transition-colors"
-              >
-                <Checkbox
-                  id={`rating-${rating}`}
-                  checked={filters.ratings.includes(rating)}
-                  onCheckedChange={() => toggleArrayFilter("ratings", rating)}
-                  className="h-4 w-4"
-                />
-                <label
-                  htmlFor={`rating-${rating}`}
-                  className="flex items-center text-sm text-gray-700 cursor-pointer flex-1"
-                >
+              <div key={rating} className="flex items-center space-x-2 hover:bg-gray-50 p-1.5 rounded transition-colors">
+                <Checkbox id={`rating-${rating}`} checked={filters.ratings.includes(rating)} onCheckedChange={() => toggleArrayFilter("ratings", rating)} className="h-4 w-4" />
+                <label htmlFor={`rating-${rating}`} className="flex items-center text-sm text-gray-700 cursor-pointer flex-1">
                   <div className="flex items-center">
                     {Array.from({ length: 5 }).map((_, i) => (
-                      <Star
-                        key={i}
-                        size={12}
-                        className={
-                          i < rating
-                            ? "text-yellow-400 fill-yellow-400"
-                            : "text-gray-300"
-                        }
-                      />
+                      <Star key={i} size={12} className={i < rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"} />
                     ))}
                   </div>
                   <span className="ml-1.5 text-xs">& Up</span>
@@ -513,12 +415,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
           </div>
         </FilterSection>
 
-        {/* Availability */}
-        <FilterSection
-          title="Availability"
-          sectionKey="availability"
-          count={filters.availability.length}
-        >
+        <FilterSection title="Availability" sectionKey="availability" count={filters.availability.length}>
           <div className="space-y-1.5">
             {[
               { value: "inStock", label: "In Stock" },
@@ -526,37 +423,17 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               { value: "newArrivals", label: "New Arrivals" },
               { value: "freeShipping", label: "Free Shipping" },
             ].map((option) => (
-              <div
-                key={option.value}
-                className="flex items-center space-x-2 hover:bg-gray-50 p-1.5 rounded transition-colors"
-              >
-                <Checkbox
-                  id={`avail-${option.value}`}
-                  checked={filters.availability.includes(option.value)}
-                  onCheckedChange={() =>
-                    toggleArrayFilter("availability", option.value)
-                  }
-                  className="h-4 w-4"
-                />
-                <label
-                  htmlFor={`avail-${option.value}`}
-                  className="text-sm text-gray-700 cursor-pointer flex-1"
-                >
-                  {option.label}
-                </label>
+              <div key={option.value} className="flex items-center space-x-2 hover:bg-gray-50 p-1.5 rounded transition-colors">
+                <Checkbox id={`avail-${option.value}`} checked={filters.availability.includes(option.value)} onCheckedChange={() => toggleArrayFilter("availability", option.value)} className="h-4 w-4" />
+                <label htmlFor={`avail-${option.value}`} className="text-sm text-gray-700 cursor-pointer flex-1">{option.label}</label>
               </div>
             ))}
           </div>
         </FilterSection>
       </>
     );
-  }, [
-    filters, minPriceInput, maxPriceInput, handleMinPriceChange, 
-    handleMaxPriceChange, handleMinPriceBlur, handleMaxPriceBlur, 
-    toggleArrayFilter, FilterSection, filterData
-  ]);
+  }, [filters, apiPriceMin, apiPriceMax, priceBoundsPending, minPriceInput, maxPriceInput, commitMinPrice, commitMaxPrice, toggleArrayFilter, FilterSection]);
 
-  // Render dynamic attributes from API
   const renderDynamicAttributes = useCallback(() => {
     if (!filterableAttributes.length) return null;
 
@@ -564,67 +441,24 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       const selectedCount = filters.attributes[attribute.id]?.length || 0;
       const displayLimit = 6;
       const shouldShowToggle = attribute.values.length > displayLimit;
-      const displayValues = showAllItems[attribute.id]
-        ? attribute.values
-        : attribute.values.slice(0, displayLimit);
+      const displayValues = showAllItems[attribute.id] ? attribute.values : attribute.values.slice(0, displayLimit);
 
       return (
-        <FilterSection
-          key={attribute.id}
-          title={`${attribute.name}${attribute.unit ? ` (${attribute.unit})` : ""}`}
-          sectionKey={`attr-${attribute.id}`}
-          count={selectedCount}
-        >
+        <FilterSection key={attribute.id} title={`${attribute.name}${attribute.unit ? ` (${attribute.unit})` : ""}`} sectionKey={`attr-${attribute.id}`} count={selectedCount}>
           <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1 custom-scrollbar">
             {displayValues.map((value: FilterAttributeValue) => {
               const displayValue = getDisplayValueWithUnit(attribute, value);
-              
               return (
-                <div
-                  key={value.id}
-                  className="flex items-center justify-between space-x-2 hover:bg-gray-50 p-1.5 rounded transition-colors"
-                >
-                  <div className="flex items-center space-x-2 flex-1 min-w-0">
-                    <Checkbox
-                      id={`attr-${value.id}`}
-                      checked={
-                        filters.attributes[attribute.id]?.includes(value.id) || false
-                      }
-                      onCheckedChange={() =>
-                        toggleAttributeFilter(attribute.id, value.id)
-                      }
-                      className="h-4 w-4"
-                    />
-                    <label
-                      htmlFor={`attr-${value.id}`}
-                      className="text-sm text-gray-700 cursor-pointer flex-1 truncate"
-                      title={displayValue}
-                    >
-                      {displayValue}
-                    </label>
-                  </div>
-                  <span className="text-xs text-gray-500 whitespace-nowrap">
-                    ({value.productCount})
-                  </span>
+                <div key={value.id} className="flex items-center space-x-2 hover:bg-gray-50 p-1.5 rounded transition-colors">
+                  <Checkbox id={`attr-${value.id}`} checked={filters.attributes[attribute.id]?.includes(value.id) || false} onCheckedChange={() => toggleAttributeFilter(attribute.id, value.id)} className="h-4 w-4" />
+                  <label htmlFor={`attr-${value.id}`} className="text-sm text-gray-700 cursor-pointer flex-1 truncate" title={displayValue}>{displayValue}</label>
                 </div>
               );
             })}
           </div>
           {shouldShowToggle && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mt-2 h-6 px-2 text-xs w-full hover:bg-gray-100"
-              onClick={() =>
-                setShowAllItems((prev) => ({
-                  ...prev,
-                  [attribute.id]: !prev[attribute.id],
-                }))
-              }
-            >
-              {showAllItems[attribute.id]
-                ? "Show Less"
-                : `+${attribute.values.length - displayLimit} more`}
+            <Button variant="ghost" size="sm" className="mt-2 h-6 px-2 text-xs w-full hover:bg-gray-100" onClick={() => setShowAllItems((prev) => ({ ...prev, [attribute.id]: !prev[attribute.id] }))}>
+              {showAllItems[attribute.id] ? "Show Less" : `+${attribute.values.length - displayLimit} more`}
             </Button>
           )}
         </FilterSection>
@@ -634,10 +468,9 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
   const FilterContent = useCallback(() => {
     const activeCount = getActiveFilterCount();
-    const defaultMin = filterData?.filters?.priceRange?.min || 0;
-    const defaultMax = filterData?.filters?.priceRange?.max || 100000;
+    const defaultMin = apiPriceMin ?? 0;
+    const defaultMax = apiPriceMax ?? 100000;
 
-    // Loading state
     if (filterLoading && categorySlug) {
       return (
         <div className="w-full md:w-64 p-4 h-full md:h-fit overflow-y-auto bg-transparent">
@@ -652,7 +485,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       );
     }
 
-    // Error state
     if (filterError) {
       return (
         <div className="w-full md:w-64 p-4 h-full md:h-fit bg-transparent overflow-y-auto">
@@ -665,95 +497,42 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       );
     }
 
-    // No data yet but still show common filters
-    if (!filterData && categorySlug) {
-      return (
-        <div className="w-full md:w-64 p-4 h-full md:h-fit bg-transparent overflow-y-auto">
-          <div className="text-center py-3">
-            <p className="text-sm text-gray-500">Loading category filters...</p>
-            <p className="text-xs text-gray-400 mt-1">Common filters available below</p>
-          </div>
-          {renderCommonFilters()}
-        </div>
-      );
-    }
-
     return (
       <div className="w-full md:w-64 p-4 h-full md:h-fit bg-transparent overflow-y-auto">
-        {/* Header with Clear All and Close */}
         <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold text-gray-900">Filters</h2>
             {activeCount > 0 && (
-              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 px-1.5 h-5">
-                {activeCount}
-              </Badge>
+              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 px-1.5 h-5">{activeCount}</Badge>
             )}
           </div>
           <div className="flex gap-1">
             {activeCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearAllFilters}
-                className="text-xs h-7 px-2 hover:bg-red-50 hover:text-red-600"
-              >
-                Clear
-              </Button>
+              <Button variant="ghost" size="sm" onClick={clearAllFilters} className="text-xs h-7 px-2 hover:bg-red-50 hover:text-red-600">Clear</Button>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden h-7 w-7"
-              onClick={onMobileClose}
-            >
-              <X size={14} />
-            </Button>
+            <Button variant="ghost" size="icon" className="md:hidden h-7 w-7" onClick={() => setIsMobileOpen(false)}><X size={14} /></Button>
           </div>
         </div>
 
-        {/* Active Filters */}
         {activeCount > 0 && (
           <div className="mb-4 p-2.5 bg-blue-50 rounded border border-blue-100">
-            <h3 className="text-xs font-semibold text-blue-900 mb-2 uppercase tracking-wide">
-              Active Filters
-            </h3>
+            <h3 className="text-xs font-semibold text-blue-900 mb-2 uppercase tracking-wide">Active Filters</h3>
             <div className="flex flex-wrap gap-1.5">
-              {/* Price filter */}
               {(filters.priceRange[0] > defaultMin || filters.priceRange[1] < defaultMax) && (
-                <Badge
-                  variant="secondary"
-                  className="flex items-center gap-1 py-1 px-2 text-xs bg-white hover:bg-gray-50 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFilter("price");
-                  }}
-                >
+                <Badge variant="secondary" className="flex items-center gap-1 py-1 px-2 text-xs bg-white hover:bg-gray-50 cursor-pointer" onClick={(e) => { e.stopPropagation(); removeFilter("price"); }}>
                   ৳{filters.priceRange[0].toLocaleString()}-৳{filters.priceRange[1].toLocaleString()}
                   <X size={12} className="hover:text-red-500" />
                 </Badge>
               )}
 
-              {/* Attribute filters */}
               {Object.entries(filters.attributes).map(([attrId, values]) =>
                 values.map((valueId) => {
                   const attribute = filterableAttributes.find((a: FilterAttribute) => a.id === attrId);
                   const value = attribute?.values.find((v: any) => v.id === valueId);
-                  
                   if (!attribute || !value) return null;
-                  
                   const displayValue = getDisplayValueWithUnit(attribute, value);
-                  
                   return (
-                    <Badge
-                      key={`${attrId}-${valueId}`}
-                      variant="secondary"
-                      className="flex items-center gap-1 py-1 px-2 text-xs bg-white hover:bg-gray-50 cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeFilter("attribute", attrId, valueId);
-                      }}
-                    >
+                    <Badge key={`${attrId}-${valueId}`} variant="secondary" className="flex items-center gap-1 py-1 px-2 text-xs bg-white hover:bg-gray-50 cursor-pointer" onClick={(e) => { e.stopPropagation(); removeFilter("attribute", attrId, valueId); }}>
                       {attribute.name}: {displayValue}
                       <X size={12} className="hover:text-red-500" />
                     </Badge>
@@ -761,37 +540,16 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                 })
               )}
 
-              {/* Rating filters */}
               {filters.ratings.map((rating) => (
-                <Badge
-                  key={rating}
-                  variant="secondary"
-                  className="flex items-center gap-1 py-1 px-2 text-xs bg-white hover:bg-gray-50 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFilter("rating", undefined, rating);
-                  }}
-                >
+                <Badge key={rating} variant="secondary" className="flex items-center gap-1 py-1 px-2 text-xs bg-white hover:bg-gray-50 cursor-pointer" onClick={(e) => { e.stopPropagation(); removeFilter("rating", undefined, rating); }}>
                   {rating}★
                   <X size={12} className="hover:text-red-500" />
                 </Badge>
               ))}
 
-              {/* Availability filters */}
               {filters.availability.map((avail) => (
-                <Badge
-                  key={avail}
-                  variant="secondary"
-                  className="flex items-center gap-1 py-1 px-2 text-xs bg-white hover:bg-gray-50 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFilter("availability", undefined, avail);
-                  }}
-                >
-                  {avail === 'inStock' ? 'In Stock' : 
-                   avail === 'onSale' ? 'On Sale' : 
-                   avail === 'newArrivals' ? 'New Arrivals' : 
-                   'Free Shipping'}
+                <Badge key={avail} variant="secondary" className="flex items-center gap-1 py-1 px-2 text-xs bg-white hover:bg-gray-50 cursor-pointer" onClick={(e) => { e.stopPropagation(); removeFilter("availability", undefined, avail); }}>
+                  {avail === 'inStock' ? 'In Stock' : avail === 'onSale' ? 'On Sale' : avail === 'newArrivals' ? 'New Arrivals' : 'Free Shipping'}
                   <X size={12} className="hover:text-red-500" />
                 </Badge>
               ))}
@@ -799,47 +557,37 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
           </div>
         )}
 
-        {/* Filter Sections */}
         <div className="space-y-3">
-          {/* Dynamic Attributes from API */}
           {hasCategoryFilters && renderDynamicAttributes()}
-
-          {/* Always show common filters */}
           {renderCommonFilters()}
-
-          
         </div>
       </div>
     );
-  }, [
-    filterLoading, categorySlug, filterError, filterData, 
-    filters, getActiveFilterCount, removeFilter, filterableAttributes,
-    showAllItems, expandedSections, onMobileClose, clearAllFilters, 
-    FilterSection, hasCategoryFilters, renderCommonFilters, 
-    renderDynamicAttributes, getDisplayValueWithUnit
-  ]);
-
-  // REMOVED: The condition that was hiding the sidebar
-  // if (!hasUrlParams) {
-  //   return null;
-  // }
+  }, [filterLoading, categorySlug, filterError, apiPriceMin, apiPriceMax, filters, getActiveFilterCount, removeFilter, filterableAttributes, clearAllFilters, hasCategoryFilters, renderCommonFilters, renderDynamicAttributes, getDisplayValueWithUnit]);
 
   return (
     <>
-      {/* Desktop sidebar - ALWAYS VISIBLE on desktop */}
-      <aside className="hidden md:block filter-sidebar sticky top-4">
+      <button
+        onClick={() => setIsMobileOpen(true)}
+        className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-teal-700 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 font-medium hover:bg-teal-800 transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+        </svg>
+        Filters
+      </button>
+
+      <aside className="hidden md:block filter-sidebar sticky top-4 w-64 flex-shrink-0">
         <FilterContent />
       </aside>
 
-      {/* Mobile sidebar overlay */}
       {isMobileOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-          onClick={onMobileClose}
+          onClick={() => setIsMobileOpen(false)}
         />
       )}
 
-      {/* Mobile sidebar */}
       <div
         className={`
         fixed top-0 left-0 h-full w-full bg-white z-50 transform transition-transform duration-300 ease-in-out
@@ -851,20 +599,10 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       </div>
 
       <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 5px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: #f1f1f1;
-          border-radius: 3px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #c1c1c1;
-          border-radius: 3px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #a8a8a8;
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
       `}</style>
     </>
   );

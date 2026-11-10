@@ -1,0 +1,43 @@
+/* Configurable product grid for /category/[slug] and /products
+   (lib/product-card/grid.ts). Values arrive as CSS variables holding
+   validated integers — never class names. Breakpoints: md 768px / lg 1024px.
+
+   Mobile: exactly --fmg-cols-m columns.
+   Tablet / desktop: AT MOST --fmg-cols-* columns. auto-fill makes as many
+   tracks as fit; each track's minimum is the larger of
+     · the card width at the selected column count, and
+     · --fmg-min (130px),
+   so the selected count is used whenever cards stay ≥ 130px, and columns
+   are dropped (never squeezed) when they wouldn't. The −0.5px absorbs
+   sub-pixel rounding so the selected count isn't lost to a fraction.
+   auto-fill (not auto-fit) keeps empty tracks, so a short last row keeps
+   the same card width, like repeat(N, 1fr). */
+
+.grid {
+  display: grid;
+  column-gap: var(--fmg-gx-m);
+  row-gap: var(--fmg-gy-m);
+  grid-template-columns: repeat(var(--fmg-cols-m), minmax(0, 1fr));
+}
+
+@media (min-width: 768px) {
+  .grid {
+    column-gap: var(--fmg-gx-t);
+    row-gap: var(--fmg-gy-t);
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(max(var(--fmg-min), calc((100% - (var(--fmg-cols-t) - 1) * var(--fmg-gx-t)) / var(--fmg-cols-t) - 0.5px)), 1fr)
+    );
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    column-gap: var(--fmg-gx-d);
+    row-gap: var(--fmg-gy-d);
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(max(var(--fmg-min), calc((100% - (var(--fmg-cols-d) - 1) * var(--fmg-gx-d)) / var(--fmg-cols-d) - 0.5px)), 1fr)
+    );
+  }
+}

@@ -29,6 +29,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "cdn.finixmart.com",
       },
+      {
+        protocol: "https",
+        hostname: "images.example.com",
+      },
     ],
   },
 

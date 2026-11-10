@@ -19,6 +19,10 @@ export interface Customer {
   isActive?: boolean;
   customerProfile?: {
     id?: string;
+    profileImage?: string | null;
+    gender?: string | null;
+    dateOfBirth?: string | null;
+    isVerifiedBySocialMedia?: boolean;
     wallet?: number;
     loyaltyPoints?: number;
     phone?: string | null;
@@ -50,10 +54,13 @@ export interface UpdateCustomerProfileRequest {
 }
 
 export interface CustomerFilterQuery {
+  /** The API reads "active" | "blocked" | "all" (User.isActive). */
   status?: string;
+  /** Matches name, email or phone. */
   search?: string;
-  createdFrom?: string;
-  createdTo?: string;
+  /** User.createdAt range (ISO); the API's parameter names. */
+  startDate?: string;
+  endDate?: string;
   page?: number;
   limit?: number;
   sortBy?: string;

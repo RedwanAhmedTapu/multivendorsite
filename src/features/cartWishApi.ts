@@ -1,3 +1,4 @@
+// features/cartWishApi.ts
 import { createApi } from "@reduxjs/toolkit/query/react";
 import baseQueryWithReauth from "./baseQueryWithReauth";
 
@@ -8,6 +9,8 @@ export interface AddToCartRequest {
   variantId: string;
   quantity: number;
   notes?: string;
+  /** Business Advisor entry point (allowlisted server-side; ignored by the cart itself). */
+  source?: "PRODUCT_PAGE" | "QUICK_VIEW" | "BUY_NOW" | "CART" | "WISHLIST";
 }
 
 export interface UpdateCartItemRequest {
@@ -64,23 +67,38 @@ export interface SuccessResponse {
 }
 
 /* ---------- CART TYPES ---------- */
+// NOTE: ProductVariant schema has NO `stock` or `weight` field anymore.
+// Stock is derived server-side from WarehouseStock (quantity - reserved - damaged)
+// and exposed as `availableStock` / `isInStock` on cart & wishlist items.
+// Weight is derived server-side from Product.warranty and is not exposed per-item here.
+
+export interface CartItemImage {
+  url: string;
+  altText?: string | null;
+}
 
 export interface CartItemProduct {
   id: string;
   name: string;
   slug: string;
-  thumbnailUrl: string;
   vendorId: string;
+  // 1C-22: read-only display fields from the cart API (vendor group header
+  // + image fallback). See cartWish.service.ts -> getCart.
+  vendor?: { storeName: string };
+  images?: CartItemImage[];
 }
 
 export interface CartItemVariant {
   id: string;
   sku: string;
   price: number;
-  compareAtPrice: number | null;
-  stock: number;
-  variantImage: string;
-  attributeValues: Record<string, string>;
+  specialPrice: number | null;
+  availability: boolean | null;
+  images?: CartItemImage[];
+  // 1C-22: variant options (e.g. Color -> Black) for the cart line
+  attributes?: Array<{
+    attributeValue: { value: string; attribute: { name: string } };
+  }>;
 }
 
 export interface CartItem {
@@ -89,8 +107,18 @@ export interface CartItem {
   variantId: string;
   quantity: number;
   price: number;
+  compareAtPrice: number | null;
   isSelected: boolean;
+  notes: string | null;
+  addedAt: string;
+  updatedAt: string;
+
+  // Server-computed fields (see cartWish.service.ts -> getCart)
   itemTotal: number;
+  savings: number;
+  isInStock: boolean;
+  availableStock: number;
+
   products: CartItemProduct;
   product_variants: CartItemVariant;
 }
@@ -107,7 +135,11 @@ export interface SelectedItemsSummary {
   selectedItems: number;
   selectedItemsCount: number;
   subtotal: number;
-  itemsByVendor: any[];
+  itemsByVendor: Array<{
+    vendorId: string;
+    items: CartItem[];
+    subtotal: number;
+  }>;
 }
 
 export interface CartCountResponse {
@@ -123,6 +155,19 @@ export interface WishlistItem {
   variantId: string | null;
   priority: number;
   notes: string | null;
+  priceWhenAdded: number;
+  notifyOnDiscount: boolean;
+  notifyOnRestock: boolean;
+  addedAt: string;
+
+  // Server-computed fields (see cartWish.service.ts -> getWishlist)
+  currentPrice: number;
+  priceChange: number;
+  priceChangePercent: string;
+  isPriceDropped: boolean;
+  isPriceIncreased: boolean;
+  isInStock: boolean;
+
   products: CartItemProduct;
   product_variants: CartItemVariant | null;
 }
@@ -157,33 +202,74 @@ export interface VendorDeliveryCalculation {
   deliveryLocation?: string;
   deliveryLocationId?: string;
   totalWeight?: number;
-  
-  // Courier information
+
   courierProviderId?: string | null;
   courierProvider?: string | null;
   deliveryCharge: number;
   codCharge: number;
   shippingCost: number;
   estimatedDeliveryDays?: number | null;
-  
-  // Order summary
+
   subtotal: number;
   codAmount?: number;
-  
-  // Items
+
   items: DeliveryFeeItem[];
-  
-  // Error handling
+
   error?: string;
 }
 
-export interface DeliveryFeesResponse {
-  deliveryCalculations: VendorDeliveryCalculation[];
-  totalDeliveryFee: number;
-  totalCodCharge: number;
-  totalShippingCost: number;
-  grandTotal: number;
+/* ---------- CHECKOUT QUOTE (Phase 2, H-3) ---------- */
+// POST /cart-wish/delivery-fees returns the server's checkout quote — the same
+// computation order placement repeats (order.service buildCheckoutQuote):
+// current selling prices, the reservation plan and per-warehouse delivery.
+
+export interface CheckoutQuoteLine {
+  cartItemId: string;
+  variantId: string;
+  vendorId: string;
+  quantity: number;
+  /** Price saved on the cart line when it was added. */
+  cartPrice: number;
+  /** Current selling price — what is charged. */
+  price: number;
+  lineTotal: number;
+  changedSinceAdded: boolean;
 }
+
+export interface CheckoutQuoteShipment {
+  warehouseId: string;
+  warehouseName: string | null;
+  locationName: string | null;
+  weightKg: number;
+  charge: number;
+  courierProviderId: string;
+  courierProvider: string;
+  items: { cartItemId: string; quantity: number }[];
+}
+
+export interface CheckoutQuoteVendor {
+  vendorId: string;
+  vendorName: string;
+  subtotal: number;
+  shippingCost: number;
+  shipments: CheckoutQuoteShipment[];
+  error?: string;
+}
+
+export interface CheckoutQuote {
+  /** Identifies exactly this quote; the order is placed with it. */
+  quoteHash: string;
+  userAddressId: string;
+  lines: CheckoutQuoteLine[];
+  vendors: CheckoutQuoteVendor[];
+  subtotal: number;
+  shippingTotal: number;
+  grandTotal: number;
+  complete: boolean;
+  priceChanges: CheckoutQuoteLine[];
+}
+
+export type DeliveryFeesResponse = CheckoutQuote;
 
 /* ==================== API ==================== */
 
@@ -193,12 +279,20 @@ export const cartWishApi = createApi({
   tagTypes: ["Cart", "CartItem", "Wishlist", "WishlistItem", "DeliveryFees"],
 
   endpoints: (builder) => ({
-
     /* ==================== CART ==================== */
 
     getCart: builder.query<ApiResponse<CartSummary>, void>({
       query: () => "/cart-wish/cart",
-      providesTags: ["Cart", "CartItem"],
+      providesTags: (result) =>
+        result?.data?.items
+          ? [
+              ...result.data.items.map((item) => ({
+                type: "CartItem" as const,
+                id: item.id,
+              })),
+              { type: "Cart" as const, id: "LIST" },
+            ]
+          : [{ type: "Cart" as const, id: "LIST" }],
     }),
 
     addToCart: builder.mutation<ApiResponse<CartItem>, AddToCartRequest>({
@@ -207,7 +301,11 @@ export const cartWishApi = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Cart", "CartItem", "DeliveryFees"],
+      invalidatesTags: [
+        { type: "Cart", id: "LIST" },
+        { type: "Cart", id: "COUNT" },
+        "DeliveryFees",
+      ],
     }),
 
     updateCartItem: builder.mutation<
@@ -219,7 +317,12 @@ export const cartWishApi = createApi({
         method: "PATCH",
         body: data,
       }),
-      invalidatesTags: ["Cart", "CartItem", "DeliveryFees"],
+      invalidatesTags: (result, error, { itemId }) => [
+        { type: "CartItem", id: itemId },
+        { type: "Cart", id: "LIST" },
+        { type: "Cart", id: "COUNT" },
+        "DeliveryFees",
+      ],
     }),
 
     removeFromCart: builder.mutation<SuccessResponse, string>({
@@ -227,7 +330,12 @@ export const cartWishApi = createApi({
         url: `/cart-wish/cart/items/${itemId}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["Cart", "CartItem", "DeliveryFees"],
+      invalidatesTags: (result, error, itemId) => [
+        { type: "CartItem", id: itemId },
+        { type: "Cart", id: "LIST" },
+        { type: "Cart", id: "COUNT" },
+        "DeliveryFees",
+      ],
     }),
 
     toggleItemSelection: builder.mutation<ApiResponse<CartItem>, string>({
@@ -235,7 +343,11 @@ export const cartWishApi = createApi({
         url: `/cart-wish/cart/items/${itemId}/toggle`,
         method: "POST",
       }),
-      invalidatesTags: ["Cart", "CartItem", "DeliveryFees"],
+      invalidatesTags: (result, error, itemId) => [
+        { type: "CartItem", id: itemId },
+        { type: "Cart", id: "LIST" },
+        "DeliveryFees",
+      ],
     }),
 
     toggleAllItems: builder.mutation<SuccessResponse, ToggleAllItemsRequest>({
@@ -244,7 +356,7 @@ export const cartWishApi = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Cart", "CartItem", "DeliveryFees"],
+      invalidatesTags: [{ type: "Cart", id: "LIST" }, "DeliveryFees"],
     }),
 
     clearCart: builder.mutation<SuccessResponse, void>({
@@ -252,17 +364,23 @@ export const cartWishApi = createApi({
         url: "/cart-wish/cart",
         method: "DELETE",
       }),
-      invalidatesTags: ["Cart", "CartItem", "DeliveryFees"],
+      invalidatesTags: [
+        { type: "Cart", id: "LIST" },
+        { type: "Cart", id: "COUNT" },
+        "DeliveryFees",
+      ],
     }),
 
     getSelectedItems: builder.query<ApiResponse<SelectedItemsSummary>, void>({
       query: () => "/cart-wish/cart/selected",
-      providesTags: ["Cart"],
+      providesTags: [{ type: "Cart", id: "LIST" }],
     }),
 
+    // NOTE: no pollingInterval baked in here — polling (if any) should be
+    // opted into per-component, not forced globally by the API slice.
     getCartCount: builder.query<ApiResponse<CartCountResponse>, void>({
       query: () => "/cart-wish/cart/count",
-      providesTags: ["Cart"],
+      providesTags: [{ type: "Cart", id: "COUNT" }],
     }),
 
     mergeGuestCart: builder.mutation<SuccessResponse, MergeGuestCartRequest>({
@@ -271,7 +389,11 @@ export const cartWishApi = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Cart", "CartItem", "DeliveryFees"],
+      invalidatesTags: [
+        { type: "Cart", id: "LIST" },
+        { type: "Cart", id: "COUNT" },
+        "DeliveryFees",
+      ],
     }),
 
     /* ==================== DELIVERY FEES ==================== */
@@ -292,7 +414,16 @@ export const cartWishApi = createApi({
 
     getWishlist: builder.query<ApiResponse<WishlistResponse>, void>({
       query: () => "/cart-wish/wishlist",
-      providesTags: ["Wishlist", "WishlistItem"],
+      providesTags: (result) =>
+        result?.data?.items
+          ? [
+              ...result.data.items.map((item) => ({
+                type: "WishlistItem" as const,
+                id: item.id,
+              })),
+              { type: "Wishlist" as const, id: "LIST" },
+            ]
+          : [{ type: "Wishlist" as const, id: "LIST" }],
     }),
 
     addToWishlist: builder.mutation<
@@ -304,7 +435,10 @@ export const cartWishApi = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Wishlist", "WishlistItem"],
+      invalidatesTags: [
+        { type: "Wishlist", id: "LIST" },
+        { type: "Wishlist", id: "COUNT" },
+      ],
     }),
 
     updateWishlistItem: builder.mutation<
@@ -316,7 +450,10 @@ export const cartWishApi = createApi({
         method: "PATCH",
         body: data,
       }),
-      invalidatesTags: ["Wishlist", "WishlistItem"],
+      invalidatesTags: (result, error, { itemId }) => [
+        { type: "WishlistItem", id: itemId },
+        { type: "Wishlist", id: "LIST" },
+      ],
     }),
 
     removeFromWishlist: builder.mutation<SuccessResponse, string>({
@@ -324,7 +461,11 @@ export const cartWishApi = createApi({
         url: `/cart-wish/wishlist/items/${itemId}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["Wishlist", "WishlistItem"],
+      invalidatesTags: (result, error, itemId) => [
+        { type: "WishlistItem", id: itemId },
+        { type: "Wishlist", id: "LIST" },
+        { type: "Wishlist", id: "COUNT" },
+      ],
     }),
 
     moveToCart: builder.mutation<
@@ -336,7 +477,14 @@ export const cartWishApi = createApi({
         method: "POST",
         body: data || {},
       }),
-      invalidatesTags: ["Wishlist", "Cart", "CartItem", "DeliveryFees"],
+      invalidatesTags: (result, error, { itemId }) => [
+        { type: "WishlistItem", id: itemId },
+        { type: "Wishlist", id: "LIST" },
+        { type: "Wishlist", id: "COUNT" },
+        { type: "Cart", id: "LIST" },
+        { type: "Cart", id: "COUNT" },
+        "DeliveryFees",
+      ],
     }),
 
     clearWishlist: builder.mutation<SuccessResponse, void>({
@@ -344,12 +492,15 @@ export const cartWishApi = createApi({
         url: "/cart-wish/wishlist",
         method: "DELETE",
       }),
-      invalidatesTags: ["Wishlist", "WishlistItem"],
+      invalidatesTags: [
+        { type: "Wishlist", id: "LIST" },
+        { type: "Wishlist", id: "COUNT" },
+      ],
     }),
 
     getWishlistCount: builder.query<ApiResponse<WishlistCountResponse>, void>({
       query: () => "/cart-wish/wishlist/count",
-      providesTags: ["Wishlist"],
+      providesTags: [{ type: "Wishlist", id: "COUNT" }],
     }),
 
     checkInWishlist: builder.query<
@@ -360,7 +511,7 @@ export const cartWishApi = createApi({
         `/cart-wish/wishlist/check/${productId}${
           variantId ? `/${variantId}` : ""
         }`,
-      providesTags: ["Wishlist"],
+      providesTags: [{ type: "Wishlist", id: "LIST" }],
     }),
   }),
 });

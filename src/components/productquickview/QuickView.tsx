@@ -11,39 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-interface ProductVariant {
-  price: number;
-  specialPrice: number | null;
-  discount: number | null;
-  stock: number;
-}
-
-interface ProductImage {
-  url: string;
-  altText: string;
-}
-
-interface Vendor {
-  id: string;
-  storeName: string;
-  avatar: string;
-  verificationStatus: "PENDING" | "VERIFIED" | "REJECTED";
-}
-
-interface Review {
-  rating: number;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  slug: string;
-  vendor?: Vendor;
-  images?: ProductImage[];
-  variants?: ProductVariant[];
-  reviews?: Review[];
-}
+import type { Product } from "@/types/product";
 
 interface QuickViewProps {
   isOpen: boolean;
@@ -97,10 +65,13 @@ export const QuickView: React.FC<QuickViewProps> = ({
 
   if (!product) return null;
 
-  // Get product images
+  // Get product images (fallback altText for null/undefined values)
   const productImages =
     product.images && product.images.length > 0
-      ? product.images
+      ? product.images.map((img) => ({
+          url: img.url,
+          altText: img.altText || product.name,
+        }))
       : [{ url: "/placeholder-product.jpg", altText: product.name }];
 
   // Get variant info
@@ -318,7 +289,7 @@ export const QuickView: React.FC<QuickViewProps> = ({
                   
                   <ProductImage
                     src={productImages[currentImageIndex].url}
-                    alt={productImages[currentImageIndex].altText || product.name}
+                    alt={productImages[currentImageIndex].altText}
                     fill
                     className="object-contain drop-shadow-xl transition-opacity duration-300"
                     style={{ opacity: imageLoaded ? 1 : 0 }}
@@ -384,7 +355,7 @@ export const QuickView: React.FC<QuickViewProps> = ({
                   {/* Category & Rating Row */}
                   <div className="flex items-center gap-3 flex-wrap">
                     <Badge className="bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 text-[10px] font-medium rounded-md">
-                      Home & Garden
+                      {product.category?.name || "General"}
                     </Badge>
 
                     <div className="flex items-center gap-1.5">
@@ -509,9 +480,8 @@ export const QuickView: React.FC<QuickViewProps> = ({
                     Product Description
                   </h3>
                   <p className="text-xs text-gray-600 leading-relaxed">
-                    This premium product features high-quality materials and
-                    excellent craftsmanship. Designed for durability and style, it
-                    offers exceptional value for your home and garden needs.
+                    {(product as any).description ||
+                      "This premium product features high-quality materials and excellent craftsmanship. Designed for durability and style, it offers exceptional value for your home and garden needs."}
                   </p>
                 </div>
 

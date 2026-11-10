@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Eye, EyeOff, Mail, Phone, Lock, ShoppingCart, X, AlertCircle, CheckCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Eye, EyeOff, Mail, Phone, Lock, ShoppingCart, X, AlertCircle, CheckCircle, Fingerprint } from "lucide-react";
 import Link from "next/link";
-import { useLoginMutation } from "@/features/authApi";
+import { useLoginMutation, useWebauthnLoginOptionsMutation, useWebauthnLoginVerifyMutation } from "@/features/authApi";
 import { useDispatch } from "react-redux";
 import { setCredentials as setReduxCredentials } from "@/features/authSlice";
 import SocialAuth from "@/components/sociallogin/SocialAuth";
 import { useRouter } from "next/navigation";
 import ForgotPasswordModal from "@/components/auth/ForgotPasswordModal";
+import { browserSupportsWebAuthn, startAuthentication } from "@simplewebauthn/browser";
 
 // Beautiful Alert Dialog Component
 interface AlertDialogProps {
@@ -64,7 +65,6 @@ const AlertDialog: React.FC<AlertDialogProps> = ({ isOpen, type, title, message,
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-all duration-300">
       <div className={`relative max-w-md w-full mx-4 p-6 rounded-2xl shadow-2xl transform transition-all duration-300 scale-100 ${getBackgroundColor()} border-2`}>
-        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1 rounded-full hover:bg-white/20 transition-colors"
@@ -72,7 +72,6 @@ const AlertDialog: React.FC<AlertDialogProps> = ({ isOpen, type, title, message,
           <X className="w-5 h-5 text-gray-500" />
         </button>
 
-        {/* Content */}
         <div className="flex items-start space-x-4">
           <div className="flex-shrink-0">
             {getIcon()}
@@ -87,7 +86,6 @@ const AlertDialog: React.FC<AlertDialogProps> = ({ isOpen, type, title, message,
           </div>
         </div>
 
-        {/* Action Button */}
         <div className="flex justify-end mt-6">
           <button
             onClick={onClose}
@@ -107,7 +105,6 @@ const AlertDialog: React.FC<AlertDialogProps> = ({ isOpen, type, title, message,
   );
 };
 
-// Mock toast function replacement with beautiful dialogs
 const useAlert = () => {
   const [alert, setAlert] = useState<{
     isOpen: boolean;
@@ -153,25 +150,32 @@ export default function LoginPage() {
   });
   const [phoneError, setPhoneError] = useState("");
 
+  // --------- WebAuthn state ---------
+  const [passkeySupported, setPasskeySupported] = useState(false);
+  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
+
   const { showAlert, AlertComponent } = useAlert();
   const dispatch = useDispatch();
   const [login, { isLoading }] = useLoginMutation();
+  const [getWebauthnOptions] = useWebauthnLoginOptionsMutation();
+  const [verifyWebauthn] = useWebauthnLoginVerifyMutation();
   const router = useRouter();
 
+  useEffect(() => {
+    setPasskeySupported(browserSupportsWebAuthn());
+  }, []);
+
   const validatePhoneNumber = (phone: string): boolean => {
-    // Remove any non-digit characters
     const cleanPhone = phone.replace(/\D/g, '');
-    
-    // Check if it's exactly 10 digits (without country code)
+
     if (cleanPhone.length !== 10) {
       setPhoneError("Phone number must be exactly 10 digits");
       return false;
     }
 
-    // Check if it starts with a valid Bangladeshi mobile prefix
     const validPrefixes = ['13', '14', '15', '16', '17', '18', '19'];
     const prefix = cleanPhone.substring(0, 2);
-    
+
     if (!validPrefixes.includes(prefix)) {
       setPhoneError("Invalid phone number format");
       return false;
@@ -183,16 +187,14 @@ export default function LoginPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    
+
     if (name === 'phone') {
-      // Only allow numbers and limit to 10 digits
       const numbersOnly = value.replace(/\D/g, '').slice(0, 10);
       setCredentials(prev => ({
         ...prev,
         [name]: numbersOnly,
       }));
 
-      // Validate as user types (but don't show error until they stop typing or submit)
       if (numbersOnly.length > 0 && numbersOnly.length !== 10) {
         setPhoneError("Phone number must be 10 digits");
       } else {
@@ -212,11 +214,33 @@ export default function LoginPage() {
     }
   };
 
+  const redirectByRole = (role?: string, userId?: string, employeeVendorId?: string | null) => {
+    setTimeout(() => {
+      if (role === "CUSTOMER") {
+        router.push(`/user-dashboard?userid=${userId}`);
+      } else if (role === "VENDOR") {
+        router.push("/vendor-dashboard");
+      } else if (role === "ADMIN") {
+        router.push("/admin-dashboard");
+      } else if (role === "EMPLOYEE") {
+        // Employees have no standalone dashboard — send them to their HR
+        // self-service page on the side their account belongs to
+        // (vendorId set = a vendor's staff, otherwise platform staff).
+        router.push(
+          employeeVendorId
+            ? "/vendor-dashboard/hrm/my-profile"
+            : "/admin-dashboard/employees/hrm/my-profile"
+        );
+      } else {
+        router.push("/dashboard");
+      }
+    }, 2000);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      // Validate inputs
       if (!useEmail && credentials.phone) {
         if (!validatePhoneNumber(credentials.phone)) {
           showAlert('error', 'Invalid Phone Number', 'Please enter a valid 10-digit phone number');
@@ -258,25 +282,49 @@ export default function LoginPage() {
       );
 
       showAlert('success', 'Login Successful', 'Welcome back! Redirecting to your dashboard...');
-
-      // Role-based navigation with delay to show success message
-      setTimeout(() => {
-        const userRole = response.user?.role;
-        const userId = response.user?.id;
-
-        if (userRole === "CUSTOMER") {
-          router.push(`/user-dashboard?userid=${userId}`);
-        } else if (userRole === "VENDOR") {
-          router.push("/vendor-dashboard");
-        } else if (userRole === "ADMIN") {
-          router.push("/admin-dashboard");
-        } else {
-          router.push("/dashboard");
-        }
-      }, 2000);
+      redirectByRole(response.user?.role, response.user?.id, response.user?.employee?.vendorId ?? null);
 
     } catch (error: any) {
       showAlert('error', 'Login Failed', error.data?.message || error.message || "Unable to sign in. Please try again.");
+    }
+  };
+
+  // --------- WebAuthn: passkey login (device PIN / fingerprint / Face ID) ---------
+  const handlePasskeyLogin = async () => {
+    setIsPasskeyLoading(true);
+    try {
+      // No email/phone passed → fully discoverable flow: browser shows
+      // whichever saved passkeys match this site
+      const { challengeId, options } = await getWebauthnOptions().unwrap();
+
+      // Triggers the OS-level PIN/fingerprint/Face ID prompt
+      const credentialResponse = await startAuthentication({ optionsJSON: options });
+
+      const response = await verifyWebauthn({ challengeId, response: credentialResponse }).unwrap();
+
+      dispatch(
+        setReduxCredentials({
+          user: response.user,
+          accessToken: response.accessToken || "",
+        })
+      );
+
+      showAlert('success', 'Login Successful', 'Welcome back! Redirecting to your dashboard...');
+      redirectByRole(response.user?.role, response.user?.id, response.user?.employee?.vendorId ?? null);
+
+    } catch (error: any) {
+      // User cancelling the OS prompt throws NotAllowedError — treat quietly
+      if (error?.name === "NotAllowedError") {
+        // no alert needed, user just backed out of the prompt
+      } else {
+        showAlert(
+          'error',
+          'Passkey Sign-In Failed',
+          error.data?.message || error.message || "Couldn't sign in with your device. Try your password instead."
+        );
+      }
+    } finally {
+      setIsPasskeyLoading(false);
     }
   };
 
@@ -296,10 +344,12 @@ export default function LoginPage() {
     showAlert('success', 'Password Reset', message);
   };
 
+  const anyLoading = isLoading || isPasskeyLoading;
+
   return (
     <>
       <div className="min-h-screen w-full flex bg-gradient-to-br from-gray-50 to-teal-50">
-        {/* Left Side - Simplified for no scroll */}
+        {/* Left Side */}
         <div className="hidden lg:flex lg:w-2/5 xl:w-1/2 bg-gradient-to-br from-teal-600 via-teal-700 to-teal-800 items-center justify-center p-6 relative overflow-hidden">
           <div className="max-w-md w-full relative z-10 text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl mb-4 shadow-2xl">
@@ -343,6 +393,41 @@ export default function LoginPage() {
                 Sign in to access your account
               </p>
             </div>
+
+            {/* Passkey Quick Sign-In — shown first, above the password form */}
+            {passkeySupported && (
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={handlePasskeyLogin}
+                  disabled={anyLoading}
+                  className="w-full flex items-center justify-center gap-2 border-2 border-teal-600 text-teal-700 text-sm font-semibold py-2.5 rounded-lg transition-all duration-200 hover:bg-teal-50 disabled:opacity-50 active:scale-[0.98]"
+                >
+                  {isPasskeyLoading ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+                      Waiting for device...
+                    </>
+                  ) : (
+                    <>
+                      <Fingerprint size={16} />
+                      Sign in with device PIN / Fingerprint / Face ID
+                    </>
+                  )}
+                </button>
+
+                <div className="relative mt-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="px-2 bg-gray-50 text-gray-500">
+                      Or sign in with password
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Login Method Toggle */}
             <div className="flex bg-gray-100 rounded-lg p-1 mb-4">
@@ -397,7 +482,7 @@ export default function LoginPage() {
                       value={credentials.email}
                       onChange={handleInputChange}
                       className="w-full px-0 py-2 text-sm border-0 border-b-2 border-gray-300 focus:border-teal-600 focus:ring-0 outline-none transition-colors bg-transparent disabled:opacity-50"
-                      disabled={isLoading}
+                      disabled={anyLoading}
                     />
                     <span className="absolute right-0 bottom-2 text-gray-400 text-xs">
                       @
@@ -410,17 +495,16 @@ export default function LoginPage() {
                   setShowPassword={setShowPassword}
                   value={credentials.password}
                   onChange={handleInputChange}
-                  isLoading={isLoading}
+                  isLoading={anyLoading}
                 />
 
-                {/* Remember Me & Forgot Password */}
                 <div className="flex items-center justify-between pt-1">
                   <div className="flex items-center">
                     <input
                       type="checkbox"
                       id="remember"
                       className="w-3 h-3 text-teal-600 border-gray-300 rounded focus:ring-teal-500 disabled:opacity-50"
-                      disabled={isLoading}
+                      disabled={anyLoading}
                     />
                     <label
                       htmlFor="remember"
@@ -432,16 +516,15 @@ export default function LoginPage() {
                   <button
                     onClick={handleForgotPassword}
                     className="text-xs text-teal-600 hover:text-teal-700 font-medium disabled:opacity-50"
-                    disabled={isLoading}
+                    disabled={anyLoading}
                   >
                     Forgot password?
                   </button>
                 </div>
 
-                {/* Submit */}
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={anyLoading}
                   className="w-full bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white text-sm font-semibold py-2.5 rounded-lg transition-all duration-200 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl mt-3 flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
@@ -477,7 +560,7 @@ export default function LoginPage() {
                       onChange={handleInputChange}
                       onBlur={handlePhoneBlur}
                       className="flex-1 px-0 py-2 text-sm border-0 focus:ring-0 outline-none bg-transparent disabled:opacity-50"
-                      disabled={isLoading}
+                      disabled={anyLoading}
                       maxLength={10}
                     />
                   </div>
@@ -500,17 +583,16 @@ export default function LoginPage() {
                   setShowPassword={setShowPassword}
                   value={credentials.password}
                   onChange={handleInputChange}
-                  isLoading={isLoading}
+                  isLoading={anyLoading}
                 />
 
-                {/* Remember Me & Forgot Password */}
                 <div className="flex items-center justify-between pt-1">
                   <div className="flex items-center">
                     <input
                       type="checkbox"
                       id="remember-phone"
                       className="w-3 h-3 text-teal-600 border-gray-300 rounded focus:ring-teal-500 disabled:opacity-50"
-                      disabled={isLoading}
+                      disabled={anyLoading}
                     />
                     <label
                       htmlFor="remember-phone"
@@ -522,16 +604,15 @@ export default function LoginPage() {
                   <button
                     onClick={handleForgotPassword}
                     className="text-xs text-teal-600 hover:text-teal-700 font-medium disabled:opacity-50"
-                    disabled={isLoading}
+                    disabled={anyLoading}
                   >
                     Forgot password?
                   </button>
                 </div>
 
-                {/* Submit */}
                 <button
                   type="submit"
-                  disabled={isLoading || !!phoneError}
+                  disabled={anyLoading || !!phoneError}
                   className="w-full bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white text-sm font-semibold py-2.5 rounded-lg transition-all duration-200 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl mt-3 flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
@@ -590,12 +671,12 @@ interface PasswordFieldProps {
   isLoading?: boolean;
 }
 
-function PasswordField({ 
-  showPassword, 
-  setShowPassword, 
-  value, 
+function PasswordField({
+  showPassword,
+  setShowPassword,
+  value,
   onChange,
-  isLoading = false 
+  isLoading = false
 }: PasswordFieldProps) {
   return (
     <div>

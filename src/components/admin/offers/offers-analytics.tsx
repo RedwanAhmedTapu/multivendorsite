@@ -1,102 +1,52 @@
 // components/admin/offers/offers-analytics.tsx
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, TrendingUp, Users, Clock, Shield, Percent, Store } from "lucide-react";
+//
+// Stat cards from real data only: the most recent offers (admin list
+// endpoint), the recorded offer analytics (admin analytics endpoint) and the
+// vendor-permission stats. Labels say which window a number covers.
+import { CircleDot, Clock, Gift, Percent, Store, TrendingUp } from "lucide-react";
 import type { Offer, OfferAnalytics, VendorPermissionStats } from "@/features/offerApi";
+import { countByStatus, formatTaka, totalRedemptions } from "@/lib/offers/offer-view";
+import { OfferStatCard } from "@/components/offers/shared/offer-ui";
 
 interface OffersAnalyticsProps {
+  /** Most recent offers, up to `windowSize`. */
   offers: Offer[];
+  windowSize: number;
+  isLoading: boolean;
   analytics: OfferAnalytics[];
+  analyticsLoading: boolean;
+  pendingVendorOffers: number;
+  pendingCapped: boolean;
   permissionStats?: VendorPermissionStats;
 }
 
-export function OffersAnalytics({ offers, analytics, permissionStats }: OffersAnalyticsProps) {
-  const totalUsage = analytics.reduce((sum, a) => sum + a.totalUsage, 0);
-  const totalRevenue = analytics.reduce((sum, a) => sum + a.totalRevenue, 0);
-  const activeOffers = offers.filter(o => o.isActive).length;
-  const vendorOffers = offers.filter(o => o.createdByType === "VENDOR").length;
-  const pendingVendorApproval = offers.filter(o => o.createdByType === "VENDOR" && !o.isActive).length;
-  const adminOffers = offers.filter(o => o.createdByType === "ADMIN").length;
+export function OffersAnalytics({
+  offers,
+  windowSize,
+  isLoading,
+  analytics,
+  analyticsLoading,
+  pendingVendorOffers,
+  pendingCapped,
+  permissionStats,
+}: OffersAnalyticsProps) {
+  const counts = countByStatus(offers);
+  const capped = offers.length >= windowSize;
+  const vendorOffers = offers.filter((o) => o.createdByType === "VENDOR").length;
+  const revenue = analytics.reduce((sum, a) => sum + (Number(a.totalRevenue) || 0), 0);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Offers</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{offers.length}</div>
-          <p className="text-xs text-muted-foreground">
-            Active: {activeOffers}
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Usage</CardTitle>
-          <Users className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {totalUsage.toLocaleString()}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            All time redemptions
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Revenue Impact</CardTitle>
-          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            ${totalRevenue.toLocaleString()}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            From offer redemptions
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Vendor Offers</CardTitle>
-          <Store className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{vendorOffers}</div>
-          <p className="text-xs text-muted-foreground">
-            {pendingVendorApproval} pending approval
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Admin Offers</CardTitle>
-          <Shield className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{adminOffers}</div>
-          <p className="text-xs text-muted-foreground">
-            System created offers
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Avg Max Discount</CardTitle>
-          <Percent className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {permissionStats?.averageMaxDiscount || 0}%
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Vendor average limit
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <section aria-label="Offer summary" className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <OfferStatCard label="Offers" icon={Gift} tone="indigo" loading={isLoading} value={capped ? `${offers.length}+` : offers.length}
+        hint={capped ? `Cards use the latest ${windowSize}` : "Across the platform"} />
+      <OfferStatCard label="Live now" icon={CircleDot} tone="emerald" loading={isLoading} value={counts.active}
+        hint={counts.scheduled ? `${counts.scheduled} scheduled` : "Active and within dates"} />
+      <OfferStatCard label="Awaiting approval" icon={Clock} tone="amber" loading={isLoading} value={pendingCapped ? `${pendingVendorOffers}+` : pendingVendorOffers} hint="Vendor offers to review" />
+      <OfferStatCard label="Vendor offers" icon={Store} tone="violet" loading={isLoading} value={vendorOffers} hint={capped ? `In the latest ${windowSize}` : "Created by vendors"} />
+      <OfferStatCard label="Redemptions" icon={TrendingUp} tone="blue" loading={isLoading} value={totalRedemptions(offers).toLocaleString("en-BD")}
+        hint={analyticsLoading ? "Loading revenue…" : analytics.length ? `${formatTaka(revenue)} recorded revenue` : "No revenue recorded yet"} />
+      <OfferStatCard label="Vendor discount cap" icon={Percent} tone="cyan" loading={!permissionStats && isLoading}
+        value={permissionStats ? `${Math.round((Number(permissionStats.averageMaxDiscount) || 0) * 10) / 10}%` : "—"} hint="Average across vendors" />
+    </section>
   );
 }

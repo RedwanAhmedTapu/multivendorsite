@@ -1,4 +1,4 @@
-// app/admin/courier/page.tsx
+// app/admin-dashboard/courier/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -50,6 +50,11 @@ import {
   X,
   ChevronRight,
   BarChart3,
+  Plus,
+  Pencil,
+  Trash2,
+  Power,
+  DollarSign,
 } from "lucide-react";
 import {
   useGetCourierProvidersQuery,
@@ -70,31 +75,74 @@ import {
 import { toast } from "sonner";
 import Link from "next/link";
 import { LocationSelectorDialog } from "@/components/courier/LocationSelectorDialog";
+import {
+  useGetPricingRulesQuery,
+  useCreatePricingRuleMutation,
+  useUpdatePricingRuleMutation,
+  useTogglePricingRuleMutation,
+  useDeletePricingRuleMutation,
+  type CourierPricingRule,
+  type CreatePricingRuleRequest,
+  type UpdatePricingRuleRequest,
+} from "@/features/courierPricingRulesApi";
+import { useGetLeafLocationsQuery } from "@/features/locationApi";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function CourierAdminPage() {
   const [activeTab, setActiveTab] = useState("overview");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto p-4 md:p-6 space-y-6">
+    <div
+      className="min-h-screen bg-[#F0F4FA]"
+      style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
+    >
+      <div className="container mx-auto px-3 py-4 sm:p-6 space-y-5">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-gradient-to-r from-teal-600 to-blue-600 bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight bg-gradient-to-r from-[#1D4ED8] to-[#7C3AED] bg-clip-text text-transparent">
               Courier Management
             </h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">
+            <p className="text-sm md:text-base text-[#7A90AB] mt-1">
               Manage courier integrations, serviceable areas, and delivery
               settings
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="text-sm">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <Badge variant="outline" className="text-sm border-[#E5EAF2] text-[#1D4ED8] bg-[#EEF3FB]">
               <Activity className="w-3 h-3 mr-1" />
               Platform Admin
             </Badge>
-            <Link href="/admin/courier/credentials">
-              <Button variant="outline" size="sm">
+            <Link href="/admin-dashboard/courier/courier-store">
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-[#E5EAF2] text-[#3D5068] hover:bg-[#FAFBFD]"
+              >
+                <Truck className="w-4 h-4 mr-2" />
+                Courier Store
+              </Button>
+            </Link>
+            <Link href="/admin-dashboard/courier/credentials">
+              <Button size="sm" className="bg-gradient-to-r from-[#1D4ED8] to-[#7C3AED] hover:from-[#2563EB] hover:to-[#8B5CF6] text-white border-0 shadow-sm">
                 <Settings className="w-4 h-4 mr-2" />
                 Manage Credentials
               </Button>
@@ -108,10 +156,10 @@ export default function CourierAdminPage() {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-white dark:bg-gray-800 shadow-sm">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-[#E5EAF2] p-1 h-auto gap-1">
             <TabsTrigger
               value="overview"
-              className="data-[state=active]:bg-teal-50 dark:data-[state=active]:bg-teal-900"
+              className="rounded-lg py-2 text-xs sm:text-sm data-[state=active]:bg-[#EEF3FB] data-[state=active]:text-[#1D4ED8] dark:data-[state=active]:bg-[#1D4ED8]"
             >
               <BarChart3 className="w-4 h-4 mr-2" />
               <span className="hidden sm:inline">Overview</span>
@@ -119,25 +167,33 @@ export default function CourierAdminPage() {
             </TabsTrigger>
             <TabsTrigger
               value="pathao"
-              className="data-[state=active]:bg-teal-50 dark:data-[state=active]:bg-teal-900"
+              className="rounded-lg py-2 text-xs sm:text-sm data-[state=active]:bg-[#EEF3FB] data-[state=active]:text-[#1D4ED8] dark:data-[state=active]:bg-[#1D4ED8]"
             >
               <Building2 className="w-4 h-4 mr-2" />
               Pathao
             </TabsTrigger>
             <TabsTrigger
               value="redx"
-              className="data-[state=active]:bg-teal-50 dark:data-[state=active]:bg-teal-900"
+              className="rounded-lg py-2 text-xs sm:text-sm data-[state=active]:bg-[#EEF3FB] data-[state=active]:text-[#1D4ED8] dark:data-[state=active]:bg-[#1D4ED8]"
             >
               <Building2 className="w-4 h-4 mr-2" />
               RedX
             </TabsTrigger>
             <TabsTrigger
               value="areas"
-              className="data-[state=active]:bg-teal-50 dark:data-[state=active]:bg-teal-900"
+              className="rounded-lg py-2 text-xs sm:text-sm data-[state=active]:bg-[#EEF3FB] data-[state=active]:text-[#1D4ED8] dark:data-[state=active]:bg-[#1D4ED8]"
             >
               <MapPin className="w-4 h-4 mr-2" />
               <span className="hidden sm:inline">Areas</span>
               <span className="sm:hidden">Map</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="pricing"
+              className="rounded-lg py-2 text-xs sm:text-sm data-[state=active]:bg-[#EEF3FB] data-[state=active]:text-[#1D4ED8] dark:data-[state=active]:bg-[#1D4ED8]"
+            >
+              <DollarSign className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Pricing Rules</span>
+              <span className="sm:hidden">Rates</span>
             </TabsTrigger>
           </TabsList>
 
@@ -155,6 +211,10 @@ export default function CourierAdminPage() {
 
           <TabsContent value="areas" className="space-y-6">
             <ServiceableAreasManagement />
+          </TabsContent>
+
+          <TabsContent value="pricing" className="space-y-6">
+            <PricingRulesManagement />
           </TabsContent>
         </Tabs>
       </div>
@@ -187,7 +247,7 @@ function CourierOverview() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-teal-600" />
+        <RefreshCw className="w-8 h-8 animate-spin text-[#1D4ED8]" />
       </div>
     );
   }
@@ -196,18 +256,18 @@ function CourierOverview() {
     <div className="space-y-6">
       {/* Key Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-900 dark:to-teal-800 border-teal-200">
+        <Card className="rounded-2xl bg-gradient-to-br from-[#EEF3FB] to-[#E5EAF2] dark:from-[#1D4ED8] dark:to-[#1D4ED8] border-[#E5EAF2] shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center justify-between">
               Active Providers
-              <Building2 className="w-4 h-4 text-teal-600" />
+              <Building2 className="w-4 h-4 text-[#1D4ED8]" />
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-teal-700 dark:text-teal-300">
+            <div className="text-3xl font-bold text-[#1D4ED8] dark:text-[#93A9D9]">
               {activeProviders}/{totalProviders}
             </div>
-            <p className="text-xs text-teal-600 dark:text-teal-400 mt-1">
+            <p className="text-xs text-[#1D4ED8] dark:text-[#3B5FCB] mt-1">
               {totalProviders > 0 
                 ? ((activeProviders / totalProviders) * 100).toFixed(0)
                 : 0}%
@@ -216,7 +276,7 @@ function CourierOverview() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-800 border-blue-200">
+        <Card className="rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-800 border-blue-200 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center justify-between">
               Total Orders
@@ -233,7 +293,7 @@ function CourierOverview() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900 dark:to-purple-800 border-purple-200">
+        <Card className="rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900 dark:to-purple-800 border-purple-200 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center justify-between">
               Serviceable Areas
@@ -250,7 +310,7 @@ function CourierOverview() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900 dark:to-green-800 border-green-200">
+        <Card className="rounded-2xl bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900 dark:to-green-800 border-green-200 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center justify-between">
               Coverage Rate
@@ -278,7 +338,7 @@ function CourierOverview() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Courier Providers</h2>
-          <Link href="/admin/courier/credentials">
+          <Link href="/admin-dashboard/courier/credentials">
             <Button size="sm" variant="outline">
               <Settings className="w-4 h-4 mr-2" />
               Manage All
@@ -287,7 +347,7 @@ function CourierOverview() {
         </div>
 
         {providers.length === 0 ? (
-          <Card className="bg-gradient-to-br from-gray-50 to-gray-100 border-dashed">
+          <Card className="rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 border-dashed border-gray-200">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Truck className="w-16 h-16 text-gray-400 mb-4" />
               <h3 className="text-lg font-semibold mb-2">
@@ -297,7 +357,7 @@ function CourierOverview() {
                 Get started by adding your first courier provider to enable
                 deliveries
               </p>
-              <Link href="/admin/courier/credentials">
+              <Link href="/admin-dashboard/courier/credentials">
                 <Button>
                   <Building2 className="w-4 h-4 mr-2" />
                   Add Provider
@@ -310,7 +370,7 @@ function CourierOverview() {
             {providers.map((provider) => (
               <Card
                 key={provider.id}
-                className="hover:shadow-lg transition-shadow"
+                className="rounded-2xl border-[#E5EAF2] hover:shadow-lg transition-shadow"
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
@@ -373,7 +433,7 @@ function CourierOverview() {
                   </div>
 
                   <div className="flex gap-2 pt-2 border-t">
-                    <Link href="/admin/courier/credentials" className="flex-1">
+                    <Link href="/admin-dashboard/courier/credentials" className="flex-1">
                       <Button variant="outline" size="sm" className="w-full">
                         <Settings className="w-3 h-3 mr-2" />
                         Configure
@@ -491,14 +551,14 @@ function PathaoManagement() {
 
   if (!pathaoProvider) {
     return (
-      <Card className="border-dashed">
+      <Card className="rounded-2xl border-dashed border-[#E5EAF2] bg-[#EEF3FB]/30">
         <CardContent className="flex flex-col items-center justify-center py-12">
           <Building2 className="w-16 h-16 text-gray-400 mb-4" />
           <h3 className="text-lg font-semibold mb-2">Pathao Not Configured</h3>
           <p className="text-sm text-muted-foreground mb-4 text-center max-w-md">
             You need to add Pathao as a courier provider first
           </p>
-          <Link href="/admin/courier/credentials">
+          <Link href="/admin-dashboard/courier/credentials">
             <Button>
               <Building2 className="w-4 h-4 mr-2" />
               Add Pathao Provider
@@ -512,12 +572,12 @@ function PathaoManagement() {
   return (
     <div className="space-y-6">
       {/* Info Alert */}
-      <Alert className="bg-teal-50 dark:bg-teal-900 border-teal-200">
-        <Info className="h-4 w-4 text-teal-600" />
-        <AlertTitle className="text-teal-900 dark:text-teal-100">
+      <Alert className="bg-[#EEF3FB] dark:bg-[#1D4ED8] border-[#E5EAF2]">
+        <Info className="h-4 w-4 text-[#1D4ED8]" />
+        <AlertTitle className="text-[#1D4ED8] dark:text-[#E5EAF2]">
           Pathao Area Explorer
         </AlertTitle>
-        <AlertDescription className="text-teal-700 dark:text-teal-300">
+        <AlertDescription className="text-[#1D4ED8] dark:text-[#93A9D9]">
           Browse Pathao's serviceable areas and map them to your platform
           locations for automatic courier routing.
         </AlertDescription>
@@ -525,7 +585,7 @@ function PathaoManagement() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Filters Card */}
-        <Card className="lg:col-span-1">
+        <Card className="lg:col-span-1 rounded-2xl border-[#E5EAF2] shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Filter className="w-5 h-5" />
@@ -646,7 +706,7 @@ function PathaoManagement() {
         </Card>
 
         {/* Areas Display Card */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 rounded-2xl border-[#E5EAF2] shadow-sm">
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
@@ -693,7 +753,7 @@ function PathaoManagement() {
               </div>
             ) : areasLoading ? (
               <div className="flex items-center justify-center py-12">
-                <RefreshCw className="w-8 h-8 animate-spin text-teal-600" />
+                <RefreshCw className="w-8 h-8 animate-spin text-[#1D4ED8]" />
               </div>
             ) : filteredAreas.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -709,7 +769,7 @@ function PathaoManagement() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-teal-50 dark:bg-teal-900">
+                      <TableRow className="bg-[#EEF3FB] dark:bg-[#1D4ED8]">
                         <TableHead className="font-semibold">
                           Area Name
                         </TableHead>
@@ -898,14 +958,14 @@ function RedXManagement() {
 
   if (!redxProvider) {
     return (
-      <Card className="border-dashed">
+      <Card className="rounded-2xl border-dashed border-[#E5EAF2] bg-[#EEF3FB]/30">
         <CardContent className="flex flex-col items-center justify-center py-12">
           <Building2 className="w-16 h-16 text-gray-400 mb-4" />
           <h3 className="text-lg font-semibold mb-2">RedX Not Configured</h3>
           <p className="text-sm text-muted-foreground mb-4 text-center max-w-md">
             You need to add RedX as a courier provider first
           </p>
-          <Link href="/admin/courier/credentials">
+          <Link href="/admin-dashboard/courier/credentials">
             <Button>
               <Building2 className="w-4 h-4 mr-2" />
               Add RedX Provider
@@ -950,7 +1010,7 @@ function RedXManagement() {
                 {authenticationFailed
                   ? "Bearer token is invalid or expired. Please update your RedX credentials."
                   : "Connection failed. Please check your bearer token and try again."}
-                <Link href="/admin/courier/credentials" className="ml-2 underline font-medium">
+                <Link href="/admin-dashboard/courier/credentials" className="ml-2 underline font-medium">
                   Update Credentials
                 </Link>
               </AlertDescription>
@@ -987,7 +1047,7 @@ function RedXManagement() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Search Filters */}
-        <Card className="lg:col-span-1">
+        <Card className="lg:col-span-1 rounded-2xl border-[#E5EAF2] shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
@@ -1112,7 +1172,7 @@ function RedXManagement() {
         </Card>
 
         {/* Results Display */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 rounded-2xl border-[#E5EAF2] shadow-sm">
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
@@ -1409,23 +1469,23 @@ function ServiceableAreasManagement() {
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-900 dark:to-teal-800">
+        <Card className="rounded-2xl bg-gradient-to-br from-[#EEF3FB] to-[#E5EAF2] dark:from-[#1D4ED8] dark:to-[#1D4ED8] shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">
               Total Mapped Areas
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-teal-700 dark:text-teal-300">
+            <div className="text-3xl font-bold text-[#1D4ED8] dark:text-[#93A9D9]">
               {areas.length}
             </div>
-            <p className="text-xs text-teal-600 dark:text-teal-400 mt-1">
+            <p className="text-xs text-[#1D4ED8] dark:text-[#3B5FCB] mt-1">
               {activeAreas} active
             </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-800">
+        <Card className="rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-800 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Home Delivery</CardTitle>
           </CardHeader>
@@ -1442,7 +1502,7 @@ function ServiceableAreasManagement() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900 dark:to-purple-800">
+        <Card className="rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900 dark:to-purple-800 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">
               Pickup Available
@@ -1463,7 +1523,7 @@ function ServiceableAreasManagement() {
       </div>
 
       {/* Main Management Card */}
-      <Card>
+      <Card className="rounded-2xl border-[#E5EAF2] shadow-sm">
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
@@ -1661,6 +1721,747 @@ function ServiceableAreasManagement() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ==================== PRICING RULES MANAGEMENT ====================
+
+/**
+ * Create/edit form state. Every numeric field is held as a string so a
+ * half-typed or empty box is never silently coerced to 0: the empty string
+ * means "not set" and is mapped to null / the backend default only on submit.
+ */
+type PricingRuleFormState = {
+  courierProviderId: string;
+  fromLocationId: string;
+  toLocationId: string;
+  minWeight: string;
+  maxWeight: string;
+  basePrice: string;
+  perKgCharge: string;
+  fuelSurcharge: string;
+  validFrom: string;
+  validTo: string;
+  priority: string;
+  isActive: boolean;
+};
+
+const EMPTY_PRICING_RULE_FORM: PricingRuleFormState = {
+  courierProviderId: "",
+  fromLocationId: "",
+  toLocationId: "",
+  minWeight: "0",
+  maxWeight: "",
+  basePrice: "",
+  perKgCharge: "0",
+  fuelSurcharge: "0",
+  validFrom: "",
+  validTo: "",
+  priority: "100",
+  isActive: true,
+};
+
+/** Empty string -> fallback (null keeps "no bound" / "provider default"). */
+const optionalNumber = (raw: string, fallback: number | null): number | null =>
+  raw.trim() === "" ? fallback : Number(raw);
+
+const formatAmount = (value: number | null | undefined) =>
+  value === null || value === undefined ? "-" : String(value);
+
+/** "0-10 kg", or "5 kg+" when the rule has no upper bound. */
+const weightBandLabel = (rule: CourierPricingRule) =>
+  rule.maxWeight === null || rule.maxWeight === undefined
+    ? `${rule.minWeight} kg+`
+    : `${rule.minWeight}-${rule.maxWeight} kg`;
+
+/** A null location means "any lane" on that side of the route. */
+const laneLabel = (rule: CourierPricingRule) => {
+  const from =
+    rule.locations_courier_pricing_rules_fromLocationIdTolocations?.name ||
+    "Any pickup location";
+  const to =
+    rule.locations_courier_pricing_rules_toLocationIdTolocations?.name ||
+    "Nationwide";
+  return `${from} -> ${to}`;
+};
+
+const validityLabel = (rule: CourierPricingRule) => {
+  const from = rule.validFrom
+    ? new Date(rule.validFrom).toLocaleDateString()
+    : "-";
+  const to = rule.validTo
+    ? new Date(rule.validTo).toLocaleDateString()
+    : "No end";
+  return `${from} -> ${to}`;
+};
+
+/** An open-ended rule is valid forever; a lapsed or future one is not in play. */
+const isRuleInWindow = (rule: CourierPricingRule) => {
+  const now = Date.now();
+  if (rule.validFrom && new Date(rule.validFrom).getTime() > now) return false;
+  if (rule.validTo && new Date(rule.validTo).getTime() <= now) return false;
+  return true;
+};
+
+/**
+ * Mirror of the backend's createPricingRule / updatePricingRule validation so
+ * an admin sees the problem before the request is sent. The backend stays the
+ * authority - this only avoids an avoidable round trip.
+ */
+function validatePricingRuleForm(form: PricingRuleFormState): string | null {
+  if (!form.courierProviderId) return "Select a courier provider";
+  if (form.basePrice.trim() === "") return "Base price is required";
+
+  const nonNegative: Array<[string, string]> = [
+    ["Base price", form.basePrice],
+    ["Per kg charge", form.perKgCharge],
+    ["Fuel surcharge", form.fuelSurcharge],
+    ["Minimum weight", form.minWeight],
+  ];
+  for (const [label, raw] of nonNegative) {
+    if (raw.trim() === "") continue;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return `${label} must be a finite non-negative number`;
+    }
+  }
+
+  const minWeight = optionalNumber(form.minWeight, 0) ?? 0;
+  if (form.maxWeight.trim() !== "") {
+    const maxWeight = Number(form.maxWeight);
+    if (!Number.isFinite(maxWeight) || maxWeight <= 0) {
+      return "Maximum weight must be a finite positive number";
+    }
+    if (maxWeight <= minWeight) {
+      return `Maximum weight (${maxWeight}) must be greater than minimum weight (${minWeight})`;
+    }
+  }
+
+  if (form.validFrom && form.validTo) {
+    if (new Date(form.validTo) <= new Date(form.validFrom)) {
+      return "Valid-to must be strictly after valid-from";
+    }
+  }
+
+  if (form.priority.trim() !== "" && !Number.isInteger(Number(form.priority))) {
+    return "Priority must be a whole number";
+  }
+
+  return null;
+}
+
+function PricingRulesManagement() {
+  const { data: providersData } = useGetCourierProvidersQuery();
+  const providers = providersData?.data || [];
+
+  const { data: locationsResponse } = useGetLeafLocationsQuery(undefined);
+  const locations = locationsResponse?.data || [];
+
+  const [providerFilter, setProviderFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [page, setPage] = useState<number>(1);
+
+  const { data: rulesData, isLoading } = useGetPricingRulesQuery({
+    ...(providerFilter !== "all" ? { courierProviderId: providerFilter } : {}),
+    ...(statusFilter === "all" ? {} : { isActive: statusFilter === "active" }),
+    page,
+    limit: 20,
+  });
+  const rules = rulesData?.data || [];
+  const pagination = rulesData?.pagination;
+
+  const [createPricingRule, { isLoading: isCreating }] =
+    useCreatePricingRuleMutation();
+  const [updatePricingRule, { isLoading: isUpdating }] =
+    useUpdatePricingRuleMutation();
+  const [togglePricingRule] = useTogglePricingRuleMutation();
+  const [deletePricingRule] = useDeletePricingRuleMutation();
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<PricingRuleFormState>(EMPTY_PRICING_RULE_FORM);
+  // The date strings the dialog was opened with. A date the admin did not touch
+  // is never re-sent: the stored value is a timestamp, so re-sending the day
+  // truncated to midnight would silently shift the rule's validity window.
+  const [loadedDates, setLoadedDates] = useState({ validFrom: "", validTo: "" });
+  const [pendingDelete, setPendingDelete] = useState<CourierPricingRule | null>(null);
+
+  const setField = <K extends keyof PricingRuleFormState>(
+    key: K,
+    value: PricingRuleFormState[K]
+  ) => setForm((previous) => ({ ...previous, [key]: value }));
+
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(EMPTY_PRICING_RULE_FORM);
+    setLoadedDates({ validFrom: "", validTo: "" });
+    setFormOpen(true);
+  };
+
+  const openEdit = (rule: CourierPricingRule) => {
+    // Date inputs are day-granular; remember exactly what was loaded so an
+    // untouched date is left out of the update payload entirely.
+    const loadedFrom = rule.validFrom ? rule.validFrom.slice(0, 10) : "";
+    const loadedTo = rule.validTo ? rule.validTo.slice(0, 10) : "";
+
+    setEditingId(rule.id);
+    setLoadedDates({ validFrom: loadedFrom, validTo: loadedTo });
+    setForm({
+      courierProviderId: rule.courierProviderId,
+      fromLocationId: rule.fromLocationId || "",
+      toLocationId: rule.toLocationId || "",
+      minWeight: String(rule.minWeight ?? 0),
+      maxWeight:
+        rule.maxWeight === null || rule.maxWeight === undefined
+          ? ""
+          : String(rule.maxWeight),
+      basePrice: String(rule.basePrice ?? ""),
+      perKgCharge: String(rule.perKgCharge ?? 0),
+      fuelSurcharge:
+        rule.fuelSurcharge === null || rule.fuelSurcharge === undefined
+          ? "0"
+          : String(rule.fuelSurcharge),
+      validFrom: loadedFrom,
+      validTo: loadedTo,
+      priority: String(rule.priority ?? 100),
+      isActive: rule.isActive,
+    });
+    setFormOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    const problem = validatePricingRuleForm(form);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
+
+    // validFrom is a non-nullable column, so it can never be cleared - only
+    // moved. Refuse rather than silently keeping the old value.
+    if (editingId && form.validFrom === "" && loadedDates.validFrom !== "") {
+      toast.error(
+        "Valid-from is required and cannot be cleared; delete the rule instead"
+      );
+      return;
+    }
+
+    const base = {
+      fromLocationId: form.fromLocationId || null,
+      toLocationId: form.toLocationId || null,
+      minWeight: optionalNumber(form.minWeight, 0) ?? 0,
+      maxWeight: optionalNumber(form.maxWeight, null),
+      basePrice: Number(form.basePrice),
+      perKgCharge: optionalNumber(form.perKgCharge, 0) ?? 0,
+      fuelSurcharge: optionalNumber(form.fuelSurcharge, 0) ?? 0,
+      priority: form.priority.trim() === "" ? 100 : Number(form.priority),
+      isActive: form.isActive,
+    };
+
+    const toIso = (day: string) => new Date(day).toISOString();
+
+    try {
+      if (editingId) {
+        const body: UpdatePricingRuleRequest = { id: editingId, ...base };
+        if (form.validFrom !== loadedDates.validFrom) {
+          body.validFrom = toIso(form.validFrom);
+        }
+        if (form.validTo !== loadedDates.validTo) {
+          // An emptied box means "no end date", which the API expresses as null;
+          // omitting the key would instead keep whatever is stored.
+          body.validTo = form.validTo === "" ? null : toIso(form.validTo);
+        }
+        await updatePricingRule(body).unwrap();
+        toast.success("Pricing rule updated");
+      } else {
+        const body: CreatePricingRuleRequest = {
+          courierProviderId: form.courierProviderId,
+          ...base,
+        };
+        if (form.validFrom) body.validFrom = toIso(form.validFrom);
+        if (form.validTo) body.validTo = toIso(form.validTo);
+        await createPricingRule(body).unwrap();
+        toast.success("Pricing rule created");
+      }
+      setFormOpen(false);
+    } catch (error: any) {
+      toast.error(
+        editingId ? "Failed to update pricing rule" : "Failed to create pricing rule",
+        { description: error?.data?.message || "Please try again" }
+      );
+    }
+  };
+
+  const handleToggle = async (rule: CourierPricingRule) => {
+    try {
+      const result = await togglePricingRule({ id: rule.id }).unwrap();
+      toast.success(
+        result?.data?.isActive
+          ? "Pricing rule activated"
+          : "Pricing rule deactivated"
+      );
+    } catch (error: any) {
+      toast.error("Failed to change pricing rule status", {
+        description: error?.data?.message || "Please try again",
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!pendingDelete) return;
+    try {
+      await deletePricingRule({ id: pendingDelete.id }).unwrap();
+      toast.success("Pricing rule deleted");
+      setPendingDelete(null);
+    } catch (error: any) {
+      toast.error("Failed to delete pricing rule", {
+        description: error?.data?.message || "Please try again",
+      });
+    }
+  };
+
+  const activeCount = rules.filter((rule) => rule.isActive).length;
+  const isSaving = isCreating || isUpdating;
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-[#E5EAF2]">
+        <CardHeader>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-[#1D4ED8]" />
+                Courier Pricing Rules
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Platform-wide delivery rates. A lane is priced at checkout only by
+                an active rule for that provider that is inside its validity window
+                and matches the parcel weight.
+              </CardDescription>
+            </div>
+            <Button
+              onClick={openCreate}
+              className="bg-[#1D4ED8] hover:bg-[#1a45bd] text-white shrink-0"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New rule
+            </Button>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <Alert className="border-[#E5EAF2] bg-[#F7F9FC] dark:bg-gray-900">
+            <Info className="h-4 w-4" />
+            <AlertTitle>Enter business-approved rates only</AlertTitle>
+            <AlertDescription>
+              Nothing is prefilled and no rate is ever invented here. Use the courier
+              contract rates your business has approved. Deactivate a rule to withdraw
+              it from checkout pricing; deleting the only applicable rule for a lane
+              makes checkout quotes for that lane fail.
+            </AlertDescription>
+          </Alert>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Select
+              value={providerFilter}
+              onValueChange={(value) => {
+                setProviderFilter(value);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-56">
+                <SelectValue placeholder="All providers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All providers</SelectItem>
+                {providers.map((provider) => (
+                  <SelectItem key={provider.id} value={provider.id}>
+                    {provider.displayName || provider.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => {
+                setStatusFilter(value);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="active">Active only</SelectItem>
+                <SelectItem value="inactive">Inactive only</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="sm:ml-auto flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+              <Badge variant="secondary">{rules.length} shown</Badge>
+              <Badge variant="secondary">{activeCount} active</Badge>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12 text-gray-500">
+              <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+              Loading pricing rules...
+            </div>
+          ) : rules.length === 0 ? (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>No pricing rules</AlertTitle>
+              <AlertDescription>
+                No rule matches the current filters. Until one exists, the checkout
+                delivery engine cannot price this lane.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Provider</TableHead>
+                    <TableHead>Lane</TableHead>
+                    <TableHead>Weight band</TableHead>
+                    <TableHead>Base price</TableHead>
+                    <TableHead>Per kg</TableHead>
+                    <TableHead>Validity</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rules.map((rule) => (
+                    <TableRow key={rule.id}>
+                      <TableCell className="font-medium">
+                        {rule.courier_providers?.displayName ||
+                          rule.courier_providers?.name ||
+                          rule.courierProviderId}
+                      </TableCell>
+                      <TableCell className="text-xs">{laneLabel(rule)}</TableCell>
+                      <TableCell>{weightBandLabel(rule)}</TableCell>
+                      <TableCell>{formatAmount(rule.basePrice)}</TableCell>
+                      <TableCell>{formatAmount(rule.perKgCharge)}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-gray-600 dark:text-gray-300">
+                        {validityLabel(rule)}
+                      </TableCell>
+                      <TableCell>{rule.priority}</TableCell>
+                      <TableCell>
+                        <Badge variant={rule.isActive ? "default" : "secondary"}>
+                          {rule.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                        {rule.isActive && !isRuleInWindow(rule) && (
+                          <span className="ml-1 text-[10px] text-amber-600">
+                            out of window
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Edit rule"
+                            onClick={() => openEdit(rule)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title={rule.isActive ? "Deactivate rule" : "Activate rule"}
+                            onClick={() => handleToggle(rule)}
+                          >
+                            <Power className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Delete rule"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setPendingDelete(rule)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {pagination && pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-300">
+              <span>
+                Page {pagination.page} of {pagination.totalPages} ({pagination.total}{' '}
+                rules)
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={page <= 1}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={page >= pagination.totalPages}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create / edit dialog */}
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingId ? "Edit pricing rule" : "New pricing rule"}
+            </DialogTitle>
+            <DialogDescription>
+              Rules are platform-wide: vendor-scoped pricing is not supported and
+              delivery type is fixed to standard (NORMAL) delivery.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="pricing-provider">Courier provider</Label>
+              <Select
+                value={form.courierProviderId}
+                onValueChange={(value) => setField("courierProviderId", value)}
+                disabled={Boolean(editingId)}
+              >
+                <SelectTrigger id="pricing-provider">
+                  <SelectValue placeholder="Select provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {providers.map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      {provider.displayName || provider.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pricing-from">Pickup location</Label>
+              <Select
+                value={form.fromLocationId || "any"}
+                onValueChange={(value) =>
+                  setField("fromLocationId", value === "any" ? "" : value)
+                }
+              >
+                <SelectTrigger id="pricing-from">
+                  <SelectValue placeholder="Any pickup location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any pickup location</SelectItem>
+                  {locations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pricing-to">Delivery location</Label>
+              <Select
+                value={form.toLocationId || "any"}
+                onValueChange={(value) =>
+                  setField("toLocationId", value === "any" ? "" : value)
+                }
+              >
+                <SelectTrigger id="pricing-to">
+                  <SelectValue placeholder="Nationwide" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Nationwide</SelectItem>
+                  {locations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pricing-base">Base price</Label>
+              <Input
+                id="pricing-base"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.basePrice}
+                onChange={(event) => setField("basePrice", event.target.value)}
+                placeholder="Required"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pricing-perkg">Per kg charge</Label>
+              <Input
+                id="pricing-perkg"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.perKgCharge}
+                onChange={(event) => setField("perKgCharge", event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pricing-fuel">Fuel surcharge</Label>
+              <Input
+                id="pricing-fuel"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.fuelSurcharge}
+                onChange={(event) => setField("fuelSurcharge", event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pricing-min">Minimum weight (kg)</Label>
+              <Input
+                id="pricing-min"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.minWeight}
+                onChange={(event) => setField("minWeight", event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pricing-max">Maximum weight (kg)</Label>
+              <Input
+                id="pricing-max"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.maxWeight}
+                onChange={(event) => setField("maxWeight", event.target.value)}
+                placeholder="Empty = no upper bound"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pricing-valid-from">Valid from</Label>
+              <Input
+                id="pricing-valid-from"
+                type="date"
+                value={form.validFrom}
+                onChange={(event) => setField("validFrom", event.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pricing-valid-to">Valid to</Label>
+              <Input
+                id="pricing-valid-to"
+                type="date"
+                value={form.validTo}
+                onChange={(event) => setField("validTo", event.target.value)}
+                placeholder="Empty = no end date"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pricing-priority">Priority</Label>
+              <Input
+                id="pricing-priority"
+                type="number"
+                step="1"
+                value={form.priority}
+                onChange={(event) => setField("priority", event.target.value)}
+              />
+              <p className="text-xs text-gray-500">Lower numbers are evaluated first.</p>
+            </div>
+
+            <div className="flex items-center gap-3 sm:col-span-2">
+              <Switch
+                id="pricing-active"
+                checked={form.isActive}
+                onCheckedChange={(checked) => setField("isActive", checked)}
+              />
+              <Label htmlFor="pricing-active" className="cursor-pointer">
+                Active - available to the checkout delivery engine
+              </Label>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setFormOpen(false)}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSaving}
+              className="bg-[#1D4ED8] hover:bg-[#1a45bd] text-white"
+            >
+              {isSaving ? "Saving..." : editingId ? "Save changes" : "Create rule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation - deactivating is offered as the safe alternative */}
+      <AlertDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this pricing rule?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete
+                ? `${laneLabel(pendingDelete)} for ${
+                    pendingDelete.courier_providers?.name ||
+                    pendingDelete.courierProviderId
+                  } will be removed permanently. If it is the only applicable rule for
+                  this lane, checkout quotes for the lane will fail - deactivate it
+                  instead to keep the row.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Delete rule
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

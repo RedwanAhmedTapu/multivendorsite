@@ -2,7 +2,17 @@
 
 import React, { useState } from 'react';
 import { useGetChartOfAccountsQuery, useCreateManualVoucherMutation } from '@/features/accountingApi';
-import { Plus, Trash2, Calendar, FileText, CheckCircle, XCircle } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  Calendar,
+  FileText,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  RotateCcw,
+  Hash,
+} from 'lucide-react';
 
 interface LedgerEntry {
   id: string;
@@ -28,7 +38,40 @@ const voucherTypes = [
   { value: 'CLOSING', label: 'Closing Voucher' },
 ];
 
-export default function VoucherEntryForm() {
+// ============================================
+// STYLE TOKENS — matches accounts page's dark cyan/blue glass theme
+// ============================================
+
+const glassCard = 'rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md';
+const darkField =
+  'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400/40 transition-all';
+const errorField =
+  'w-full rounded-lg border border-rose-400/50 bg-rose-400/5 px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-400/50 transition-all';
+
+function InputField({
+  label,
+  required,
+  children,
+  icon,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-semibold text-white/40 uppercase tracking-wider flex items-center gap-1">
+        {icon && <span className="text-cyan-300">{icon}</span>}
+        {label}
+        {required && <span className="text-rose-400">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+export default function CreateVoucherForm() {
   const [formData, setFormData] = useState({
     voucherType: 'JOURNAL',
     voucherDate: new Date().toISOString().split('T')[0],
@@ -51,10 +94,9 @@ export default function VoucherEntryForm() {
 
   const accounts = accountsData?.data || [];
 
-  // Format date for display (e.g., "23 Jan, 2025")
   const formatDateDisplay = (dateString: string): string => {
     if (!dateString) return '';
-    const date = new Date(dateString + 'T00:00:00'); // Add time to avoid timezone issues
+    const date = new Date(dateString + 'T00:00:00');
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const day = date.getDate();
     const month = months[date.getMonth()];
@@ -68,8 +110,8 @@ export default function VoucherEntryForm() {
       return;
     }
 
-    const selectedAccount = accounts.find(acc => acc.id === currentEntry.accountId);
-    
+    const selectedAccount = accounts.find((acc) => acc.id === currentEntry.accountId);
+
     if (!selectedAccount) {
       alert('Selected account not found');
       return;
@@ -85,28 +127,27 @@ export default function VoucherEntryForm() {
     };
 
     setEntries([...entries, newEntry]);
-    
-    // Reset current entry but keep the drCr toggle for convenience
+
     setCurrentEntry({
-      drCr: currentEntry.drCr === 'Dr' ? 'Cr' : 'Dr', // Auto-toggle for double-entry convenience
+      drCr: currentEntry.drCr === 'Dr' ? 'Cr' : 'Dr',
       accountId: '',
       amount: '',
     });
   };
 
   const removeEntry = (id: string) => {
-    setEntries(entries.filter(entry => entry.id !== id));
+    setEntries(entries.filter((entry) => entry.id !== id));
   };
 
   const calculateTotals = () => {
     const totalDebit = entries
-      .filter(e => e.drCr === 'Dr')
+      .filter((e) => e.drCr === 'Dr')
       .reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0);
-    
+
     const totalCredit = entries
-      .filter(e => e.drCr === 'Cr')
+      .filter((e) => e.drCr === 'Cr')
       .reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0);
-    
+
     return { totalDebit, totalCredit, isBalanced: totalDebit === totalCredit && totalDebit > 0 };
   };
 
@@ -115,13 +156,18 @@ export default function VoucherEntryForm() {
   const numberToWords = (num: number): string => {
     const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
     const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-    const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const teens = [
+      'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen',
+      'Eighteen', 'Nineteen',
+    ];
 
     if (num === 0) return 'Zero';
     if (num < 10) return ones[num];
     if (num >= 10 && num < 20) return teens[num - 10];
-    if (num >= 20 && num < 100) return tens[Math.floor(num / 10)] + (num % 10 ? ' ' + ones[num % 10] : '');
-    if (num >= 100 && num < 1000) return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + numberToWords(num % 100) : '');
+    if (num >= 20 && num < 100)
+      return tens[Math.floor(num / 10)] + (num % 10 ? ' ' + ones[num % 10] : '');
+    if (num >= 100 && num < 1000)
+      return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + numberToWords(num % 100) : '');
     if (num >= 1000 && num < 100000) {
       const thousands = Math.floor(num / 1000);
       const remainder = num % 1000;
@@ -157,28 +203,24 @@ export default function VoucherEntryForm() {
     }
 
     try {
-      // Convert date to ISO-8601 DateTime format (YYYY-MM-DDTHH:mm:ss.sssZ)
       const voucherDateTime = new Date(formData.voucherDate + 'T00:00:00.000Z').toISOString();
-      
+
       const voucherData = {
         voucherType: formData.voucherType,
         entityType: 'ADMIN' as const,
-        voucherDate: voucherDateTime, // ISO-8601 DateTime format
+        voucherDate: voucherDateTime,
         narration: formData.narration.trim(),
-        entries: entries.map(entry => ({
+        entries: entries.map((entry) => ({
           accountId: entry.accountId,
           debitAmount: entry.drCr === 'Dr' ? parseFloat(entry.amount).toFixed(2) : '0.00',
           creditAmount: entry.drCr === 'Cr' ? parseFloat(entry.amount).toFixed(2) : '0.00',
         })),
       };
 
-      console.log('Sending voucher data:', voucherData); // For debugging
-
       const result = await createVoucher(voucherData).unwrap();
-      
+
       if (result.success) {
         alert(`Voucher created successfully! Voucher Number: ${result.data?.voucherNumber}`);
-        // Reset form
         setEntries([]);
         setFormData({
           voucherType: 'JOURNAL',
@@ -217,319 +259,360 @@ export default function VoucherEntryForm() {
     });
   };
 
+  const canSave = isBalanced && !isCreating && entries.length > 0 && !!formData.narration.trim();
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-slate-50 to-blue-50 p-6">
-      <div className="mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="mb-6 flex items-center gap-4 rounded-xl bg-white px-6 py-5 shadow-md border border-teal-100">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-teal-100">
-            <FileText className="h-6 w-6 text-teal-600" />
+    <div className="space-y-5">
+      {/* Header + top actions */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-500/30 shrink-0">
+            <FileText size={18} className="text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Voucher Entry</h1>
-            <p className="text-sm text-gray-600">Create and manage accounting journal entries</p>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
+              Voucher Entry
+            </h1>
+            <p className="text-xs sm:text-sm text-white/35 mt-0.5">
+              Create and manage accounting journal entries
+            </p>
           </div>
         </div>
 
-        {/* Main Form Container */}
-        <div className="rounded-xl bg-white shadow-xl border border-gray-200 overflow-hidden">
-          <div className="border-b border-teal-200 bg-teal-50 px-6 py-4">
-            <h2 className="text-lg font-semibold text-teal-900">Voucher Information</h2>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <button
+            onClick={handleReset}
+            className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-all"
+          >
+            <RotateCcw size={12} />
+            Reset
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!canSave}
+            className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-gradient-to-r from-cyan-400 to-blue-500 text-white border-0 shadow-lg shadow-cyan-500/30 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          >
+            {isCreating ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}
+            {isCreating ? 'Saving...' : 'Save Voucher'}
+          </button>
+        </div>
+      </div>
+
+      {/* Voucher Details Card */}
+      <div className={glassCard}>
+        <div className="px-5 py-4 border-b border-white/10 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-sm shadow-cyan-500/30">
+            <FileText size={15} className="text-white" />
+          </div>
+          <span className="text-sm font-bold text-white">Voucher Information</span>
+        </div>
+
+        <div className="p-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <InputField label="Voucher Type" required icon={<Hash size={11} />}>
+              <select
+                value={formData.voucherType}
+                onChange={(e) => setFormData({ ...formData, voucherType: e.target.value })}
+                className={`${darkField} appearance-none cursor-pointer`}
+              >
+                {voucherTypes.map((type) => (
+                  <option key={type.value} value={type.value} className="bg-slate-900 text-white">
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            </InputField>
+
+            <InputField label="Voucher Date" required icon={<Calendar size={11} />}>
+              <input
+                type="date"
+                value={formData.voucherDate}
+                onChange={(e) => setFormData({ ...formData, voucherDate: e.target.value })}
+                className={`${darkField} [color-scheme:dark]`}
+              />
+              {formData.voucherDate && (
+                <div className="mt-1 text-xs font-semibold text-cyan-300">
+                  Selected: {formatDateDisplay(formData.voucherDate)}
+                </div>
+              )}
+            </InputField>
+          </div>
+        </div>
+      </div>
+
+      {/* Ledger Entries Card */}
+      <div className={glassCard}>
+        <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-sm shadow-cyan-500/30">
+              <Plus size={15} className="text-white" />
+            </div>
+            <span className="text-sm font-bold text-white">Ledger Entries</span>
+          </div>
+          <span className="text-xs font-semibold text-cyan-300 bg-cyan-400/10 border border-cyan-400/25 rounded-full px-3 py-1">
+            Add debit and credit entries
+          </span>
+        </div>
+
+        <div className="p-5">
+          {/* Entry input row */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="grid grid-cols-12 gap-3">
+              <div className="col-span-12 md:col-span-2">
+                <InputField label="Dr / Cr">
+                  <select
+                    value={currentEntry.drCr}
+                    onChange={(e) =>
+                      setCurrentEntry({ ...currentEntry, drCr: e.target.value as 'Dr' | 'Cr' })
+                    }
+                    className={`${darkField} appearance-none cursor-pointer font-semibold`}
+                  >
+                    <option value="Dr" className="bg-slate-900 text-white">Debit</option>
+                    <option value="Cr" className="bg-slate-900 text-white">Credit</option>
+                  </select>
+                </InputField>
+              </div>
+
+              <div className="col-span-12 md:col-span-5">
+                <InputField label="Account">
+                  <select
+                    value={currentEntry.accountId}
+                    onChange={(e) => setCurrentEntry({ ...currentEntry, accountId: e.target.value })}
+                    className={`${darkField} appearance-none cursor-pointer`}
+                    disabled={isLoadingAccounts}
+                  >
+                    <option value="" className="bg-slate-900 text-white/50">
+                      {isLoadingAccounts ? 'Loading accounts...' : 'Select Account'}
+                    </option>
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id} className="bg-slate-900 text-white">
+                        [{acc.code}] {acc.name}
+                      </option>
+                    ))}
+                  </select>
+                </InputField>
+              </div>
+
+              <div className="col-span-12 md:col-span-4">
+                <InputField label="Amount (৳)">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={currentEntry.amount}
+                    onChange={(e) => setCurrentEntry({ ...currentEntry, amount: e.target.value })}
+                    className={darkField}
+                    placeholder="0.00"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addEntry();
+                      }
+                    }}
+                  />
+                </InputField>
+              </div>
+
+              <div className="col-span-12 md:col-span-1 flex items-end">
+                <button
+                  type="button"
+                  onClick={addEntry}
+                  className="flex h-[42px] w-full items-center justify-center rounded-lg bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow-lg shadow-cyan-500/30 hover:opacity-90 active:scale-95 transition-all"
+                  title="Add Entry (or press Enter)"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div className="p-6">
-            {/* Voucher Header */}
-            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
-              <div>
-                <label className="mb-2 flex items-center text-sm font-semibold text-gray-700">
-                  Voucher Type <span className="ml-1 text-rose-500">*</span>
-                </label>
-                <select
-                  value={formData.voucherType}
-                  onChange={(e) => setFormData({ ...formData, voucherType: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                >
-                  {voucherTypes.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 flex items-center text-sm font-semibold text-gray-700">
-                  <Calendar className="mr-1.5 h-4 w-4 text-teal-600" />
-                  Voucher Date <span className="ml-1 text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={formData.voucherDate}
-                    onChange={(e) => setFormData({ ...formData, voucherDate: e.target.value })}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                  />
-                  {formData.voucherDate && (
-                    <div className="mt-2 text-sm font-medium text-teal-600">
-                      Selected: {formatDateDisplay(formData.voucherDate)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Entry Input Section */}
-            <div className="mb-6">
-              <div className="mb-4 flex items-center justify-between border-b border-gray-200 pb-3">
-                <h3 className="text-base font-semibold text-gray-900">Ledger Entries</h3>
-                <span className="rounded-full bg-teal-100 px-3 py-1 text-xs font-medium text-teal-700">
-                  Add debit and credit entries
-                </span>
-              </div>
-
-              <div className="rounded-lg border-2 border-teal-200 bg-teal-50/50 p-5">
-                <div className="grid grid-cols-12 gap-3">
-                  <div className="col-span-12 md:col-span-2">
-                    <label className="mb-2 block text-xs font-semibold text-gray-700">Dr/Cr</label>
-                    <select
-                      value={currentEntry.drCr}
-                      onChange={(e) => setCurrentEntry({ ...currentEntry, drCr: e.target.value as 'Dr' | 'Cr' })}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                    >
-                      <option value="Dr">Debit</option>
-                      <option value="Cr">Credit</option>
-                    </select>
-                  </div>
-
-                  <div className="col-span-12 md:col-span-5">
-                    <label className="mb-2 block text-xs font-semibold text-gray-700">Account</label>
-                    <select
-                      value={currentEntry.accountId}
-                      onChange={(e) => setCurrentEntry({ ...currentEntry, accountId: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                      disabled={isLoadingAccounts}
-                    >
-                      <option value="">
-                        {isLoadingAccounts ? 'Loading accounts...' : 'Select Account'}
-                      </option>
-                      {accounts.map((acc) => (
-                        <option key={acc.id} value={acc.id}>
-                          [{acc.code}] {acc.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="col-span-12 md:col-span-4">
-                    <label className="mb-2 block text-xs font-semibold text-gray-700">Amount (৳)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={currentEntry.amount}
-                      onChange={(e) => setCurrentEntry({ ...currentEntry, amount: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                      placeholder="0.00"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addEntry();
-                        }
-                      }}
-                    />
-                  </div>
-
-                  <div className="col-span-12 md:col-span-1 flex items-end">
-                    <button
-                      type="button"
-                      onClick={addEntry}
-                      className="flex h-[42px] w-full items-center justify-center rounded-lg bg-teal-600 text-white shadow-md transition hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                      title="Add Entry (or press Enter)"
-                    >
-                      <Plus className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Entries Table */}
-            {entries.length > 0 && (
-              <div className="mb-6">
-                <div className="overflow-hidden rounded-xl border-2 border-gray-200 shadow-md">
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-100 border-b-2 border-gray-200">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">
-                            Type
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">
-                            Code
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-700">
-                            Account Name
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-700">
-                            Debit (৳)
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-700">
-                            Credit (৳)
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-gray-700">
-                            Action
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 bg-white">
-                        {entries.map((entry, index) => (
-                          <tr 
-                            key={entry.id} 
-                            className={`transition hover:bg-teal-50 ${
-                              index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+          {/* Entries table */}
+          {entries.length > 0 && (
+            <div className="mt-5 overflow-hidden rounded-xl border border-white/10">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px]">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      {['Type', 'Code', 'Account Name', 'Debit (৳)', 'Credit (৳)', 'Action'].map(
+                        (h, i) => (
+                          <th
+                            key={i}
+                            className={`px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/40 whitespace-nowrap ${
+                              i === 3 || i === 4 ? 'text-right' : i === 5 ? 'text-center' : 'text-left'
                             }`}
                           >
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
-                                entry.drCr === 'Dr' 
-                                  ? 'bg-rose-100 text-rose-700 border border-rose-200' 
-                                  : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                              }`}>
-                                {entry.drCr === 'Dr' ? 'Debit' : 'Credit'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="font-mono text-sm font-semibold text-teal-600">
-                                {entry.accountCode}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                              {entry.accountName}
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm font-bold text-gray-900">
-                              {entry.drCr === 'Dr' ? parseFloat(entry.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm font-bold text-gray-900">
-                              {entry.drCr === 'Cr' ? parseFloat(entry.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <button
-                                onClick={() => removeEntry(entry.id)}
-                                className="inline-flex items-center rounded-lg p-2 text-rose-600 transition hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-500/50"
-                                title="Remove Entry"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-teal-50 border-t-2 border-teal-200">
-                        <tr className="font-bold">
-                          <td colSpan={3} className="px-4 py-4 text-right text-sm text-gray-900">
-                            <span className="text-base">Totals:</span>
-                          </td>
-                          <td className="px-4 py-4 text-right text-base text-gray-900">
-                            ৳ {totalDebit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                          <td className="px-4 py-4 text-right text-base text-gray-900">
-                            ৳ {totalCredit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                          <td className="px-4 py-4 text-center">
-                            {isBalanced ? (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
-                                <CheckCircle className="h-4 w-4" />
-                                Balanced
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-700 border border-rose-200">
-                                <XCircle className="h-4 w-4" />
-                                Not Balanced
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>
+                            {h}
+                          </th>
+                        ),
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries.map((entry, index) => (
+                      <tr
+                        key={entry.id}
+                        className={`${index % 2 === 0 ? 'bg-transparent' : 'bg-white/[0.02]'} border-b border-white/5 hover:bg-cyan-400/5 transition-colors`}
+                      >
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold border ${
+                              entry.drCr === 'Dr'
+                                ? 'bg-rose-400/10 text-rose-300 border-rose-400/25'
+                                : 'bg-emerald-400/10 text-emerald-300 border-emerald-400/25'
+                            }`}
+                          >
+                            {entry.drCr === 'Dr' ? 'Debit' : 'Credit'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="font-mono text-xs font-semibold text-cyan-300/80">
+                            {entry.accountCode}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium text-white/80">
+                          {entry.accountName}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm font-bold text-white/80 font-mono">
+                          {entry.drCr === 'Dr'
+                            ? parseFloat(entry.amount).toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })
+                            : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm font-bold text-white/80 font-mono">
+                          {entry.drCr === 'Cr'
+                            ? parseFloat(entry.amount).toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })
+                            : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => removeEntry(entry.id)}
+                            className="inline-flex items-center rounded-lg p-1.5 text-white/40 hover:text-rose-300 hover:bg-rose-400/10 transition-colors"
+                            title="Remove Entry"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-white/[0.03] border-t border-white/10">
+                      <td colSpan={3} className="px-4 py-3.5 text-right text-xs font-bold text-white/50">
+                        Totals
+                      </td>
+                      <td className="px-4 py-3.5 text-right text-sm font-extrabold text-cyan-300 font-mono">
+                        ৳{totalDebit.toLocaleString('en-US', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td className="px-4 py-3.5 text-right text-sm font-extrabold text-cyan-300 font-mono">
+                        ৳{totalCredit.toLocaleString('en-US', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        {isBalanced ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300 border border-emerald-400/25">
+                            <CheckCircle className="h-3.5 w-3.5" />
+                            Balanced
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-400/10 px-3 py-1 text-xs font-bold text-rose-300 border border-rose-400/25">
+                            <XCircle className="h-3.5 w-3.5" />
+                            Not Balanced
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
-            )}
-
-            {/* Totals in Words */}
-            {entries.length > 0 && (
-              <div className="mb-6 rounded-xl border-2 border-teal-200 bg-gradient-to-br from-teal-50 to-blue-50 p-5 shadow-sm">
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2">
-                    <span className="text-sm font-semibold text-gray-700 min-w-[120px]">Total Debit:</span>
-                    <span className="text-sm font-bold text-gray-900">
-                      {numberToWords(Math.floor(totalDebit))} Taka {totalDebit % 1 > 0 ? `and ${Math.round((totalDebit % 1) * 100)} Paisa` : ''} Only
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-sm font-semibold text-gray-700 min-w-[120px]">Total Credit:</span>
-                    <span className="text-sm font-bold text-gray-900">
-                      {numberToWords(Math.floor(totalCredit))} Taka {totalCredit % 1 > 0 ? `and ${Math.round((totalCredit % 1) * 100)} Paisa` : ''} Only
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Narration */}
-            <div className="mb-6">
-              <label className="mb-2 flex items-center text-sm font-semibold text-gray-700">
-                Narration / Description <span className="ml-1 text-rose-500">*</span>
-              </label>
-              <textarea
-                value={formData.narration}
-                onChange={(e) => setFormData({ ...formData, narration: e.target.value })}
-                rows={4}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                placeholder="Enter a detailed description for this voucher entry..."
-              />
             </div>
+          )}
 
-            {/* Balance Warning */}
-            {!isBalanced && entries.length > 0 && (
-              <div className="mb-6 flex items-start gap-3 rounded-lg border-2 border-rose-200 bg-rose-50 p-4">
-                <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-600" />
-                <div>
-                  <p className="text-sm font-bold text-rose-800">Voucher is not balanced</p>
-                  <p className="mt-1 text-xs text-rose-700">
-                    Total debit must equal total credit. Difference: ৳ {Math.abs(totalDebit - totalCredit).toFixed(2)}
-                  </p>
+          {/* Totals in words */}
+          {entries.length > 0 && (
+            <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="space-y-1.5">
+                <div className="flex items-start gap-2">
+                  <span className="text-xs font-semibold text-white/40 min-w-[110px]">Total Debit:</span>
+                  <span className="text-xs font-bold text-white/75">
+                    {numberToWords(Math.floor(totalDebit))} Taka
+                    {totalDebit % 1 > 0 ? ` and ${Math.round((totalDebit % 1) * 100)} Paisa` : ''} Only
+                  </span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-xs font-semibold text-white/40 min-w-[110px]">Total Credit:</span>
+                  <span className="text-xs font-bold text-white/75">
+                    {numberToWords(Math.floor(totalCredit))} Taka
+                    {totalCredit % 1 > 0 ? ` and ${Math.round((totalCredit % 1) * 100)} Paisa` : ''} Only
+                  </span>
                 </div>
               </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex items-center justify-between border-t-2 border-gray-200 pt-6">
-              <button
-                type="button"
-                onClick={handleReset}
-                className="rounded-lg border-2 border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500/50"
-              >
-                Reset Form
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={!isBalanced || isCreating || entries.length === 0 || !formData.narration.trim()}
-                className="flex items-center gap-2 rounded-lg bg-teal-600 px-8 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-teal-600"
-              >
-                {isCreating ? (
-                  <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-5 w-5" />
-                    Save Voucher
-                  </>
-                )}
-              </button>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Narration + Actions Card */}
+      <div className={glassCard}>
+        <div className="px-5 py-4 border-b border-white/10 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
+            <FileText size={15} className="text-white/60" />
+          </div>
+          <span className="text-sm font-bold text-white">Narration</span>
+        </div>
+
+        <div className="p-5">
+          <InputField label="Narration / Description" required>
+            <textarea
+              value={formData.narration}
+              onChange={(e) => setFormData({ ...formData, narration: e.target.value })}
+              rows={4}
+              className={`${darkField} resize-none`}
+              placeholder="Enter a detailed description for this voucher entry..."
+            />
+          </InputField>
+
+          {/* Balance warning */}
+          {!isBalanced && entries.length > 0 && (
+            <div className="mt-4 flex items-start gap-3 rounded-xl border border-rose-400/25 bg-rose-400/5 p-4">
+              <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-400" />
+              <div>
+                <p className="text-sm font-bold text-rose-300">Voucher is not balanced</p>
+                <p className="mt-1 text-xs text-rose-300/70">
+                  Total debit must equal total credit. Difference: ৳
+                  {Math.abs(totalDebit - totalCredit).toFixed(2)}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-5">
+            <button
+              type="button"
+              onClick={handleReset}
+              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white/70 hover:bg-white/10 hover:text-white transition-all"
+            >
+              <RotateCcw size={14} />
+              Reset Form
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!canSave}
+              className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-400 to-blue-500 px-6 py-2.5 text-sm font-bold text-white border-0 shadow-lg shadow-cyan-500/30 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
+            >
+              {isCreating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+              {isCreating ? 'Saving...' : 'Save Voucher'}
+            </button>
           </div>
         </div>
       </div>

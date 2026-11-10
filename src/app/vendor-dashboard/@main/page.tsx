@@ -5,6 +5,7 @@ import React from 'react';
 import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import OnboardingWizard from '@/components/vendorinfo/OnboardingWizard';
+import { HrmWorkspaceEntry } from '@/components/hrm/HrmWorkspaceEntry';
 
 const OnboardingPage = () => {
   const router = useRouter();
@@ -84,6 +85,7 @@ const OnboardingPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 ">
       <div className="container mx-auto px-4">
+        <div className="flex justify-end pt-4"><HrmWorkspaceEntry /></div>
         <OnboardingWizard 
           vendorId={user.vendorId} 
           onComplete={handleOnboardingComplete}

@@ -7,7 +7,6 @@ import { CategoryAttribute } from "@/types/category.types";
 // TYPE DEFINITIONS
 // ===========================
 
-// Filter API Response Types
 export interface FilterableAttributeValue {
   id: string;
   value: string;
@@ -102,28 +101,32 @@ export interface TemplateInfoResponse {
   };
 }
 
-export interface TemplateDownloadResponse {
-  success: boolean;
-  data: {
-    buffer: Blob;
-    fileName: string;
-    contentType: string;
-  };
-  message: string;
+// ⭐ NEW: Row-level detail for admin report
+export interface RowDetail {
+  row: number;
+  status: "imported" | "failed";
+  path: string;
+  message?: string;
+  categoriesCreated: number;
+  categoriesReused: number;
+  attributesCreated: number;
+  categoryAttributeLinks: number;
 }
 
+// ⭐ UPDATED: Flat response matching new controller
 export interface BulkImportResponse {
   success: boolean;
   message: string;
-  data?: {
-    imported: number;
-    failed: number;
-    errors?: Array<{
-      row: number;
-      errors: string[];
-    }>;
-    warnings?: string[];
-  };
+  totalRows: number;
+  imported: number;
+  failed: number;
+  categoriesCreated: number;
+  categoriesReused: number;
+  attributesCreated: number;
+  categoryAttributeLinks: number;
+  warnings: string[];
+  errors: Array<{ row: number; message: string }>;
+  rowDetails: RowDetail[];
 }
 
 // ===========================
@@ -133,12 +136,9 @@ export interface BulkImportResponse {
 export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Category", "Attribute", "Product", "Auth", "CategoryFilter", "Template"],
+  tagTypes: ["Category", "Attribute", "Product", "Auth", "CategoryFilter", "Template", "CatalogRequest"],
   endpoints: (builder) => ({
-    // ==========================================
-    // CATEGORY ENDPOINTS
-    // ==========================================
-
+    // ---------- Category endpoints ----------
     getCategories: builder.query<EnhancedCategory[], void>({
       query: () => "/categories",
       providesTags: (result) =>
@@ -214,10 +214,7 @@ export const apiSlice = createApi({
       ],
     }),
 
-    // ==========================================
-    // CATEGORY FILTER ENDPOINTS
-    // ==========================================
-
+    // ---------- Category Filter endpoints ----------
     getCategoryFilters: builder.query<
       { success: boolean; data: CategoryFilterResponse; message: string },
       string
@@ -250,11 +247,7 @@ export const apiSlice = createApi({
     }),
 
     getMultipleCategoriesFilters: builder.query<
-      {
-        success: boolean;
-        data: MultipleCategoriesFilterResponse;
-        message: string;
-      },
+      { success: boolean; data: MultipleCategoriesFilterResponse; message: string },
       string[]
     >({
       query: (categoryIds) => ({
@@ -273,11 +266,7 @@ export const apiSlice = createApi({
     }),
 
     getMultipleCategoriesFiltersBySlugs: builder.query<
-      {
-        success: boolean;
-        data: MultipleCategoriesFilterResponse;
-        message: string;
-      },
+      { success: boolean; data: MultipleCategoriesFilterResponse; message: string },
       string[]
     >({
       query: (categorySlugs) => ({
@@ -307,23 +296,15 @@ export const apiSlice = createApi({
       ],
     }),
 
-    // ==========================================
-    // TEMPLATE ENDPOINTS
-    // ==========================================
-
-    /**
-     * Get template information
-     */
+    // ---------- Template endpoints ----------
     getTemplateInfo: builder.query<TemplateInfoResponse, void>({
       query: () => "/category-template/info",
       providesTags: [{ type: "Template", id: "INFO" }],
     }),
 
-    /**
-     * Download standard template
-     */
+    // ⭐ Returns raw Blob — no transformResponse to avoid Redux serialization issues
     downloadStandardTemplate: builder.mutation<
-      TemplateDownloadResponse,
+      Blob,
       { maxLevels?: number; includeAttributes?: number }
     >({
       query: (params) => ({
@@ -332,23 +313,11 @@ export const apiSlice = createApi({
         params,
         responseHandler: (response) => response.blob(),
       }),
-      transformResponse: (response: Blob, meta, args) => ({
-        success: true,
-        data: {
-          buffer: response,
-          fileName: "category_template_standard.xlsx",
-          contentType:
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        },
-        message: "Template downloaded successfully",
-      }),
     }),
 
-    /**
-     * Download custom template
-     */
+    // ⭐ Returns raw Blob — no transformResponse
     downloadCustomTemplate: builder.mutation<
-      TemplateDownloadResponse,
+      Blob,
       { maxLevels?: number; includeAttributes?: number }
     >({
       query: (params) => ({
@@ -357,25 +326,10 @@ export const apiSlice = createApi({
         params,
         responseHandler: (response) => response.blob(),
       }),
-      transformResponse: (response: Blob, meta, args) => ({
-        success: true,
-        data: {
-          buffer: response,
-          fileName: `category_template_${args.maxLevels || 10}levels.xlsx`,
-          contentType:
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        },
-        message: "Template downloaded successfully",
-      }),
     }),
 
-    // ==========================================
-    // BULK IMPORT WITH TEMPLATE VALIDATION
-    // ==========================================
-
-    /**
-     * Bulk import categories from Excel template
-     */
+    // ---------- Bulk Import ----------
+    // ⭐ No transformResponse — controller returns exact shape
     bulkImportCategories: builder.mutation<BulkImportResponse, FormData>({
       query: (formData) => ({
         url: "/bulk-import-category",
@@ -383,28 +337,9 @@ export const apiSlice = createApi({
         body: formData,
       }),
       invalidatesTags: ["Category", "Attribute", "CategoryFilter"],
-      transformResponse: (response: any): BulkImportResponse => ({
-        success: response.success,
-        message: response.message,
-        data: response.data,
-      }),
-      transformErrorResponse: (response: {
-        status: number;
-        data: any;
-      }): BulkImportResponse => ({
-        success: false,
-        message: response.data?.message || "Import failed",
-        data: response.data?.data,
-      }),
     }),
 
-    // ==========================================
-    // UNIFIED ATTRIBUTE ENDPOINTS
-    // ==========================================
-
-    /**
-     * Get all attributes for a category
-     */
+    // ---------- Attribute endpoints ----------
     getAttributes: builder.query<CategoryAttribute[], string>({
       query: (categoryId) => `/attributes/${categoryId}`,
       providesTags: (result, error, categoryId) => [
@@ -413,9 +348,6 @@ export const apiSlice = createApi({
       ],
     }),
 
-    /**
-     * Create a new unified attribute
-     */
     createAttribute: builder.mutation<
       CategoryAttribute,
       {
@@ -440,9 +372,6 @@ export const apiSlice = createApi({
       ],
     }),
 
-    /**
-     * Update an attribute
-     */
     updateAttribute: builder.mutation<
       CategoryAttribute,
       {
@@ -468,9 +397,6 @@ export const apiSlice = createApi({
       ],
     }),
 
-    /**
-     * Delete an attribute
-     */
     deleteAttribute: builder.mutation<{ message: string }, string>({
       query: (id) => ({
         url: `/attributes/${id}`,
@@ -483,9 +409,6 @@ export const apiSlice = createApi({
       ],
     }),
 
-    /**
-     * Add a value to an attribute
-     */
     addAttributeValue: builder.mutation<
       AttributeValue,
       { attributeId: string; value: string }
@@ -501,9 +424,6 @@ export const apiSlice = createApi({
       ],
     }),
 
-    /**
-     * Delete an attribute value
-     */
     deleteAttributeValue: builder.mutation<{ message: string }, string>({
       query: (id) => ({
         url: `/attributes/values/${id}`,
@@ -515,9 +435,6 @@ export const apiSlice = createApi({
       ],
     }),
 
-    /**
-     * Update attribute value
-     */
     updateAttributeValue: builder.mutation<
       AttributeValue,
       { id: string; value: string }
@@ -533,9 +450,6 @@ export const apiSlice = createApi({
       ],
     }),
 
-    /**
-     * Reorder attributes in a category
-     */
     reorderAttributes: builder.mutation<
       { message: string },
       {
@@ -552,6 +466,36 @@ export const apiSlice = createApi({
         { type: "Attribute", id: categoryId },
       ],
     }),
+
+    // ---------- Catalog Request endpoints ----------
+    createCatalogRequest: builder.mutation<
+      any,
+      {
+        requestType: string;
+        categoryId?: string;
+        attributeId?: string;
+        requestedName: string;
+        requestedType?: string;
+        description?: string;
+      }
+    >({
+      query: (body) => ({
+        url: "/categories/catalog-request",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "CatalogRequest", id: "LIST" }],
+    }),
+
+    getMyCatalogRequests: builder.query<any[], void>({
+      query: () => "/categories/catalog-request/my",
+      providesTags: [{ type: "CatalogRequest", id: "MY" }],
+    }),
+
+    getAllCatalogRequests: builder.query<any[], void>({
+      query: () => "/categories/catalog-request/all",
+      providesTags: [{ type: "CatalogRequest", id: "LIST" }],
+    }),
   }),
 });
 
@@ -560,7 +504,6 @@ export const apiSlice = createApi({
 // ===========================
 
 export const {
-  // ---------- Category hooks ----------
   useGetCategoriesQuery,
   useGetCategoryByIdQuery,
   useSearchCategoriesQuery,
@@ -569,23 +512,15 @@ export const {
   useCreateCategoryMutation,
   useUpdateCategoryMutation,
   useDeleteCategoryMutation,
-
-  // ---------- Category Filter hooks ----------
   useGetCategoryFiltersQuery,
   useGetCategoryFiltersBySlugQuery,
   useGetMultipleCategoriesFiltersQuery,
   useGetMultipleCategoriesFiltersBySlugsQuery,
   useGetCategoryFilterSummaryQuery,
-
-  // ---------- Template hooks ----------
   useGetTemplateInfoQuery,
   useDownloadStandardTemplateMutation,
   useDownloadCustomTemplateMutation,
-
-  // ---------- Bulk Import hook ----------
   useBulkImportCategoriesMutation,
-
-  // ---------- Unified Attribute hooks ----------
   useGetAttributesQuery,
   useCreateAttributeMutation,
   useUpdateAttributeMutation,
@@ -594,4 +529,7 @@ export const {
   useDeleteAttributeValueMutation,
   useUpdateAttributeValueMutation,
   useReorderAttributesMutation,
+  useCreateCatalogRequestMutation,
+  useGetMyCatalogRequestsQuery,
+  useGetAllCatalogRequestsQuery,
 } = apiSlice;

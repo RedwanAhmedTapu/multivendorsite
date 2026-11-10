@@ -66,12 +66,21 @@ export interface UpdateVendorOrderStatusRequest {
 }
 
 export interface MarkForDeliveryRequest {
-  warehouseId: string;
   specialInstruction?: string;
 }
 
 export interface ConfirmCodOrderRequest {
   confirmedByName: string;
+  note?: string;
+}
+
+/**
+ * Vendor confirms physical receipt of a returned parcel.
+ * Requires courierOrder.returnedAt to already be set (courier must have
+ * reported "Returned To Merchant" first) — otherwise the endpoint 400s.
+ */
+export interface ConfirmReturnReceiptRequest {
+  sellable: boolean;
   note?: string;
 }
 
@@ -120,6 +129,8 @@ export interface VendorOrderAddress {
 
 export interface OrderAddressDetail extends VendorOrderAddress {
   location: LocationInfo;
+  state?: string;
+  landmark?: string | null;
 }
 
 export interface LocationInfo {
@@ -194,7 +205,13 @@ export interface CourierOrderSummary {
   courierTrackingId?: string;
   courierOrderId?: string;
   status: CourierOrderStatus;
+  shipmentKind?: string;
+  warehouseId?: string; 
   lastStatusUpdate: string;
+  returnedAt?: string;
+  vendorConfirmedReturnAt?: string;
+  /** Phase 4 (M-b): server-derived booking state (the raw intent text is never sent). */
+  bookingState?: "BOOKED" | "PENDING" | "IN_FLIGHT" | "NEEDS_RECONCILIATION" | "CANCELLED";
   courier_providers: CourierProvider;
 }
 
@@ -215,17 +232,23 @@ export interface VendorInfo {
 export interface MasterOrderSummary {
   id: string;
   orderNumber: string;
+  totalAmount: number; 
   paymentStatus: PaymentStatus;
+  paymentmethod?: string;
   createdAt: string;
-  confirmedAt?: string;
+ confirmedAt?: string | null; 
   address: VendorOrderAddress;
+  
   user: VendorOrderUser;
 }
 
 export interface MasterOrderDetail {
   id: string;
   orderNumber: string;
+  /** Decimal — may arrive as a string. */
+  totalAmount?: number | string;
   paymentStatus: PaymentStatus;
+  paymentmethod?: string;
   createdAt: string;
   confirmedAt?: string;
   address: OrderAddressDetail;
@@ -256,12 +279,70 @@ export interface VendorOrder {
   order: MasterOrderSummary;
   items: OrderItem[];
   courierOrder?: CourierOrderSummary;
+  /** Newest first — one per warehouse shipment. */
+  courierOrders?: CourierOrderSummary[];
+}
+
+// ── 1C-7B G2 contract: physical returns on the vendor order detail ─────────
+// GET /api/vendor-orders/:vendorOrderId now returns the vendor order's
+// VendorReturn rows (creation stays exclusively server-side via
+// confirmReturnReceipt). A return that has been consumed by a refund carries
+// its refundId and a { id, status } refund summary; unconsumed returns have
+// refundId: null and refund: null.
+
+export interface VendorReturnItem {
+  id: string;
+  orderItemId: string;
+  variantId: string;
+  quantity: number;
+}
+
+export interface VendorReturnRefundSummary {
+  id: string;
+  status: string;
+}
+
+export interface VendorReturn {
+  id: string;
+  vendorOrderId: string;
+  vendorId: string;
+  refundId: string | null;
+  condition: "SELLABLE" | "DAMAGED";
+  status: string;
+  confirmedAt: string;
+  confirmedBy?: string | null;
+  note?: string | null;
+  items: VendorReturnItem[];
+  refund: VendorReturnRefundSummary | null;
 }
 
 export interface VendorOrderDetail extends Omit<VendorOrder, "order" | "courierOrder"> {
   order: MasterOrderDetail;
   courierOrder?: CourierOrderDetail;
   vendor: VendorInfo;
+  /** Physical returns (1C-7B G2) — always present in the current contract. */
+  returns: VendorReturn[];
+  /** Server-derived: a high-risk PENDING COD order awaiting FinixMart's fraud review (the store may not confirm it). */
+  codReviewRequired?: boolean;
+  /** Newest first — one per warehouse shipment. */
+  courierOrders: CourierOrderDetail[];
+  /** Server-derived from the rules the action endpoints enforce (they re-check). */
+  vendorActions?: VendorOrderActions;
+}
+
+export type VendorActionNote =
+  | "COD_REVIEW_REQUIRED"
+  | "STOCK_RELEASED"
+  | "AWAITING_PAYMENT"
+  | "PAID_AWAITING_CONFIRMATION"
+  | "BOOKING_NEEDS_ATTENTION";
+
+export interface VendorOrderActions {
+  nextStatus: VendorAllowedStatus | null;
+  canConfirmCod: boolean;
+  canMarkForDelivery: boolean;
+  canConfirmReturn: boolean;
+  notes: VendorActionNote[];
 }
 
 // ---- Shipping label ----
@@ -276,7 +357,7 @@ export interface ShippingLabelData {
   items: OrderItem[];
   vendor: VendorInfo;
   order: MasterOrderDetail;
-  courierOrder: CourierOrderDetail & {
+  courierOrders: (CourierOrderDetail & {
     recipientName: string;
     recipientPhone: string;
     recipientAddress: string;
@@ -286,7 +367,8 @@ export interface ShippingLabelData {
     codAmount: number;
     deliveryCharge: number;
     totalCharge: number;
-  };
+    warehouseId?: string;
+  })[];
 }
 
 // ---- Tracking ----
@@ -297,7 +379,7 @@ export interface TrackingData {
   fulfillmentStatus: FulfillmentStatus;
   shippedAt?: string;
   deliveredAt?: string;
-  courierOrder: CourierOrderDetail;
+  courierOrders: CourierOrderDetail[];
 }
 
 // ---- Statistics ----
@@ -334,7 +416,8 @@ export interface RevenueDataPoint {
 
 export interface MarkForDeliveryResponse {
   vendorOrder: VendorOrderDetail;
-  courierOrder: {
+  courierOrders: { warehouseId: string; courierOrderId: string }[];
+  newlyBooked: {
     id: string;
     courierProviderId: string;
     vendorId: string;
@@ -345,8 +428,15 @@ export interface MarkForDeliveryResponse {
     codAmount: number;
     deliveryCharge: number;
     totalCharge: number;
-  };
+  }[];
   shippingLabelUrl: string;
+}
+
+// ---- Confirm return receipt response ----
+
+export interface ConfirmReturnReceiptResponse {
+  success: boolean;
+  sellable: boolean;
 }
 
 // =============================
@@ -532,6 +622,30 @@ export const vendorOrderApi = createApi({
       ],
     }),
 
+    /**
+     * PATCH /api/vendor-orders/:vendorOrderId/confirm-return-receipt
+     * Body: { sellable: boolean, note?: string }
+     * Requires courierOrder.returnedAt to already be set. Restores physical
+     * warehouse stock when sellable=true, and unblocks admin refund approval.
+     */
+    confirmVendorReturnReceipt: builder.mutation<
+      ApiResponse<ConfirmReturnReceiptResponse>,
+      { vendorOrderId: string } & ConfirmReturnReceiptRequest
+    >({
+      query: ({ vendorOrderId, ...body }) => ({
+        url: `/vendor-orders/${vendorOrderId}/confirm-return-receipt`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (result, error, { vendorOrderId }) => [
+        { type: "VendorOrder", id: vendorOrderId },
+        { type: "VendorOrderDetail", id: vendorOrderId },
+        { type: "Tracking", id: vendorOrderId },
+        { type: "VendorOrder", id: "LIST" },
+        "VendorOrderStatistics",
+      ],
+    }),
+
     // =====================================================
     // SHIPPING & COURIER
     // =====================================================
@@ -589,6 +703,7 @@ export const {
   useUpdateVendorOrderStatusMutation,
   useMarkVendorOrderForDeliveryMutation,
   useConfirmVendorCodOrderMutation,
+  useConfirmVendorReturnReceiptMutation,
 
   // Shipping & Courier
   useGetVendorOrderShippingLabelQuery,

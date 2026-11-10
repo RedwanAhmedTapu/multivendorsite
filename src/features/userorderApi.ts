@@ -1,6 +1,44 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import baseQueryWithReauth from "./baseQueryWithReauth";
 
+// ─── Enums (mirror Prisma) ────────────────────────────────────────────────────
+
+export type OrderStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "PROCESSING"
+  | "PACKAGING"
+  | "SHIPPED"
+  | "DELIVERED"
+  | "RETURNED"
+  | "FAILED_TO_DELIVER"
+  | "CANCELLED"
+  | "REFUNDED";
+
+export type PaymentStatus = "PENDING" | "PAID" | "PARTIALLY_REFUNDED" | "FAILED" | "REFUNDED";
+
+/** Persisted Refund.status values (Prisma RefundStatus). */
+export type RefundStatus = "PENDING" | "APPROVED" | "PROCESSING" | "REFUNDED" | "FAILED" | "REJECTED" | "CANCELLED";
+
+export type FulfillmentStatus =
+  | "UNFULFILLED"
+  | "PARTIALLY_FULFILLED"
+  | "FULFILLED"
+  | "SHIPPED"
+  | "DELIVERED"
+  | "RETURNED"
+  | "CANCELLED";
+
+/** Order.paymentmethod is now mandatory at placement time. */
+export type PaymentMethod =
+  | "COD"
+  | "SSLCOMMERZ"
+  | "BKASH"
+  | "NAGAD"
+  | "ROCKET"
+  | "WALLET"
+  | "BANK_TRANSFER";
+
 // ─── Shared sub-types ─────────────────────────────────────────────────────────
 
 export interface OrderVendor {
@@ -18,6 +56,7 @@ export interface OrderVariantProduct {
   id: string;
   name: string;
   slug: string;
+  vendorId: string;
 }
 
 export interface OrderVariant {
@@ -26,6 +65,7 @@ export interface OrderVariant {
   name: string | null;
   price: number;
   specialPrice: number | null;
+  taxRate: number | null;
   images: OrderVariantImage[];
   product: OrderVariantProduct;
 }
@@ -33,7 +73,10 @@ export interface OrderVariant {
 export interface OrderItem {
   id: string;
   quantity: number;
-  price: number;
+  /** Unit price actually paid (persisted at order time; Decimal → may arrive as a string). */
+  price: number | string;
+  deliveredQuantity: number | null;
+  returnedQuantity: number | null;
   variant: OrderVariant;
 }
 
@@ -49,6 +92,7 @@ export interface OrderAddress {
 export interface VendorOrderSummary {
   id: string;
   status: OrderStatus;
+  fulfillmentStatus: FulfillmentStatus;
   subtotal: number;
   vendor: OrderVendor;
   items: OrderItem[];
@@ -62,10 +106,10 @@ export interface CourierProvider {
   logo: string | null;
 }
 
-export interface CourierInfo {
+/** Shape returned inline on Order/OrderDetail.vendorOrders[].courierOrder — no tracking history. */
+export interface CourierSummary {
   id: string;
   courierTrackingId: string | null;
-  courierOrderId: string | null;
   status: string;
   recipientName: string;
   recipientAddress: string;
@@ -82,7 +126,8 @@ export interface VendorOrderDetail extends VendorOrderSummary {
   shippingCost: number;
   shippedAt: string | null;
   deliveredAt: string | null;
-  courierOrder: CourierInfo | null;
+  cancelledAt: string | null;
+  courierOrder: CourierSummary | null;
 }
 
 // ─── Payment & Refund ─────────────────────────────────────────────────────────
@@ -98,36 +143,36 @@ export interface OrderPayment {
 
 export interface OrderRefund {
   id: string;
-  amount: number;
+  /** Decimal — may arrive as a string. */
+  amount: number | string;
   reason: string | null;
-  status: string;
+  status: RefundStatus;
   createdAt: string;
 }
 
-// ─── Enums (mirror Prisma) ────────────────────────────────────────────────────
+/**
+ * Derived by the backend from the same rules it enforces (GET /user-orders/:id).
+ * The cancel / Pay Now endpoints re-check — this only decides what to offer.
+ */
+export interface CustomerOrderActions {
+  canPayNow: boolean;
+  canCancel: boolean;
+  cancelBlockedReason: "ALREADY_CANCELLED" | "DISPATCHED" | "COURIER_BOOKING_ACTIVE" | null;
+}
 
-export type OrderStatus =
-  | "PENDING"
-  | "CONFIRMED"
-  | "PROCESSING"
-  | "PACKAGING"
-  | "SHIPPED"
-  | "DELIVERED"
-  | "RETURNED"
-  | "FAILED_TO_DELIVER"
-  | "CANCELLED"
-  | "REFUNDED";
+/** POST /user-orders/:orderId/pay-now — the gateway page issued by the active gateway. */
+export interface PayNowResponse {
+  success: boolean;
+  data: { gatewayPageURL: string; transactionId: string };
+}
 
-export type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
-
-export type FulfillmentStatus =
-  | "UNFULFILLED"
-  | "PARTIALLY_FULFILLED"
-  | "FULFILLED"
-  | "SHIPPED"
-  | "DELIVERED"
-  | "RETURNED"
-  | "CANCELLED";
+/** Error body of Pay Now (stable codes). */
+export interface PayNowErrorBody {
+  success: false;
+  code?: "NOT_FOUND" | "NOT_PAYABLE" | "COD_ORDER" | "PAYMENT_IN_PROGRESS" | "STOCK_UNAVAILABLE" | "RESERVATION_CHANGED" | "GATEWAY_ERROR" | "INVALID_GATEWAY" | "PAY_NOW_FAILED";
+  message?: string;
+  retryAfterSeconds?: number;
+}
 
 // ─── Order shapes ─────────────────────────────────────────────────────────────
 
@@ -137,13 +182,16 @@ export interface OrderSummary {
   orderNumber: string | null;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
+  /** Chosen at placement (COD or an online gateway). */
+  paymentmethod?: PaymentMethod | string;
   fulfillmentStatus: FulfillmentStatus;
   totalAmount: number;
   subtotal: number | null;
   shippingCost: number | null;
   discountAmount: number | null;
   createdAt: string;
-  confirmedAt: string;
+  /** Stays null until an actual confirm action happens (fraud-clear / COD confirm). */
+  confirmedAt: string | null;
   vendorOrders: VendorOrderSummary[];
   address: OrderAddress | null;
 }
@@ -155,6 +203,7 @@ export interface OrderDetail extends OrderSummary {
   payments: OrderPayment[];
   refunds: OrderRefund[];
   vendorOrders: VendorOrderDetail[];
+  customerActions?: CustomerOrderActions;
 }
 
 // ─── Tracking types ───────────────────────────────────────────────────────────
@@ -169,17 +218,35 @@ export interface TrackingEvent {
   timestamp: string;
 }
 
+/** Fuller courier shape used only by getOrderTracking — includes history + return/cancel timestamps. */
+export interface CourierTrackingInfo {
+  id: string;
+  courierTrackingId: string | null;
+  courierOrderId: string | null;
+  status: string;
+  courierStatus: string | null;
+  shipmentKind: string | null;
+  recipientName: string;
+  recipientAddress: string;
+  deliveryCharge: number;
+  codAmount: number;
+  createdAt: string;
+  pickedUpAt: string | null;
+  inTransitAt: string | null;
+  deliveredAt: string | null;
+  returnedAt: string | null;
+  cancelledAt: string | null;
+  courier_providers: CourierProvider | null;
+  courier_tracking_history: TrackingEvent[];
+}
+
 export interface VendorOrderTracking {
   id: string;
   status: OrderStatus;
   shippedAt: string | null;
   deliveredAt: string | null;
   vendor: OrderVendor;
-  courierOrder:
-    | (CourierInfo & {
-        courier_tracking_history: TrackingEvent[];
-      })
-    | null;
+  courierOrder: CourierTrackingInfo | null;
 }
 
 export interface OrderTracking {
@@ -193,10 +260,18 @@ export interface OrderTracking {
 
 /**
  * POST /orders
- * Controller reads `userAddressId` from req.body — no checkoutSessionId needed.
+ * Places a new order from the user's selected cart items.
+ * paymentMethod is now mandatory (schema: Order.paymentmethod).
+ * COD gets no accounting voucher until delivery; non-COD methods get a
+ * PENDING Payment placeholder created immediately for the gateway flow.
  */
 export interface PlaceOrderRequest {
-  userAddressId: string; // ✅ fixed: was `checkoutSessionId`
+  userAddressId: string;
+  paymentMethod: PaymentMethod;
+  /** The reviewed checkout quote (POST /cart-wish/delivery-fees). Required. */
+  quoteHash: string;
+  /** The customer accepted prices that changed since the items were added. */
+  acknowledgePriceChanges?: boolean;
 }
 
 /**
@@ -210,10 +285,12 @@ export interface GetMyOrdersRequest {
 
 /**
  * PATCH /orders/:orderId/cancel
+ * Only PENDING orders can be cancelled this way — post-confirm cancellation
+ * must go through the admin courier-aware cancel flow instead.
  */
 export interface CancelOrderRequest {
   orderId: string;
-  reason?: string;
+  reason: string;
 }
 
 // ─── Response wrappers ────────────────────────────────────────────────────────
@@ -259,13 +336,15 @@ export const userOrderApi = createApi({
     /**
      * POST /orders
      * Places a new order directly from the user's selected cart items.
-     * Body: { userAddressId }
+     * Body: { userAddressId, paymentMethod, quoteHash, acknowledgePriceChanges? }
+     * 409 CHECKOUT_CHANGED (data.quote = the fresh quote) when the order no
+     * longer matches the reviewed quote — nothing was placed.
      */
     placeOrder: builder.mutation<PlaceOrderResponse, PlaceOrderRequest>({
       query: (body) => ({
         url: "/user-orders",
         method: "POST",
-        body, // sends { userAddressId }
+        body, // sends { userAddressId, paymentMethod, quoteHash, acknowledgePriceChanges }
       }),
       invalidatesTags: [
         { type: "Order", id: "LIST" },
@@ -328,8 +407,25 @@ export const userOrderApi = createApi({
 
     /**
      * PATCH /orders/:orderId/cancel
-     * Cancels a PENDING order. Restores stock + creates refund if paid.
+     * Cancels a PENDING order. Restores stock reservation + creates a
+     * PENDING refund record if a payment had already been captured.
      */
+    /**
+     * POST /user-orders/:orderId/pay-now
+     * Opens a gateway session for a PAYMENT_PENDING online order and returns
+     * the gateway page URL. Nothing is paid until the gateway confirms.
+     * 409 PAYMENT_IN_PROGRESS (retryAfterSeconds) while another session is open.
+     */
+    payNow: builder.mutation<PayNowResponse, { orderId: string; gatewayCode?: string }>({
+      query: ({ orderId, gatewayCode }) => ({
+        url: `/user-orders/${encodeURIComponent(orderId)}/pay-now`,
+        method: "POST",
+        body: gatewayCode ? { gatewayCode } : {},
+      }),
+      // A refusal (e.g. no longer payable) means the order changed — refresh it.
+      invalidatesTags: (result, _error, { orderId }) => (result ? [] : [{ type: "Order", id: orderId }]),
+    }),
+
     cancelOrder: builder.mutation<CancelOrderResponse, CancelOrderRequest>({
       query: ({ orderId, reason }) => ({
         url: `/user-orders/${orderId}/cancel`,
@@ -352,4 +448,5 @@ export const {
   useGetOrderByIdQuery,
   useTrackOrderQuery,
   useCancelOrderMutation,
+  usePayNowMutation,
 } = userOrderApi;

@@ -1,275 +1,175 @@
 // components/admin/offers/offers-management.tsx
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Clock, ShieldCheck } from "lucide-react";
 import {
   useGetAllOffersQuery,
   useGetAllOfferAnalyticsQuery,
-  useGetAllVendorPermissionsQuery,
   useGetVendorPermissionStatsQuery,
-  type Offer,
-  type OfferFilters,
+  type CreatorType,
+  type OfferType,
 } from "@/features/offerApi";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import {
+  OFFER_STATUS_TABS,
+  OFFER_TYPES,
+  OFFER_TYPE_LABEL,
+  buildOfferFilters,
+  hasNextPage,
+  matchesOfferSearch,
+  rowsForTab,
+  type OfferStatusTab,
+} from "@/lib/offers/offer-view";
+import {
+  OfferBanner,
+  OfferPagination,
+  OfferSearchInput,
+  OfferSelect,
+  OfferStatusTabs,
+  offerCard,
+  offerErrorMessage,
+  useDebouncedValue,
+} from "@/components/offers/shared/offer-ui";
 import { OffersHeader } from "./offers-header";
 import { OffersAnalytics } from "./offers-analytics";
 import { OffersTable } from "./offers-table";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { VendorPermissionsManagement } from "./vendor-permissions-management";
 
+const PAGE_SIZE = 10;
+/** Offers loaded for the stat cards (the list API returns no true total). */
+const STATS_WINDOW = 100;
+
+type Section = "offers" | "permissions";
+type Source = CreatorType | "ALL";
+
+const TYPE_OPTIONS: { value: OfferType | "ALL"; label: string }[] = [
+  { value: "ALL", label: "All types" },
+  ...OFFER_TYPES.map((t) => ({ value: t, label: OFFER_TYPE_LABEL[t] })),
+];
+const SOURCE_OPTIONS: { value: Source; label: string }[] = [
+  { value: "ALL", label: "All creators" },
+  { value: "ADMIN", label: "Admin" },
+  { value: "VENDOR", label: "Vendors" },
+  { value: "SYSTEM", label: "System" },
+];
+
 export function OffersManagement() {
-  const [activeTab, setActiveTab] = useState("offers");
-  const [filters, setFilters] = useState<OfferFilters>({
-    page: 1,
-    limit: 10,
-  });
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
+  const [section, setSection] = useState<Section>("offers");
+  const [tab, setTab] = useState<OfferStatusTab>("all");
+  const [type, setType] = useState<OfferType | "ALL">("ALL");
+  const [source, setSource] = useState<Source>("ALL");
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const query = useDebouncedValue(search, 250);
 
-  // RTK Query hooks for offers
-  const { data: offersData, isLoading: offersLoading } = useGetAllOffersQuery(filters);
-  const { data: analyticsData } = useGetAllOfferAnalyticsQuery({});
-
-  // RTK Query hooks for vendor permissions
-  const { data: permissionsData } = useGetAllVendorPermissionsQuery({});
-  const { data: permissionStatsData } = useGetVendorPermissionStatsQuery();
-  console.log(permissionsData,"permissionData")
-
-  const offers = offersData?.data || [];
-  const analytics = analyticsData?.data || [];
-  const vendorPermissions = permissionsData?.data || [];
-  const permissionStats = permissionStatsData?.data;
-
-  // Filter offers based on active tab
-  const filteredOffers = offers.filter((offer) => {
-    switch (activeTab) {
-      case "active":
-        return offer.isActive;
-      case "inactive":
-        return !offer.isActive;
-      case "vouchers":
-        return offer.type === "VOUCHER";
-      case "flash-sales":
-        return offer.type === "FLASH_SALE";
-      case "countdown":
-        return offer.type === "COUNTDOWN_DEAL";
-      case "vendor-offers":
-        return offer.createdByType === "VENDOR";
-      default:
-        return true;
-    }
-  });
-
-  // Get vendor offers pending approval
-  const pendingVendorOffers = offers.filter(
-    offer => offer.createdByType === "VENDOR" && !offer.isActive
+  // Status, type and creator are list-endpoint filters → filtered on the server.
+  const filters = useMemo(
+    () => buildOfferFilters({ tab, type, page, limit: PAGE_SIZE, createdByType: source }),
+    [tab, type, page, source],
   );
+  const list = useGetAllOffersQuery(filters);
+  const stats = useGetAllOffersQuery({ page: 1, limit: STATS_WINDOW });
+  const pending = useGetAllOffersQuery({ status: "PENDING", createdByType: "VENDOR", page: 1, limit: STATS_WINDOW });
+  const { data: analyticsData, isLoading: analyticsLoading } = useGetAllOfferAnalyticsQuery({});
+  const { data: permissionStatsData } = useGetVendorPermissionStatsQuery();
+
+  const pageRows = list.data?.data ?? [];
+  // No search parameter on the API: search narrows the loaded page only.
+  const rows = rowsForTab(pageRows, tab).filter((o) => matchesOfferSearch(o, query));
+  const pendingCount = pending.data?.data?.length ?? 0;
+  const filtersActive = tab !== "all" || type !== "ALL" || source !== "ALL" || !!query;
+
+  const reset = () => setPage(1);
+  const reviewPending = () => {
+    setSection("offers");
+    setTab("pending");
+    setSource("VENDOR");
+    setType("ALL");
+    setSearch("");
+    reset();
+  };
 
   return (
-    <div className="space-y-6">
-      <OffersHeader 
-        pendingApprovals={pendingVendorOffers.length}
+    <div className="space-y-4">
+      <OffersHeader />
+
+      <OfferStatusTabs<Section>
+        label="Offer management sections"
+        value={section}
+        onChange={setSection}
+        tabs={[
+          { value: "offers", label: "Offers", count: pendingCount },
+          { value: "permissions", label: "Vendor permissions" },
+        ]}
       />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-8">
-          
-          <TabsTrigger value="vendor-offers">
-            Vendor Offers
-            {pendingVendorOffers.length > 0 && (
-              <Badge variant="destructive" className="ml-2">
-                {pendingVendorOffers.length}
-              </Badge>
+      {section === "permissions" ? (
+        <VendorPermissionsManagement />
+      ) : (
+        <>
+          {pendingCount > 0 && !(tab === "pending" && source === "VENDOR") && (
+            <OfferBanner
+              tone="amber"
+              icon={Clock}
+              title={`${pendingCount}${pendingCount >= STATS_WINDOW ? "+" : ""} vendor offer${pendingCount === 1 ? "" : "s"} waiting for approval`}
+              action={
+                <Button type="button" size="sm" variant="outline" className="h-8 border-amber-300 bg-white text-amber-800 hover:bg-amber-50" onClick={reviewPending}>
+                  <ShieldCheck className="mr-1.5 h-4 w-4" /> Review now
+                </Button>
+              }
+            >
+              Pending offers stay hidden from customers until you approve them.
+            </OfferBanner>
+          )}
+
+          <OffersAnalytics
+            offers={stats.data?.data ?? []}
+            windowSize={STATS_WINDOW}
+            isLoading={stats.isLoading}
+            analytics={analyticsData?.data ?? []}
+            analyticsLoading={analyticsLoading}
+            pendingVendorOffers={pendingCount}
+            pendingCapped={pendingCount >= STATS_WINDOW}
+            permissionStats={permissionStatsData?.data}
+          />
+
+          <section className={cn(offerCard, "overflow-hidden")} aria-label="All offers">
+            <div className="flex flex-col gap-3 border-b border-[#EEF2F7] p-3 sm:p-4 xl:flex-row xl:items-center xl:justify-between">
+              <OfferStatusTabs label="Filter offers by status" value={tab} onChange={(t) => { setTab(t); reset(); }} tabs={OFFER_STATUS_TABS} />
+              <div className="flex w-full flex-col gap-2 sm:flex-row xl:w-auto xl:min-w-[34rem]">
+                <OfferSearchInput label="Search offers on this page" value={search} onChange={setSearch} placeholder="Search title, code or store" />
+                <div className="grid grid-cols-2 gap-2 sm:flex">
+                  <OfferSelect label="Filter by offer type" value={type} onChange={(v) => { setType(v); reset(); }} options={TYPE_OPTIONS} />
+                  <OfferSelect label="Filter by creator" value={source} onChange={(v) => { setSource(v); reset(); }} options={SOURCE_OPTIONS} />
+                </div>
+              </div>
+            </div>
+            {query && (
+              <p className="border-b border-[#EEF2F7] bg-[#FAFBFD] px-4 py-1.5 text-xs text-[#7A90AB]" aria-live="polite">
+                {rows.length} match{rows.length === 1 ? "" : "es"} on this page for “{query}”
+              </p>
             )}
-          </TabsTrigger>
-          <TabsTrigger value="permissions">Permissions</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="offers" className="space-y-6">
-          <OffersAnalytics 
-            offers={offers} 
-            analytics={analytics} 
-            permissionStats={permissionStats}
-          />
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>All Offers</CardTitle>
-                  <CardDescription>
-                    Manage all promotional offers and discounts across the platform
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <OffersTable
-                offers={filteredOffers}
-                isLoading={offersLoading}
-                onEdit={setSelectedOffer}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="active" className="space-y-6">
-          <OffersAnalytics 
-            offers={offers.filter(o => o.isActive)} 
-            analytics={analytics} 
-            permissionStats={permissionStats}
-          />
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Active Offers</CardTitle>
-                  <CardDescription>
-                    Currently active promotional offers and discounts
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <OffersTable
-                offers={filteredOffers}
-                isLoading={offersLoading}
-                onEdit={setSelectedOffer}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="inactive" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Inactive Offers</CardTitle>
-                  <CardDescription>
-                    Expired or deactivated promotional offers
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <OffersTable
-                offers={filteredOffers}
-                isLoading={offersLoading}
-                onEdit={setSelectedOffer}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="vouchers" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Voucher Offers</CardTitle>
-                  <CardDescription>
-                    Manage voucher codes and discount coupons
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <OffersTable
-                offers={filteredOffers}
-                isLoading={offersLoading}
-                onEdit={setSelectedOffer}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="flash-sales" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Flash Sales</CardTitle>
-                  <CardDescription>
-                    Limited-time flash sale events and promotions
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <OffersTable
-                offers={filteredOffers}
-                isLoading={offersLoading}
-                onEdit={setSelectedOffer}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="countdown" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Countdown Deals</CardTitle>
-                  <CardDescription>
-                    Time-limited deals with countdown timers
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <OffersTable
-                offers={filteredOffers}
-                isLoading={offersLoading}
-                onEdit={setSelectedOffer}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="vendor-offers" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Vendor Offers</CardTitle>
-                  <CardDescription>
-                    Manage offers created by vendors
-                    {pendingVendorOffers.length > 0 && (
-                      <span className="ml-2 text-destructive font-medium">
-                        ({pendingVendorOffers.length} pending approval)
-                      </span>
-                    )}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <OffersTable
-                offers={filteredOffers}
-                isLoading={offersLoading}
-                onEdit={setSelectedOffer}
-                showVendorInfo={true}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="permissions" className="space-y-6">
-          <VendorPermissionsManagement />
-        </TabsContent>
-      </Tabs>
-
-     
-
-      
+            <OffersTable
+              offers={rows}
+              isLoading={list.isLoading}
+              isFetching={list.isFetching}
+              error={list.isError ? offerErrorMessage(list.error) : null}
+              onRetry={() => list.refetch()}
+              showVendorInfo
+              empty={
+                filtersActive
+                  ? { title: "No offers match these filters", description: "Try another status, type, creator or search term." }
+                  : { title: "No offers yet", description: "Create a platform offer, or wait for vendors to submit theirs." }
+              }
+            />
+            {!list.isError && (
+              <OfferPagination page={page} hasNext={hasNextPage(pageRows.length, PAGE_SIZE)} onPage={setPage} shown={rows.length} busy={list.isFetching} />
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }

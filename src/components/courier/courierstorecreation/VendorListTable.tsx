@@ -1,54 +1,101 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { useState } from "react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Store,
-  Plus,
-  Search,
   Users,
+  Search,
   RefreshCw,
+  Plus,
   CheckCircle2,
   Clock,
   Ban,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
 import type { Vendor } from "@/features/vendorManageApi";
 import type { VendorRow } from "@/types/courier-store";
 
-const STATUS_BADGE: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
+/* ─── shared small bits (same visual language as Bank page) ─────────────── */
+
+function FilterInput({
+  icon,
+  placeholder,
+  value,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div style={{ position: "relative", width: "100%", maxWidth: 260 }}>
+      <div
+        style={{
+          position: "absolute",
+          left: 9,
+          top: "50%",
+          transform: "translateY(-50%)",
+          color: "#94A3B8",
+          display: "flex",
+        }}
+      >
+        {icon}
+      </div>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: "100%",
+          padding: "7px 10px 7px 30px",
+          borderRadius: 8,
+          border: "1.5px solid #E2E8F0",
+          fontSize: 12.5,
+          fontFamily: "inherit",
+          outline: "none",
+          background: "#fff",
+          boxSizing: "border-box",
+        }}
+      />
+    </div>
+  );
+}
+
+const STATUS_BADGE: Record<
+  string,
+  { label: string; bg: string; color: string; border: string; icon: React.ReactNode }
+> = {
   ACTIVE: {
     label: "Active",
-    cls: "bg-green-50 text-green-700 border-green-200",
-    icon: <CheckCircle2 className="w-3 h-3" />,
+    bg: "#F0F9F0",
+    color: "#16A34A",
+    border: "#BBF7D0",
+    icon: <CheckCircle2 size={11} />,
   },
   PENDING: {
     label: "Pending",
-    cls: "bg-amber-50 text-amber-700 border-amber-200",
-    icon: <Clock className="w-3 h-3" />,
+    bg: "#FFFBEB",
+    color: "#B45309",
+    border: "#FDE68A",
+    icon: <Clock size={11} />,
   },
   SUSPENDED: {
     label: "Suspended",
-    cls: "bg-red-50 text-red-700 border-red-200",
-    icon: <Ban className="w-3 h-3" />,
+    bg: "#FEF2F2",
+    color: "#DC2626",
+    border: "#FECACA",
+    icon: <Ban size={11} />,
   },
   DEACTIVATED: {
     label: "Deactivated",
-    cls: "bg-slate-100 text-slate-500 border-slate-200",
-    icon: <XCircle className="w-3 h-3" />,
+    bg: "#F1F5F9",
+    color: "#64748B",
+    border: "#E2E8F0",
+    icon: <XCircle size={11} />,
   },
 };
+
+/* ─── main component ─────────────────────────────────────────────────────── */
 
 interface Props {
   vendors: Vendor[];
@@ -67,152 +114,254 @@ export function VendorListTable({ vendors, isLoading, onCreateStore }: Props) {
   );
 
   return (
-    <Card className="shadow-sm border-slate-200">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Users className="w-4 h-4 text-teal-600" />
-              Vendors
-              <Badge
-                variant="secondary"
-                className="bg-slate-100 text-slate-600 text-xs font-medium"
-              >
-                {vendors.length}
-              </Badge>
-            </CardTitle>
-            <CardDescription className="text-xs mt-0.5">
-              Click "Create Store" on any vendor to register a pickup location
-            </CardDescription>
+    <div style={{ padding: 14 }}>
+      {/* Header row */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 10,
+          marginBottom: 12,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: "#0D1B2E",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <Users size={15} color="#1D4ED8" />
+            Vendors
+            <span
+              style={{
+                fontSize: 10.5,
+                fontWeight: 700,
+                padding: "2px 7px",
+                borderRadius: 20,
+                background: "#EEF3FB",
+                color: "#1D4ED8",
+              }}
+            >
+              {vendors.length}
+            </span>
           </div>
-          {/* Search */}
-          <div className="relative w-52 flex-shrink-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-            <Input
-              className="pl-9 h-8 text-sm"
-              placeholder="Search vendors…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div style={{ fontSize: 11, color: "#7A90AB", marginTop: 2 }}>
+            Tap "Create Store" on any vendor to register a pickup location
           </div>
         </div>
-      </CardHeader>
 
-      <CardContent className="p-0">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12 text-slate-400 gap-2 text-sm">
-            <RefreshCw className="w-4 h-4 animate-spin" />
-            Loading vendors…
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
-            <Users className="w-8 h-8 opacity-30" />
-            <p className="text-sm">
-              {search ? `No vendors matching "${search}"` : "No vendors found."}
-            </p>
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-slate-50/80 hover:bg-slate-50">
-                <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                  Vendor
-                </TableHead>
-                <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                  Contact
-                </TableHead>
-                <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                  Status
-                </TableHead>
-                <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                  Orders
-                </TableHead>
-                <TableHead className="text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                  Action
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((vendor) => {
-                const statusInfo =
-                  STATUS_BADGE[vendor.status] || STATUS_BADGE["PENDING"];
-                return (
-                  <TableRow
-                    key={vendor.id}
-                    className="hover:bg-slate-50/60 transition-colors group"
+        <FilterInput
+          icon={<Search size={13} />}
+          placeholder="Search vendors…"
+          value={search}
+          onChange={setSearch}
+        />
+      </div>
+
+      {/* Table */}
+      <div
+        style={{
+          background: "#fff",
+          border: "1px solid #E5EAF2",
+          borderRadius: 12,
+          overflow: "hidden",
+          boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
+        }}
+      >
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+            <thead>
+              <tr style={{ background: "#FAFBFD", borderBottom: "1px solid #E5EAF2" }}>
+                {["Vendor", "Contact", "Status", "Orders", ""].map((h, i) => (
+                  <th
+                    key={`${h}-${i}`}
+                    style={{
+                      textAlign: i === 4 ? "right" : "left",
+                      padding: "9px 12px",
+                      fontWeight: 700,
+                      color: "#64748B",
+                      fontSize: 11,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.03em",
+                      whiteSpace: "nowrap",
+                    }}
                   >
-                    {/* Vendor name + avatar */}
-                    <TableCell>
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
-                          {vendor.storeName?.[0]?.toUpperCase() || "V"}
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: 24, textAlign: "center" }}>
+                    <RefreshCw
+                      size={16}
+                      color="#94A3B8"
+                      style={{ animation: "spin 1s linear infinite" }}
+                    />
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    style={{
+                      padding: 28,
+                      textAlign: "center",
+                      color: "#9BAABB",
+                      fontSize: 12.5,
+                    }}
+                  >
+                    {search ? `No vendors matching "${search}"` : "No vendors found."}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((vendor) => {
+                  const statusInfo = STATUS_BADGE[vendor.status] || STATUS_BADGE.PENDING;
+                  return (
+                    <tr
+                      key={vendor.id}
+                      style={{ borderBottom: "1px solid #F0F4FA", transition: "background 0.12s" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#FAFBFD")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      {/* Vendor */}
+                      <td style={{ padding: "9px 12px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div
+                            style={{
+                              width: 26,
+                              height: 26,
+                              borderRadius: 7,
+                              background: "#EEF3FB",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                              fontSize: 11,
+                              fontWeight: 800,
+                              color: "#1D4ED8",
+                            }}
+                          >
+                            {vendor.storeName?.[0]?.toUpperCase() || "V"}
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontWeight: 700,
+                                color: "#0D1B2E",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                maxWidth: 180,
+                              }}
+                            >
+                              {vendor.storeName}
+                            </div>
+                            <div style={{ fontSize: 10.5, color: "#9BAABB" }}>
+                              #{vendor.id.slice(-8)}
+                            </div>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-800 truncate">
-                            {vendor.storeName}
-                          </p>
-                          <p className="text-xs text-slate-400 truncate">
-                            #{vendor.id.slice(-8)}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
+                      </td>
 
-                    {/* Contact */}
-                    <TableCell>
-                      <div className="text-xs text-slate-600 space-y-0.5">
+                      {/* Contact */}
+                      <td style={{ padding: "9px 12px", color: "#334155" }}>
                         {vendor.user?.email && (
-                          <p className="truncate max-w-[160px]">{vendor.user.email}</p>
+                          <div
+                            style={{
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              maxWidth: 170,
+                            }}
+                          >
+                            {vendor.user.email}
+                          </div>
                         )}
                         {vendor.user?.phone && (
-                          <p className="text-slate-400">{vendor.user.phone}</p>
+                          <div style={{ color: "#94A3B8", fontSize: 11.5 }}>
+                            {vendor.user.phone}
+                          </div>
                         )}
-                      </div>
-                    </TableCell>
+                        {!vendor.user?.email && !vendor.user?.phone && "—"}
+                      </td>
 
-                    {/* Status */}
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={`text-xs gap-1 py-0.5 ${statusInfo.cls}`}
-                      >
-                        {statusInfo.icon}
-                        {statusInfo.label}
-                      </Badge>
-                    </TableCell>
+                      {/* Status */}
+                      <td style={{ padding: "9px 12px" }}>
+                        <span
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: 700,
+                            padding: "2px 8px",
+                            borderRadius: 20,
+                            background: statusInfo.bg,
+                            color: statusInfo.color,
+                            border: `1px solid ${statusInfo.border}`,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                        >
+                          {statusInfo.icon}
+                          {statusInfo.label}
+                        </span>
+                      </td>
 
-                    {/* Orders count */}
-                    <TableCell className="text-sm text-slate-600 font-medium">
-                      {vendor._count?.orders ?? 0}
-                    </TableCell>
+                      {/* Orders */}
+                      <td style={{ padding: "9px 12px", fontWeight: 700, color: "#334155" }}>
+                        {vendor._count?.orders ?? 0}
+                      </td>
 
-                    {/* Action */}
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-3 text-xs gap-1.5 border-teal-200 text-teal-700 hover:bg-teal-50 hover:border-teal-400 group-hover:border-teal-300 transition-colors"
-                        onClick={() =>
-                          onCreateStore({
-                            id: vendor.id,
-                            storeName: vendor.storeName,
-                            email: vendor.user?.email,
-                            phone: vendor.user?.phone,
-                            status: vendor.status,
-                          })
-                        }
-                      >
-                        <Plus className="w-3 h-3" />
-                        Create Store
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
+                      {/* Action */}
+                      <td style={{ padding: "9px 12px", textAlign: "right" }}>
+                        <button
+                          onClick={() =>
+                            onCreateStore({
+                              id: vendor.id,
+                              storeName: vendor.storeName,
+                              email: vendor.user?.email,
+                              phone: vendor.user?.phone,
+                              status: vendor.status,
+                            })
+                          }
+                          style={{
+                            border: "1.5px solid #DBEAFE",
+                            background: "#EFF6FF",
+                            color: "#1D4ED8",
+                            borderRadius: 6,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: "4px 9px",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            whiteSpace: "nowrap",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          <Plus size={11} /> Create Store
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
   );
 }

@@ -402,7 +402,7 @@ const CheckoutPage: React.FC = () => {
                                 </p>
                                 <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                                 <p className="text-sm text-gray-500">
-                                  Vendor: {item.products.vendor?.name || 'Unknown Store'}
+                                  Vendor: {item.products.vendor?.storeName || 'Unknown Store'}
                                 </p>
                               </div>
                             </div>
@@ -551,7 +551,7 @@ const CheckoutPage: React.FC = () => {
                       cartData.data.items
                         .filter(item => item.isSelected)
                         .reduce((acc, item) => {
-                          const vendor = item.products.vendor?.name || 'Unknown Store';
+                          const vendor = item.products.vendor?.storeName || 'Unknown Store';
                           if (!acc[vendor]) acc[vendor] = 0;
                           acc[vendor] += item.itemTotal;
                           return acc;

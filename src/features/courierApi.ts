@@ -88,6 +88,10 @@ export interface CourierCredential {
   vendorId: string | null;
   environment: Environment;
   clientId?: string;
+  // NOTE: for a Steadfast credential row, `clientSecret` holds the
+  // Steadfast "Secret-Key" (there's no dedicated secretKey column on the
+  // backend — see getSteadfastHeaders() in courier.service.ts). `apiKey`
+  // holds the Steadfast "Api-Key". Same fields, provider-specific meaning.
   clientSecret?: string;
   username?: string;
   accessToken?: string;
@@ -362,11 +366,13 @@ export interface RedXStore {
   name: string;
   phone: string;
   address: string;
+  area_name?: string;
   area_id: number;
+  created_at?: string;
 }
 
 export interface RedXStoresResponse {
-  stores: RedXStore[];
+  pickup_stores: RedXStore[];
 }
 
 export interface RedXTrackingUpdate {
@@ -377,6 +383,86 @@ export interface RedXTrackingUpdate {
 
 export interface RedXTrackingResponse {
   tracking: RedXTrackingUpdate[];
+}
+
+// ==================== STEADFAST TYPES ====================
+// Matches courier.service.ts's steadfastCheckStatus / steadfastGetBalance /
+// steadfastBulkCreateOrder, wired via courier.controller.ts's
+// steadfastCheckStatus / steadfastGetBalance / steadfastBulkOrder and
+// courier.routes.ts's /admin/steadfast/* routes.
+//
+// There's no dedicated "create single Steadfast order" REST endpoint —
+// single orders go through the existing generic
+// POST /courier/orders/create (useCreateCourierOrderMutation), same as
+// Pathao/RedX; the courier is auto-selected by selectBestCourier() based
+// on CourierPricingRules pricing.
+
+export type SteadfastDeliveryStatus =
+  | "pending"
+  | "delivered_approval_pending"
+  | "partial_delivered_approval_pending"
+  | "cancelled_approval_pending"
+  | "unknown_approval_pending"
+  | "delivered"
+  | "partial_delivered"
+  | "cancelled"
+  | "hold"
+  | "in_review"
+  | "unknown";
+
+// Pass exactly one of these — matches the backend's union lookup type.
+export type SteadfastStatusLookup =
+  | { consignmentId: string | number; invoice?: never; trackingCode?: never }
+  | { invoice: string; consignmentId?: never; trackingCode?: never }
+  | { trackingCode: string; consignmentId?: never; invoice?: never };
+
+export interface SteadfastCheckStatusRequest {
+  courierProviderId: string;
+  environment?: Environment;
+  lookup: SteadfastStatusLookup;
+}
+
+export interface SteadfastStatusResponse {
+  status: number;
+  delivery_status: SteadfastDeliveryStatus;
+}
+
+export interface SteadfastGetBalanceRequest {
+  courierProviderId: string;
+  environment?: Environment;
+}
+
+export interface SteadfastBalanceResponse {
+  status: number;
+  current_balance: number;
+}
+
+export interface SteadfastBulkOrderItem {
+  invoice: string;
+  recipient_name: string;
+  recipient_address: string;
+  recipient_phone: string;
+  cod_amount: number;
+  note?: string;
+}
+
+export interface SteadfastBulkOrderRequest {
+  courierProviderId: string;
+  environment?: Environment;
+  /** Max 500 items per call (enforced backend-side too). */
+  orders: SteadfastBulkOrderItem[];
+}
+
+export interface SteadfastBulkOrderResult {
+  invoice: string;
+  recipient_name: string;
+  recipient_address: string;
+  recipient_phone: string;
+  cod_amount: string;
+  note: string | null;
+  consignment_id: number | null;
+  tracking_code: string | null;
+  status: "success" | "error";
 }
 
 // ==================== ORDER TYPES ====================
@@ -448,6 +534,9 @@ export interface RedXTrackParcelRequest {
 
 export interface CourierPricing {
   courierProviderId: string;
+  // "Pathao" | "RedX" | "Steadfast" | any future provider name — kept as
+  // a plain string on purpose since the backend dispatches by provider
+  // name/row rather than a closed enum.
   courierName: string;
   deliveryCharge: number;
   codCharge: number;
@@ -481,9 +570,9 @@ export interface ShippingLabel {
   recipientAddress: string;
   codAmount: number;
   weight: number;
-  itemDescription: string;  
+  itemDescription: string;
   barcode: string;
-  createdAt: string;  
+  createdAt: string;
 }
 
 export interface CourierTrackingHistory {
@@ -552,6 +641,10 @@ export interface RedXWebhookRequest {
   [key: string]: any;
 }
 
+// Steadfast has no webhook (supportsWebhook: false on its provider row) —
+// poll useSteadfastCheckStatusQuery instead, e.g. from a scheduled
+// re-fetch on the order-tracking screen.
+
 // ==================== RESPONSE TYPES ====================
 
 export interface ApiResponse<T = any> {
@@ -579,6 +672,8 @@ export const courierApi = createApi({
     "PathaoStores",
     "RedXAreas",
     "RedXStores",
+    "SteadfastStatus",
+    "SteadfastBalance",
     "CourierOrders",
     "VendorOrders",
     "OrderTracking",
@@ -591,7 +686,10 @@ export const courierApi = createApi({
      * Get all courier providers
      * GET /api/courier/admin/providers
      */
-    getCourierProviders: builder.query<ApiResponse<CourierProvider[]>, GetProvidersRequest | void>({
+    getCourierProviders: builder.query<
+      ApiResponse<CourierProvider[]>,
+      GetProvidersRequest | void
+    >({
       query: (params) => ({
         url: "/courier/admin/providers",
         method: "GET",
@@ -600,7 +698,10 @@ export const courierApi = createApi({
       providesTags: (result) =>
         result?.data
           ? [
-              ...result.data.map(({ id }) => ({ type: "CourierProviders" as const, id })),
+              ...result.data.map(({ id }) => ({
+                type: "CourierProviders" as const,
+                id,
+              })),
               { type: "CourierProviders", id: "LIST" },
             ]
           : [{ type: "CourierProviders", id: "LIST" }],
@@ -610,7 +711,10 @@ export const courierApi = createApi({
      * Get single courier provider by ID
      * GET /api/courier/admin/providers/:providerId
      */
-    getCourierProviderById: builder.query<ApiResponse<CourierProvider>, { providerId: string }>({
+    getCourierProviderById: builder.query<
+      ApiResponse<CourierProvider>,
+      { providerId: string }
+    >({
       query: ({ providerId }) => ({
         url: `/courier/admin/providers/${providerId}`,
         method: "GET",
@@ -623,8 +727,16 @@ export const courierApi = createApi({
     /**
      * Create courier provider
      * POST /api/courier/admin/providers
+     *
+     * To register Steadfast: { name: "Steadfast", authType: "API_KEY",
+     * productionBaseUrl: "https://portal.packzy.com/api/v1",
+     * sandboxBaseUrl: "https://portal.packzy.com/api/v1" (no separate
+     * sandbox), supportsBulkOrder: true, supportsWebhook: false }
      */
-    createCourierProvider: builder.mutation<ApiResponse<CourierProvider>, CreateProviderRequest>({
+    createCourierProvider: builder.mutation<
+      ApiResponse<CourierProvider>,
+      CreateProviderRequest
+    >({
       query: (body) => ({
         url: "/courier/admin/providers",
         method: "POST",
@@ -637,7 +749,10 @@ export const courierApi = createApi({
      * Update courier provider
      * PUT /api/courier/admin/providers/:providerId
      */
-    updateCourierProvider: builder.mutation<ApiResponse<CourierProvider>, UpdateProviderRequest>({
+    updateCourierProvider: builder.mutation<
+      ApiResponse<CourierProvider>,
+      UpdateProviderRequest
+    >({
       query: ({ providerId, ...body }) => ({
         url: `/courier/admin/providers/${providerId}`,
         method: "PUT",
@@ -653,7 +768,10 @@ export const courierApi = createApi({
      * Delete courier provider
      * DELETE /api/courier/admin/providers/:providerId
      */
-    deleteCourierProvider: builder.mutation<ApiResponse, { providerId: string }>({
+    deleteCourierProvider: builder.mutation<
+      ApiResponse,
+      { providerId: string }
+    >({
       query: ({ providerId }) => ({
         url: `/courier/admin/providers/${providerId}`,
         method: "DELETE",
@@ -665,7 +783,10 @@ export const courierApi = createApi({
      * Toggle provider active status
      * PATCH /api/courier/admin/providers/:providerId/toggle
      */
-    toggleProviderStatus: builder.mutation<ApiResponse<CourierProvider>, { providerId: string }>({
+    toggleProviderStatus: builder.mutation<
+      ApiResponse<CourierProvider>,
+      { providerId: string }
+    >({
       query: ({ providerId }) => ({
         url: `/courier/admin/providers/${providerId}/toggle`,
         method: "PATCH",
@@ -682,7 +803,10 @@ export const courierApi = createApi({
      * Get all credentials
      * GET /api/courier/admin/credentials
      */
-    getAllCredentials: builder.query<ApiResponse<CourierCredential[]>, GetCredentialsRequest | void>({
+    getAllCredentials: builder.query<
+      ApiResponse<CourierCredential[]>,
+      GetCredentialsRequest | void
+    >({
       query: (params) => ({
         url: "/courier/admin/credentials",
         method: "GET",
@@ -691,7 +815,10 @@ export const courierApi = createApi({
       providesTags: (result) =>
         result?.data
           ? [
-              ...result.data.map(({ id }) => ({ type: "CourierCredentials" as const, id })),
+              ...result.data.map(({ id }) => ({
+                type: "CourierCredentials" as const,
+                id,
+              })),
               { type: "CourierCredentials", id: "LIST" },
             ]
           : [{ type: "CourierCredentials", id: "LIST" }],
@@ -701,7 +828,10 @@ export const courierApi = createApi({
      * Get credential by ID
      * GET /api/courier/admin/credentials/:credentialId
      */
-    getCredentialById: builder.query<ApiResponse<CourierCredential>, { credentialId: string }>({
+    getCredentialById: builder.query<
+      ApiResponse<CourierCredential>,
+      { credentialId: string }
+    >({
       query: ({ credentialId }) => ({
         url: `/courier/admin/credentials/${credentialId}`,
         method: "GET",
@@ -714,6 +844,10 @@ export const courierApi = createApi({
     /**
      * Create platform courier credentials
      * POST /api/courier/admin/credentials
+     *
+     * For Steadfast: { courierProviderId, environment: "PRODUCTION",
+     * apiKey: "<Steadfast Api-Key>", clientSecret: "<Steadfast Secret-Key>" }
+     * — see the note on CourierCredential.clientSecret above.
      */
     createCourierCredentials: builder.mutation<
       ApiResponse<CourierCredential>,
@@ -754,7 +888,10 @@ export const courierApi = createApi({
      * Delete platform courier credentials
      * DELETE /api/courier/admin/credentials/:credentialId
      */
-    deleteCourierCredentials: builder.mutation<ApiResponse, { credentialId: string }>({
+    deleteCourierCredentials: builder.mutation<
+      ApiResponse,
+      { credentialId: string }
+    >({
       query: ({ credentialId }) => ({
         url: `/courier/admin/credentials/${credentialId}`,
         method: "DELETE",
@@ -786,6 +923,14 @@ export const courierApi = createApi({
     /**
      * Test courier credentials
      * POST /api/courier/admin/credentials/:credentialId/test
+     *
+     * NOTE: courier.controller.ts's testCourierCredentials currently only
+     * implements the Pathao and RedX branches — a Steadfast credential
+     * will hit its `else` branch and come back with "Credential testing
+     * not implemented for this provider". Use
+     * useSteadfastGetBalanceQuery as a practical substitute (it fails
+     * the same way a bad Api-Key/Secret-Key pair would) until that's
+     * added on the backend.
      */
     testCourierCredentials: builder.mutation<
       ApiResponse<{ courierName: string; environment: string }>,
@@ -800,6 +945,9 @@ export const courierApi = createApi({
     /**
      * Refresh OAuth token for credential
      * POST /api/courier/admin/credentials/:credentialId/refresh-token
+     *
+     * Pathao-only (OAuth2). Not applicable to RedX or Steadfast, which
+     * both use static keys with no token to refresh.
      */
     refreshCredentialToken: builder.mutation<
       ApiResponse<{ expiresIn: number }>,
@@ -819,6 +967,14 @@ export const courierApi = createApi({
     /**
      * Get serviceable areas
      * GET /api/courier/admin/serviceable-areas
+     *
+     * NOTE: Steadfast never appears here — it has no city/zone/area-sync
+     * API, so selectBestCourier() and createCourierOrderForVendor() both
+     * skip the serviceable-area check specifically for it (see
+     * courier.service.ts). Its pricing instead comes from
+     * CourierPricingRules — there's no RTK endpoint for that table yet on
+     * the frontend; manage it via direct DB/admin SQL for now (see
+     * PAYMENT_AND_STEADFAST_SETUP.md on the backend for an example insert).
      */
     getServiceableAreas: builder.query<
       ApiResponse<ServiceableArea[]>,
@@ -836,7 +992,10 @@ export const courierApi = createApi({
      * Sync serviceable areas for a courier provider
      * POST /api/courier/admin/serviceable-areas/sync
      */
-    syncServiceableAreas: builder.mutation<ApiResponse<any[]>, SyncServiceableAreasRequest>({
+    syncServiceableAreas: builder.mutation<
+      ApiResponse<any[]>,
+      SyncServiceableAreasRequest
+    >({
       query: (body) => ({
         url: "/courier/admin/serviceable-areas/sync",
         method: "POST",
@@ -863,7 +1022,10 @@ export const courierApi = createApi({
      * Get Pathao cities for area mapping
      * GET /api/courier/admin/pathao/cities
      */
-    pathaoGetCities: builder.query<ApiResponse<PathaoCitiesResponse>, PathaoGetCitiesRequest>({
+    pathaoGetCities: builder.query<
+      ApiResponse<PathaoCitiesResponse>,
+      PathaoGetCitiesRequest
+    >({
       query: (params) => ({
         url: "/courier/admin/pathao/cities",
         method: "GET",
@@ -876,39 +1038,57 @@ export const courierApi = createApi({
      * Get Pathao zones for a city
      * GET /api/courier/admin/pathao/cities/:cityId/zones
      */
-    pathaoGetZones: builder.query<ApiResponse<PathaoZonesResponse>, PathaoGetZonesRequest>({
+    pathaoGetZones: builder.query<
+      ApiResponse<PathaoZonesResponse>,
+      PathaoGetZonesRequest
+    >({
       query: ({ cityId, ...params }) => ({
         url: `/courier/admin/pathao/cities/${cityId}/zones`,
         method: "GET",
         params,
       }),
-      providesTags: (result, error, { cityId }) => [{ type: "PathaoZones", id: cityId }],
+      providesTags: (result, error, { cityId }) => [
+        { type: "PathaoZones", id: cityId },
+      ],
     }),
 
     /**
      * Get Pathao areas for a zone
      * GET /api/courier/admin/pathao/zones/:zoneId/areas
      */
-    pathaoGetAreas: builder.query<ApiResponse<PathaoAreasResponse>, PathaoGetAreasRequest>({
+    pathaoGetAreas: builder.query<
+      ApiResponse<PathaoAreasResponse>,
+      PathaoGetAreasRequest
+    >({
       query: ({ zoneId, ...params }) => ({
         url: `/courier/admin/pathao/zones/${zoneId}/areas`,
         method: "GET",
         params,
       }),
-      providesTags: (result, error, { zoneId }) => [{ type: "PathaoAreas", id: zoneId }],
+      providesTags: (result, error, { zoneId }) => [
+        { type: "PathaoAreas", id: zoneId },
+      ],
     }),
 
     /**
      * Get Pathao stores
      * GET /api/courier/admin/pathao/stores
      */
-    pathaoGetStores: builder.query<ApiResponse<PathaoStoresResponse>, PathaoGetStoresRequest>({
+    pathaoGetStores: builder.query<
+      ApiResponse<PathaoStoresResponse>,
+      PathaoGetStoresRequest
+    >({
       query: (params) => ({
         url: "/courier/admin/pathao/stores",
         method: "GET",
         params,
       }),
-      providesTags: ["PathaoStores"],
+      providesTags: (result, error, arg) => [
+        {
+          type: "PathaoStores" as const,
+          id: `${arg.courierProviderId}-${arg.environment ?? "PRODUCTION"}`,
+        },
+      ],
     }),
 
     /**
@@ -921,7 +1101,12 @@ export const courierApi = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["PathaoStores"],
+      invalidatesTags: (result, error, arg) => [
+        {
+          type: "PathaoStores" as const,
+          id: `${arg.courierProviderId}-${arg.environment ?? "PRODUCTION"}`,
+        },
+      ],
     }),
 
     /**
@@ -948,7 +1133,10 @@ export const courierApi = createApi({
      * Get RedX delivery areas
      * GET /api/courier/admin/redx/areas
      */
-    redxGetAreas: builder.query<ApiResponse<RedXAreasResponse>, RedXGetAreasRequest>({
+    redxGetAreas: builder.query<
+      ApiResponse<RedXAreasResponse>,
+      RedXGetAreasRequest
+    >({
       query: (params) => ({
         url: "/courier/admin/redx/areas",
         method: "GET",
@@ -961,33 +1149,52 @@ export const courierApi = createApi({
      * Get RedX pickup stores
      * GET /api/courier/admin/redx/stores
      */
-    redxGetPickupStores: builder.query<ApiResponse<RedXStoresResponse>, RedXGetStoresRequest>({
+    redxGetPickupStores: builder.query<
+      ApiResponse<RedXStoresResponse>,
+      RedXGetStoresRequest
+    >({
       query: (params) => ({
         url: "/courier/admin/redx/stores",
         method: "GET",
         params,
       }),
-      providesTags: ["RedXStores"],
+      providesTags: (result, error, arg) => [
+        {
+          type: "RedXStores" as const,
+          id: `${arg.courierProviderId}-${arg.environment ?? "PRODUCTION"}`,
+        },
+      ],
     }),
 
     /**
      * Create RedX pickup store
      * POST /api/courier/admin/redx/stores
      */
-    redxCreatePickupStore: builder.mutation<ApiResponse, RedXCreateStoreRequest>({
+    redxCreatePickupStore: builder.mutation<
+      ApiResponse,
+      RedXCreateStoreRequest
+    >({
       query: (body) => ({
         url: "/courier/admin/redx/stores",
         method: "POST",
         body,
       }),
-      invalidatesTags: ["RedXStores"],
+      invalidatesTags: (result, error, arg) => [
+        {
+          type: "RedXStores" as const,
+          id: `${arg.courierProviderId}-${arg.environment ?? "PRODUCTION"}`,
+        },
+      ],
     }),
 
     /**
      * Get detailed RedX tracking info
      * GET /api/courier/orders/redx/:trackingId/track
      */
-    redxTrackParcel: builder.query<ApiResponse<RedXTrackingResponse>, RedXTrackParcelRequest>({
+    redxTrackParcel: builder.query<
+      ApiResponse<RedXTrackingResponse>,
+      RedXTrackParcelRequest
+    >({
       query: ({ trackingId, ...params }) => ({
         url: `/courier/orders/redx/${trackingId}/track`,
         method: "GET",
@@ -998,11 +1205,79 @@ export const courierApi = createApi({
       ],
     }),
 
+    // ==================== STEADFAST SPECIFIC ENDPOINTS ====================
+
+    /**
+     * Check a Steadfast consignment's live delivery status.
+     * GET /api/courier/admin/steadfast/status
+     *   ?courierProviderId=...&consignmentId=...
+     *   (or &invoice=... or &trackingCode=... — pass exactly one)
+     */
+    steadfastCheckStatus: builder.query<
+      ApiResponse<SteadfastStatusResponse>,
+      SteadfastCheckStatusRequest
+    >({
+      query: ({ courierProviderId, environment, lookup }) => ({
+        url: "/courier/admin/steadfast/status",
+        method: "GET",
+        params: { courierProviderId, environment, ...lookup },
+      }),
+      providesTags: (result, error, { lookup }) => [
+        {
+          type: "SteadfastStatus" as const,
+          id:
+            "consignmentId" in lookup
+              ? `cid-${lookup.consignmentId}`
+              : "invoice" in lookup
+              ? `invoice-${lookup.invoice}`
+              : `tc-${lookup.trackingCode}`,
+        },
+      ],
+    }),
+
+    /**
+     * Check current Steadfast COD balance.
+     * GET /api/courier/admin/steadfast/balance?courierProviderId=...
+     */
+    steadfastGetBalance: builder.query<
+      ApiResponse<SteadfastBalanceResponse>,
+      SteadfastGetBalanceRequest
+    >({
+      query: (params) => ({
+        url: "/courier/admin/steadfast/balance",
+        method: "GET",
+        params,
+      }),
+      providesTags: (result, error, { courierProviderId }) => [
+        { type: "SteadfastBalance" as const, id: courierProviderId },
+      ],
+    }),
+
+    /**
+     * Create up to 500 Steadfast orders in one call.
+     * POST /api/courier/admin/steadfast/bulk-order
+     */
+    steadfastBulkOrder: builder.mutation<
+      ApiResponse<SteadfastBulkOrderResult[]>,
+      SteadfastBulkOrderRequest
+    >({
+      query: (body) => ({
+        url: "/courier/admin/steadfast/bulk-order",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["CourierOrders", "VendorOrders"],
+    }),
+
     // ==================== ORDER PLACEMENT ENDPOINTS ====================
 
     /**
      * Create courier order (Platform automatically creates)
      * POST /api/courier/orders/create
+     *
+     * Works for Steadfast too — selectBestCourier() picks it up
+     * automatically once a CourierPricingRules row exists for it and its
+     * price wins, no request-shape change needed here.
      */
     createCourierOrder: builder.mutation<
       ApiResponse<CourierOrderResponse>,
@@ -1020,7 +1295,10 @@ export const courierApi = createApi({
      * Get courier pricing quote for checkout
      * POST /api/courier/quote
      */
-    getCourierQuote: builder.mutation<ApiResponse<CourierSelection>, GetCourierQuoteRequest>({
+    getCourierQuote: builder.mutation<
+      ApiResponse<CourierSelection>,
+      GetCourierQuoteRequest
+    >({
       query: (body) => ({
         url: "/courier/quote",
         method: "POST",
@@ -1034,7 +1312,10 @@ export const courierApi = createApi({
      * Vendor marks order as ready for pickup
      * POST /api/courier/vendor/orders/:orderId/ready
      */
-    vendorMarkReadyForPickup: builder.mutation<ApiResponse, VendorMarkReadyRequest>({
+    vendorMarkReadyForPickup: builder.mutation<
+      ApiResponse,
+      VendorMarkReadyRequest
+    >({
       query: ({ orderId, vendorId }) => ({
         url: `/courier/vendor/orders/${orderId}/ready`,
         method: "POST",
@@ -1050,20 +1331,28 @@ export const courierApi = createApi({
      * Get shipping label for vendor to print
      * GET /api/courier/vendor/orders/:orderId/label
      */
-    getShippingLabel: builder.query<ApiResponse<ShippingLabel>, GetShippingLabelRequest>({
+    getShippingLabel: builder.query<
+      ApiResponse<ShippingLabel>,
+      GetShippingLabelRequest
+    >({
       query: ({ orderId, vendorId }) => ({
         url: `/courier/vendor/orders/${orderId}/label`,
         method: "GET",
         params: vendorId ? { vendorId } : undefined,
       }),
-      providesTags: (result, error, { orderId }) => [{ type: "ShippingLabels", id: orderId }],
+      providesTags: (result, error, { orderId }) => [
+        { type: "ShippingLabels", id: orderId },
+      ],
     }),
 
     /**
      * Get vendor's courier orders
      * GET /api/courier/vendor/orders
      */
-    getVendorCourierOrders: builder.query<ApiResponse<CourierOrder[]>, GetVendorOrdersRequest>({
+    getVendorCourierOrders: builder.query<
+      ApiResponse<CourierOrder[]>,
+      GetVendorOrdersRequest
+    >({
       query: (params) => ({
         url: "/courier/vendor/orders",
         method: "GET",
@@ -1078,7 +1367,10 @@ export const courierApi = createApi({
      * Track order by tracking ID (Public)
      * GET /api/courier/track/:trackingId
      */
-    trackOrder: builder.query<ApiResponse<PublicTrackingData>, TrackOrderRequest>({
+    trackOrder: builder.query<
+      ApiResponse<PublicTrackingData>,
+      TrackOrderRequest
+    >({
       query: ({ trackingId }) => ({
         url: `/courier/track/${trackingId}`,
         method: "GET",
@@ -1092,12 +1384,17 @@ export const courierApi = createApi({
      * Get courier orders by order ID (Internal)
      * GET /api/courier/orders/:orderId
      */
-    getCourierOrdersByOrderId: builder.query<ApiResponse<CourierOrder[]>, GetOrdersByOrderIdRequest>({
+    getCourierOrdersByOrderId: builder.query<
+      ApiResponse<CourierOrder[]>,
+      GetOrdersByOrderIdRequest
+    >({
       query: ({ orderId }) => ({
         url: `/courier/orders/${orderId}`,
         method: "GET",
       }),
-      providesTags: (result, error, { orderId }) => [{ type: "CourierOrders", id: orderId }],
+      providesTags: (result, error, { orderId }) => [
+        { type: "CourierOrders", id: orderId },
+      ],
     }),
 
     // ==================== WEBHOOK ENDPOINTS ====================
@@ -1133,6 +1430,9 @@ export const courierApi = createApi({
         "CourierOrders",
       ],
     }),
+
+    // Steadfast: no webhook endpoint — see the note above
+    // RedXWebhookRequest/PathaoWebhookRequest.
   }),
 });
 
@@ -1188,6 +1488,13 @@ export const {
   useRedxCreatePickupStoreMutation,
   useRedxTrackParcelQuery,
   useLazyRedxTrackParcelQuery,
+
+  // Steadfast Specific
+  useSteadfastCheckStatusQuery,
+  useLazySteadfastCheckStatusQuery,
+  useSteadfastGetBalanceQuery,
+  useLazySteadfastGetBalanceQuery,
+  useSteadfastBulkOrderMutation,
 
   // Order Placement
   useCreateCourierOrderMutation,

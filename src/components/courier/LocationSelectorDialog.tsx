@@ -69,19 +69,16 @@ export function LocationSelectorDialog({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
-  // Use RTK Query hooks
   const { data: locationsResponse, isLoading, error } = useGetLeafLocationsQuery(undefined, {
-    skip: !open, // Only fetch when dialog is open
+    skip: !open,
   });
 
-  // Use the sync mutation from RTK Query
   const [syncServiceableAreas, { isLoading: isSyncing }] = useSyncServiceableAreasMutation();
 
   const locations = locationsResponse?.data || [];
 
-  // Filter locations based on search
-  const filteredLocations = searchQuery.trim() === "" 
-    ? locations 
+  const filteredLocations = searchQuery.trim() === ""
+    ? locations
     : locations.filter((loc) => {
         const query = searchQuery.toLowerCase();
         return (
@@ -91,7 +88,6 @@ export function LocationSelectorDialog({
         );
       });
 
-  // Reset selected location when dialog closes
   useEffect(() => {
     if (!open) {
       setSelectedLocation(null);
@@ -99,7 +95,6 @@ export function LocationSelectorDialog({
     }
   }, [open]);
 
-  // Show error toast if fetch fails
   useEffect(() => {
     if (error) {
       toast.error("Failed to load locations");
@@ -113,7 +108,6 @@ export function LocationSelectorDialog({
     }
 
     try {
-      // Prepare the mapping data
       const mapping = {
         locationId: selectedLocation.id,
         courierCityId: courierArea.courierCityId,
@@ -126,36 +120,23 @@ export function LocationSelectorDialog({
         pickupAvailable: courierArea.pickupAvailable,
       };
 
-      console.log("Mapping data:", mapping);
-      console.log("Courier Provider ID:", courierProviderId);
-
-      // Use RTK Query mutation
       const result = await syncServiceableAreas({
         courierProviderId,
         areas: [mapping],
       }).unwrap();
 
-      console.log("Sync result:", result);
-
       toast.success(
         `Successfully mapped ${courierArea.courierAreaName} to ${selectedLocation.name}`
       );
-      
-      // Call the onMapComplete callback
+
       onMapComplete(mapping);
-      
-      // Close the dialog
       onClose();
-      
     } catch (error: any) {
-      console.error("Error mapping location:", error);
-      
-      // Extract error message
-      const errorMessage = 
-        error?.data?.message || 
-        error?.message || 
+      const errorMessage =
+        error?.data?.message ||
+        error?.message ||
         "Failed to map location";
-      
+
       toast.error(errorMessage, {
         description: "Please try again or contact support if the issue persists"
       });
@@ -180,9 +161,9 @@ export function LocationSelectorDialog({
       case "THANA":
         return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
       case "DISTRICT":
-        return "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300";
+        return "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300";
       case "DIVISION":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300";
+        return "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300";
       default:
         return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
     }
@@ -190,24 +171,24 @@ export function LocationSelectorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[100vh]  overflow-y-scroll">
+      <DialogContent className="max-w-lg sm:max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border-[#E5EAF2]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-teal-600" />
+          <DialogTitle className="flex items-center gap-2 text-[#0D1B2E]">
+            <MapPin className="w-5 h-5 text-indigo-600" />
             Map Courier Area to Platform Location
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             Map <strong>{courierArea.courierAreaName}</strong> ({courierProviderName}) to a platform location
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4 ">
+        <div className="space-y-3 py-2">
           {/* Courier Area Info */}
-          <div className="p-4 bg-teal-50 dark:bg-teal-900 rounded-lg border border-teal-200 dark:border-teal-700">
-            <Label className="text-xs text-teal-600 dark:text-teal-400 mb-2">
+          <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-200">
+            <Label className="text-[11px] font-bold text-indigo-600 uppercase tracking-wide">
               Courier Area Information
             </Label>
-            <div className="space-y-2 mt-2">
+            <div className="space-y-1.5 mt-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Area Name</span>
                 <span className="text-sm">{courierArea.courierAreaName}</span>
@@ -244,27 +225,27 @@ export function LocationSelectorDialog({
             </div>
           </div>
 
-          <Separator />
+          <Separator className="bg-[#E5EAF2]" />
 
           {/* Search */}
-          <div className="space-y-2">
-            <Label>Search Platform Locations</Label>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Search Platform Locations</Label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search by name, local name, or ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pl-9 border-[#E5EAF2]"
               />
             </div>
           </div>
 
           {/* Location List */}
-          <ScrollArea className="h-[300px] border rounded-lg p-2">
+          <ScrollArea className="h-[260px] border border-[#E5EAF2] rounded-xl p-2">
             {isLoading ? (
               <div className="flex items-center justify-center h-full">
-                <Loader2 className="w-6 h-6 animate-spin text-teal-600 mr-2" />
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mr-2" />
                 <p className="text-sm text-muted-foreground">Loading locations...</p>
               </div>
             ) : filteredLocations.length === 0 ? (
@@ -274,39 +255,39 @@ export function LocationSelectorDialog({
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {filteredLocations.map((location) => (
                   <button
                     key={location.id}
                     onClick={() => setSelectedLocation(location)}
-                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                    className={`w-full p-2.5 rounded-xl border-2 transition-all text-left ${
                       selectedLocation?.id === location.id
-                        ? "border-teal-500 bg-teal-50 dark:bg-teal-900"
-                        : "border-gray-200 dark:border-gray-700 hover:border-teal-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        ? "border-indigo-500 bg-indigo-50"
+                        : "border-[#E5EAF2] hover:border-indigo-300 hover:bg-slate-50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-full ${getLevelColor(location.level)}`}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`p-2 rounded-full shrink-0 ${getLevelColor(location.level)}`}>
                           {getLevelIcon(location.level)}
                         </div>
-                        <div>
-                          <p className="font-medium text-sm">{location.name}</p>
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{location.name}</p>
                           {location.name_local && (
-                            <p className="text-xs text-muted-foreground">{location.name_local}</p>
+                            <p className="text-xs text-muted-foreground truncate">{location.name_local}</p>
                           )}
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant="outline" className="text-xs">
                               {location.level}
                             </Badge>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-muted-foreground truncate">
                               ID: {location.id}
                             </span>
                           </div>
                         </div>
                       </div>
                       {selectedLocation?.id === location.id && (
-                        <CheckCircle className="w-5 h-5 text-teal-600" />
+                        <CheckCircle className="w-5 h-5 text-indigo-600 shrink-0" />
                       )}
                     </div>
                   </button>
@@ -317,11 +298,11 @@ export function LocationSelectorDialog({
 
           {/* Selected Location Summary */}
           {selectedLocation && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-900 rounded-lg border border-blue-200 dark:border-blue-700">
-              <Label className="text-xs text-blue-600 dark:text-blue-400">
+            <div className="p-3 bg-violet-50 rounded-xl border border-violet-200">
+              <Label className="text-[11px] font-bold text-violet-600 uppercase tracking-wide">
                 Selected Location
               </Label>
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
                 <Badge variant="outline">{selectedLocation.level}</Badge>
                 <span className="text-sm font-medium">{selectedLocation.name}</span>
                 {selectedLocation.name_local && (
@@ -341,6 +322,7 @@ export function LocationSelectorDialog({
           <Button
             onClick={handleMapLocation}
             disabled={!selectedLocation || isSyncing}
+            className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white border-0"
           >
             {isSyncing ? (
               <>

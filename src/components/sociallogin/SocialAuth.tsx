@@ -377,7 +377,7 @@ const SocialAuth = ({ enableOneTap = true, onSuccess }: SocialAuthProps) => {
         token: credential,
       }).unwrap();
 
-      console.log("Social login API response:", result);
+      console.log("Social login API response received:", { hasAccessToken: !!result?.accessToken }); // Phase 3: never log the token
 
       dispatch(setReduxCredentials({ 
         user: result.user, 
@@ -455,7 +455,7 @@ const SocialAuth = ({ enableOneTap = true, onSuccess }: SocialAuthProps) => {
     try {
       window.FB.login(
         (response: any) => {
-          console.log("Facebook login response:", response);
+          console.log("Facebook login response:", { status: response?.status }); // Phase 3: authResponse holds the Facebook access token
           
           if (response.authResponse) {
             handleFacebookResponse(response.authResponse.accessToken);
@@ -502,7 +502,7 @@ const SocialAuth = ({ enableOneTap = true, onSuccess }: SocialAuthProps) => {
         token: accessToken,
       }).unwrap();
 
-      console.log("Social login API response:", result);
+      console.log("Social login API response received:", { hasAccessToken: !!result?.accessToken }); // Phase 3: never log the token
 
       dispatch(setReduxCredentials({ 
         user: result.user, 

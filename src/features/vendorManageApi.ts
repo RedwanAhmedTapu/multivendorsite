@@ -73,6 +73,11 @@ export interface CreateVendorRequest {
 export interface UpdateVendorProfileRequest {
   storeName?: string;
   avatar?: string;
+  email?: string;   
+  phone?: string;  
+  accountType?: any;
+  businessType?: any;
+  status?: any;
 }
 
 export interface VendorCommissionRequest {
@@ -218,12 +223,11 @@ export interface VendorPersonalInfoRequest {
   // Individual-specific fields
   idNumber?: string;
   idName?: string;
-  // Business-specific fields  
+  // Business-specific fields
   companyName?: string;
   businessRegNo?: string;
   taxIdNumber?: string;
 }
-
 
 export interface VendorPersonalInfo {
   id: string;
@@ -257,42 +261,100 @@ export interface VendorAddress {
   updatedAt: string;
 }
 
-export interface VendorBankInfoRequest {
-  accountName: string;
-  accountNumber: string;
-  bankName: string;
-  branchName: string;
-}
+// ================================
+// BANK ACCOUNT TYPES (multi-account, branch selected from master list)
+// ================================
 
-export interface VendorBankInfo {
+export type PaymentInstrumentType = "BANK" | "MOBILE_BANKING" | "CARD" | "CASH";
+export type MobileBankingProvider =
+  | "BKASH"
+  | "NAGAD"
+  | "ROCKET"
+  | "UPAY"
+  | "OTHER";
+
+export interface VendorPaymentAccountCOA {
+  id: string;
+  code: string;
+  name: string;
+}
+export interface VendorBankAccountBranch {
+  id: string;
+  bankId: string;
+  branchName: string;
+  routingNumber?: string | null;
+  isActive: boolean;
+  bank: {
+    id: string;
+    name: string;
+    code?: string | null;
+    swiftCode?: string | null;
+  };
+}
+export interface VendorPaymentAccount {
   id: string;
   vendorId: string;
-  accountName: string;
-  accountNumber: string;
-  bankName: string;
-  branchName: string;
+  type: PaymentInstrumentType;
+
+  // BANK
+  bankBranchId?: string | null;
+  accountName?: string | null;
+  accountNumber?: string | null;
+  bankBranch?: VendorBankAccountBranch | null;
+
+  // MOBILE_BANKING
+  mobileProvider?: MobileBankingProvider | null;
+  walletNumber?: string | null;
+  walletKind?: string | null;
+
+  // CARD
+  cardProcessor?: string | null;
+  merchantId?: string | null;
+
+  label?: string | null;
+  isDefault: boolean;
+  isActive: boolean;
+  chartOfAccountId?: string | null;
+  chartOfAccount?: VendorPaymentAccountCOA | null;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface AddVendorPaymentAccountRequest {
+  type: PaymentInstrumentType;
+  bankBranchId?: string;
+  accountName?: string;
+  accountNumber?: string;
+  mobileProvider?: MobileBankingProvider;
+  walletNumber?: string;
+  walletKind?: string;
+  cardProcessor?: string;
+  merchantId?: string;
+  label?: string;
+  isDefault?: boolean;
+}
 export interface VendorDocumentRequest {
-  type: 
-    | "NATIONAL_ID_FRONT" 
-    | "NATIONAL_ID_BACK" 
-    | "PASSPORT_FRONT" 
-    | "PASSPORT_BACK" 
-    | "TRADE_LICENSE"           // Updated to match Prisma enum
-    | "RJSC_REGISTRATION"       // Added
-    | "TIN_CERTIFICATE"         // Added
-    | "VAT_CERTIFICATE"         // Added
-    | "OTHER";                  // Added
+  type:
+    | "NATIONAL_ID_FRONT"
+    | "NATIONAL_ID_BACK"
+    | "PASSPORT_FRONT"
+    | "PASSPORT_BACK"
+    | "TRADE_LICENSE" // Updated to match Prisma enum
+    | "RJSC_REGISTRATION" // Added
+    | "TIN_CERTIFICATE" // Added
+    | "VAT_CERTIFICATE" // Added
+    | "OTHER"; // Added
   title: string;
   filePath: string;
-  fileSize?: number | null;     // Made nullable to match schema
-  mimeType?: string | null;     // Made nullable to match schema
-  verificationStatus?: "PENDING" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "EXPIRED";
+  fileSize?: number | null; // Made nullable to match schema
+  mimeType?: string | null; // Made nullable to match schema
+  verificationStatus?:
+    | "PENDING"
+    | "UNDER_REVIEW"
+    | "APPROVED"
+    | "REJECTED"
+    | "EXPIRED";
 }
-
 
 export interface VendorDocument {
   id: string;
@@ -300,14 +362,13 @@ export interface VendorDocument {
   type: string;
   title: string;
   filePath: string;
-  fileSize?: number | null;    
-  mimeType?: string | null;     
+  fileSize?: number | null;
+  mimeType?: string | null;
   verificationStatus: string;
-  rejectionReason?: string | null;  // Added and made nullable
+  rejectionReason?: string | null; // Added and made nullable
   createdAt: string;
   updatedAt: string;
 }
-
 
 export interface VendorSubscriptionRequest {
   planType: "FREE" | "BASIC" | "PRO" | "ENTERPRISE";
@@ -341,7 +402,7 @@ export interface VendorOnboardingStatus {
   personalInfoComplete: boolean;
   addressComplete: boolean;
   bankInfoComplete: boolean;
-  documentsComplete: boolean; 
+  documentsComplete: boolean;
   overallComplete: boolean;
   createdAt: string;
   updatedAt: string;
@@ -353,14 +414,18 @@ export interface VendorVerificationRequest {
 
 export interface CompleteVendorProfile extends VendorWithDetails {
   personalInfo?: VendorPersonalInfo | null;
-  bankInfo?: VendorBankInfo | null;
-  documents?: VendorDocument[]; 
+  paymentAccounts?: VendorPaymentAccount[];
+  documents?: VendorDocument[];
   pickupAddress?: VendorAddress | null;
   settings?: VendorSettings | null;
   subscription?: VendorSubscription | null;
   onboarding?: VendorOnboardingStatus | null;
   accountType: "INDIVIDUAL" | "BUSINESS";
-  businessType?: "PROPRIETORSHIP" | "LIMITED_COMPANY" | "PARTNERSHIP_FIRM" | null; 
+  businessType?:
+    | "PROPRIETORSHIP"
+    | "LIMITED_COMPANY"
+    | "PARTNERSHIP_FIRM"
+    | null;
 }
 
 export interface RequiredDocumentTypes {
@@ -380,7 +445,7 @@ export interface DocumentUploadData {
   nidBack?: File;
   passportFront?: File;
   passportBack?: File;
-  
+
   // Business account documents - Updated to match schema
   tradeLicense?: File;
   rjscRegistration?: File;
@@ -388,7 +453,6 @@ export interface DocumentUploadData {
   vatCertificate?: File;
   otherDocument?: File;
 }
-
 
 export interface OnboardingProgress {
   personalInfo: boolean;
@@ -407,13 +471,15 @@ export interface StorageFile {
   id: string;
   fileName: string;
   fileKey: string;
-  fileSize: number;
+  fileSize: string;
   mimeType: string;
   fileType: "IMAGE" | "DOCUMENT";
   url: string;
   r2Url: string;
   productId?: string;
   variantId?: string;
+  folderId?: string | null;
+  documentType?: string | null;
   createdAt: string;
 }
 
@@ -460,16 +526,18 @@ export interface UploadFileResponse {
     id: string;
     fileName: string;
     url: string;
-    fileSize: number;
+    fileSize: string;
     mimeType: string;
+    folderId?: string | null;
   };
   files?: Array<{
     id: string;
     fileName: string;
     url: string;
     path: string;
-    fileSize: number;
+    fileSize: string;
     mimeType: string;
+    folderId?: string | null;
   }>;
   totalFiles?: number;
   totalSize?: number;
@@ -486,14 +554,51 @@ export interface PaginatedFilesResponse {
   };
 }
 
-// Folder interface
+// Folder interface — id-based hierarchy (matches VendorFolder model)
 export interface Folder {
   id: string;
+  vendorId: string;
   name: string;
-  path: string;
-  parentPath?: string;
+  parentId: string | null;
+  isActive: boolean;
   fileCount: number;
+  childFolderCount: number;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface FolderTreeNode extends Folder {
+  children: FolderTreeNode[];
+}
+
+export interface FolderWithContents extends Folder {
+  children: Folder[];
+  files: Array<{
+    id: string;
+    fileName: string;
+    fileKey: string;
+    fileSize: number;
+    mimeType: string;
+    fileType: string;
+    r2Url: string;
+    createdAt: string;
+  }>;
+}
+// ================================
+// R2 DIRECT LISTING (audit / debug tool — see cloudflare-r2.ts)
+// ================================
+
+export interface R2ListedFile {
+  key: string;
+  url: string;
+  size: number;
+  lastModified?: string;
+}
+
+export interface R2ListResponse {
+  success: boolean;
+  files: R2ListedFile[];
+  total: number;
 }
 // ================================
 // VENDOR MANAGEMENT API
@@ -502,7 +607,7 @@ export interface Folder {
 export const vendorManageApi = createApi({
   reducerPath: "vendorManageApi",
   baseQuery: baseQueryWithReauth,
-   tagTypes: [
+  tagTypes: [
     "Vendor",
     "VendorCommission",
     "VendorPayout",
@@ -512,7 +617,7 @@ export const vendorManageApi = createApi({
     "VendorPerformance",
     "VendorPersonalInfo",
     "VendorAddress",
-    "VendorBankInfo",
+    "VendorBankAccount",
     "VendorDocument",
     "VendorSubscription",
     "VendorSettings",
@@ -586,7 +691,7 @@ export const vendorManageApi = createApi({
       }),
       invalidatesTags: ["Vendor"],
     }),
-     // ================================
+    // ================================
     // VERIFICATION STATUS MANAGEMENT (NEW)
     // ================================
 
@@ -683,7 +788,7 @@ export const vendorManageApi = createApi({
     // Get commission history (category-wise)
     getCommissionHistory: builder.query<any[], string>({
       query: (vendorId) => `/vendormanagement/${vendorId}/commission/history`,
-      
+
       providesTags: (result, error, vendorId) => [
         { type: "VendorCommission", id: vendorId },
       ],
@@ -945,7 +1050,7 @@ export const vendorManageApi = createApi({
         params: data,
       }),
     }),
-   // Create or update personal info - UPDATED
+    // Create or update personal info - UPDATED
     createOrUpdatePersonalInfo: builder.mutation<
       VendorPersonalInfo,
       { vendorId: string; data: VendorPersonalInfoRequest }
@@ -1000,34 +1105,47 @@ export const vendorManageApi = createApi({
     }),
 
     // ================================
-    // BANK INFO MANAGEMENT
+    // BANK ACCOUNT MANAGEMENT (multi-account, auto-creates ChartOfAccount)
     // ================================
 
-    // Create or update bank info
-    createOrUpdateBankInfo: builder.mutation<
-      VendorBankInfo,
-      { vendorId: string; data: VendorBankInfoRequest }
+    addVendorPaymentAccount: builder.mutation<
+      { success: boolean; message: string; data: VendorPaymentAccount },
+      { vendorId: string; data: AddVendorPaymentAccountRequest }
     >({
       query: ({ vendorId, data }) => ({
-        url: `/vendormanagement/${vendorId}/bank-info`,
-        method: "PUT",
+        url: `/vendormanagement/${vendorId}/payment-accounts`,
+        method: "POST",
         body: data,
       }),
       invalidatesTags: (result, error, { vendorId }) => [
-        { type: "VendorBankInfo", id: vendorId },
+        { type: "VendorBankAccount", id: vendorId },
         { type: "VendorOnboarding", id: vendorId },
         { type: "Vendor", id: vendorId },
       ],
     }),
 
-    // Get bank info
-    getBankInfo: builder.query<VendorBankInfo, string>({
-      query: (vendorId) => `/vendormanagement/${vendorId}/bank-info`,
+    getVendorPaymentAccounts: builder.query<
+      { success: boolean; data: VendorPaymentAccount[] },
+      string
+    >({
+      query: (vendorId) => `/vendormanagement/${vendorId}/payment-accounts`,
       providesTags: (result, error, vendorId) => [
-        { type: "VendorBankInfo", id: vendorId },
+        { type: "VendorBankAccount", id: vendorId },
       ],
     }),
 
+    setDefaultVendorPaymentAccount: builder.mutation<
+      { success: boolean; message: string; data: VendorPaymentAccount },
+      { vendorId: string; paymentAccountId: string }
+    >({
+      query: ({ vendorId, paymentAccountId }) => ({
+        url: `/vendormanagement/${vendorId}/payment-accounts/${paymentAccountId}/default`,
+        method: "PATCH",
+      }),
+      invalidatesTags: (result, error, { vendorId }) => [
+        { type: "VendorBankAccount", id: vendorId },
+      ],
+    }),
     // ================================
     // DOCUMENT MANAGEMENT
     // ================================
@@ -1048,43 +1166,48 @@ export const vendorManageApi = createApi({
     >({
       query: ({ vendorId, files }) => ({
         url: `/vendormanagement/${vendorId}/documents`,
-        method: 'POST',
+        method: "POST",
         body: files,
         // Don't set Content-Type - let browser handle it for FormData
       }),
       invalidatesTags: (result, error, { vendorId }) => [
-        { type: 'VendorDocument', id: vendorId },
-        { type: 'VendorOnboarding', id: vendorId },
-        { type: 'Vendor', id: vendorId },
+        { type: "VendorDocument", id: vendorId },
+        { type: "VendorOnboarding", id: vendorId },
+        { type: "Vendor", id: vendorId },
       ],
     }),
 
     // Get documents - UPDATED (returns array now)
     getDocuments: builder.query<VendorDocument[], string>({
-  query: (vendorId) => `/vendormanagement/${vendorId}/documents`,
-  transformResponse: (response: any) => {
-    // Handle different response structures
-    if (Array.isArray(response)) {
-      return response;
-    } else if (response?.data && Array.isArray(response.data)) {
-      return response.data;
-    } else if (response?.documents && Array.isArray(response.documents)) {
-      return response.documents;
-    }
-    return [];
-  },
-  providesTags: (result, error, vendorId) => [
-    { type: "VendorDocument", id: vendorId },
-  ],
-}),
+      query: (vendorId) => `/vendormanagement/${vendorId}/documents`,
+      transformResponse: (response: any) => {
+        // Handle different response structures
+        if (Array.isArray(response)) {
+          return response;
+        } else if (response?.data && Array.isArray(response.data)) {
+          return response.data;
+        } else if (response?.documents && Array.isArray(response.documents)) {
+          return response.documents;
+        }
+        return [];
+      },
+      providesTags: (result, error, vendorId) => [
+        { type: "VendorDocument", id: vendorId },
+      ],
+    }),
 
     // Update document status - UPDATED
     updateDocumentStatus: builder.mutation<
       VendorDocument,
-      { 
-        documentId: string; 
-        status: "PENDING" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "EXPIRED"; 
-        rejectionReason?: string 
+      {
+        documentId: string;
+        status:
+          | "PENDING"
+          | "UNDER_REVIEW"
+          | "APPROVED"
+          | "REJECTED"
+          | "EXPIRED";
+        rejectionReason?: string;
       }
     >({
       query: ({ documentId, status, rejectionReason }) => ({
@@ -1103,15 +1226,14 @@ export const vendorManageApi = createApi({
     >({
       query: (documentId) => ({
         url: `/vendormanagement/documents/${documentId}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
-      invalidatesTags: (result, error, documentId) => [
-        'VendorDocument',
-      ],
+      invalidatesTags: (result, error, documentId) => ["VendorDocument"],
     }),
-  // Get required document types
+    // Get required document types
     getRequiredDocumentTypes: builder.query<RequiredDocumentTypes, string>({
-      query: (vendorId) => `/vendormanagement/${vendorId}/required-document-types`,
+      query: (vendorId) =>
+        `/vendormanagement/${vendorId}/required-document-types`,
       providesTags: (result, error, vendorId) => [
         { type: "Vendor", id: vendorId },
       ],
@@ -1170,7 +1292,7 @@ export const vendorManageApi = createApi({
     // ================================
 
     // Get onboarding status
-      getOnboardingStatus: builder.query<VendorOnboardingStatus, string>({
+    getOnboardingStatus: builder.query<VendorOnboardingStatus, string>({
       query: (vendorId) => `/vendormanagement/${vendorId}/onboarding-status`,
       providesTags: (result, error, vendorId) => [
         { type: "VendorOnboarding", id: vendorId },
@@ -1205,25 +1327,26 @@ export const vendorManageApi = createApi({
       ],
     }),
 
-   
     // ================================
     // COMPLETE PROFILE MANAGEMENT
     // ================================
 
     // Get complete vendor profile
-    getCompleteVendorProfile: builder.query<CompleteVendorProfile, string>({
-      query: (vendorId) => `/vendormanagement/${vendorId}/complete-profile`,
-      providesTags: (result, error, vendorId) => [
-        { type: "Vendor", id: vendorId },
-        { type: "VendorPersonalInfo", id: vendorId },
-        { type: "VendorAddress", id: vendorId },
-        { type: "VendorBankInfo", id: vendorId },
-        { type: "VendorDocument", id: vendorId },
-        { type: "VendorSubscription", id: vendorId },
-        { type: "VendorSettings", id: vendorId },
-        { type: "VendorOnboarding", id: vendorId },
-      ],
-    }),
+   getCompleteVendorProfile: builder.query<CompleteVendorProfile, string>({
+  query: (vendorId) => `/vendormanagement/${vendorId}/complete-profile`,
+  transformResponse: (response: { success: boolean; data: CompleteVendorProfile }) =>
+    response.data,
+  providesTags: (result, error, vendorId) => [
+    { type: "Vendor", id: vendorId },
+    { type: "VendorPersonalInfo", id: vendorId },
+    { type: "VendorAddress", id: vendorId },
+    { type: "VendorBankAccount", id: vendorId },
+    { type: "VendorDocument", id: vendorId },
+    { type: "VendorSubscription", id: vendorId },
+    { type: "VendorSettings", id: vendorId },
+    { type: "VendorOnboarding", id: vendorId },
+  ],
+}),
     // ================================
     // STORAGE MANAGEMENT
     // ================================
@@ -1256,7 +1379,7 @@ export const vendorManageApi = createApi({
           method: "DELETE",
         }),
         invalidatesTags: ["VendorFile", "VendorStorage"],
-      }
+      },
     ),
 
     // Get storage stats
@@ -1305,6 +1428,8 @@ export const vendorManageApi = createApi({
         page?: number;
         limit?: number;
         fileType?: "IMAGE" | "DOCUMENT";
+        folderId?: string | "root";
+        excludeProductFiles?: boolean;
       }
     >({
       query: (params) => ({
@@ -1312,45 +1437,79 @@ export const vendorManageApi = createApi({
         method: "GET",
         params,
       }),
-      providesTags: (result, error, { vendorId }) => [
+      providesTags: (result, error, { vendorId, folderId }) => [
         { type: "VendorFile", id: vendorId },
+        ...(folderId
+          ? [
+              {
+                type: "Folders" as const,
+                id: folderId === "root" ? "LIST" : folderId,
+              },
+            ]
+          : []),
       ],
+    }),
+    // Get product images directly from R2 (bypasses DB — audit/debug use only,
+    getProductImagesFromR2: builder.query<R2ListResponse, void>({
+      query: () => "/vendor-storage/r2/product-images",
+      providesTags: ["VendorStorage"],
     }),
     // ================================
     // FOLDER MANAGEMENT
     // ================================
 
-    // Get all folders
+    // Get all folders (flat, with file/subfolder counts)
     getFolders: builder.query<Folder[], void>({
       query: () => "/filemanager/folders",
+      transformResponse: (response: any) => response?.folders ?? response ?? [],
       providesTags: (result) =>
         result && result.length > 0
           ? [
               ...result.map(({ id }) => ({
                 type: "Folders" as const,
-                id: id.toString(),
+                id,
               })),
               { type: "Folders", id: "LIST" },
             ]
           : [{ type: "Folders", id: "LIST" }],
     }),
 
+    // Get folders as a nested tree
+    getFolderTree: builder.query<FolderTreeNode[], void>({
+      query: () => "/filemanager/folders/tree",
+      transformResponse: (response: any) => response?.tree ?? [],
+      providesTags: [{ type: "Folders", id: "TREE" }],
+    }),
+
+    // Get single folder with its children + files
+    getFolderById: builder.query<FolderWithContents, string>({
+      query: (folderId) => `/filemanager/folders/${folderId}`,
+      transformResponse: (response: any) => response?.folder,
+      providesTags: (result, error, folderId) => [
+        { type: "Folders", id: folderId },
+      ],
+    }),
+
     // Create a new folder
     createFolder: builder.mutation<
       { success: boolean; folder: Folder },
-      { name: string; parentPath?: string }
+      { name: string; parentId?: string | null }
     >({
-      query: ({ name, parentPath }) => ({
+      query: ({ name, parentId }) => ({
         url: "/filemanager/folders",
         method: "POST",
-        body: { name, parentPath },
+        body: { name, parentId },
       }),
-      invalidatesTags: [{ type: "Folders", id: "LIST" }],
+      invalidatesTags: (result, error, { parentId }) => [
+        { type: "Folders", id: "LIST" },
+        { type: "Folders", id: "TREE" },
+        ...(parentId ? [{ type: "Folders" as const, id: parentId }] : []),
+      ],
     }),
 
     // Rename folder
     renameFolder: builder.mutation<
-      { success: boolean; newPath: string },
+      { success: boolean; folder: Folder },
       { folderId: string; newName: string }
     >({
       query: ({ folderId, newName }) => ({
@@ -1358,7 +1517,29 @@ export const vendorManageApi = createApi({
         method: "PUT",
         body: { newName },
       }),
-      invalidatesTags: [{ type: "Folders", id: "LIST" }],
+      invalidatesTags: (result, error, { folderId }) => [
+        { type: "Folders", id: "LIST" },
+        { type: "Folders", id: "TREE" },
+        { type: "Folders", id: folderId },
+      ],
+    }),
+
+    // Move folder to a new parent
+    moveFolder: builder.mutation<
+      { success: boolean; folder: Folder },
+      { folderId: string; newParentId: string | null }
+    >({
+      query: ({ folderId, newParentId }) => ({
+        url: `/filemanager/folders/${folderId}/move`,
+        method: "PUT",
+        body: { newParentId },
+      }),
+      invalidatesTags: (result, error, { folderId, newParentId }) => [
+        { type: "Folders", id: "LIST" },
+        { type: "Folders", id: "TREE" },
+        { type: "Folders", id: folderId },
+        ...(newParentId ? [{ type: "Folders" as const, id: newParentId }] : []),
+      ],
     }),
 
     // Delete folder
@@ -1370,20 +1551,31 @@ export const vendorManageApi = createApi({
         url: `/filemanager/folders/${folderId}`,
         method: "DELETE",
       }),
-      invalidatesTags: [{ type: "Folders", id: "LIST" }],
+      invalidatesTags: (result, error, { folderId }) => [
+        { type: "Folders", id: "LIST" },
+        { type: "Folders", id: "TREE" },
+        { type: "Folders", id: folderId },
+      ],
     }),
 
-    // Move files to folder
+    // Move files to folder (or to root, by passing null)
     moveFilesToFolder: builder.mutation<
       { success: boolean; movedCount: number },
-      { fileIds: string[]; targetFolderPath: string }
+      { fileIds: string[]; targetFolderId: string | null }
     >({
-      query: ({ fileIds, targetFolderPath }) => ({
+      query: ({ fileIds, targetFolderId }) => ({
         url: "/filemanager/files/move",
         method: "POST",
-        body: { fileIds, targetFolderPath },
+        body: { fileIds, targetFolderId },
       }),
-      invalidatesTags: [{ type: "Folders", id: "LIST" }],
+      invalidatesTags: (result, error, { targetFolderId }) => [
+        { type: "Folders", id: "LIST" },
+        { type: "Folders", id: "TREE" },
+        { type: "VendorFile", id: "LIST" },
+        ...(targetFolderId
+          ? [{ type: "Folders" as const, id: targetFolderId }]
+          : []),
+      ],
     }),
   }),
 });
@@ -1400,12 +1592,13 @@ export const {
   useCreateOrUpdateAddressMutation,
   useGetAddressQuery,
   // vendor bank info
-  useCreateOrUpdateBankInfoMutation,
-  useGetBankInfoQuery,
+  useAddVendorPaymentAccountMutation,
+  useGetVendorPaymentAccountsQuery,
+  useSetDefaultVendorPaymentAccountMutation,
   // vendor document
   useUploadDocumentsMutation,
   useGetDocumentsQuery,
-  useDeleteDocumentMutation,  
+  useDeleteDocumentMutation,
   useUpdateDocumentStatusMutation,
   useGetRequiredDocumentTypesQuery,
   useCheckDocumentsCompleteQuery,
@@ -1417,7 +1610,7 @@ export const {
   useGetOnboardingStatusQuery,
   useGetSettingsQuery,
   useUpdateSettingsMutation,
-   // Verification Status Management 
+  // Verification Status Management
   useSetUnderReviewMutation,
   useVerifyVendorVerificationMutation,
   useRejectVendorVerificationMutation,
@@ -1480,10 +1673,14 @@ export const {
   useCheckQuotaMutation,
   usePurchaseStorageMutation,
   useGetVendorFilesQuery,
+  useGetProductImagesFromR2Query,
   // Folder Management
   useGetFoldersQuery,
+  useGetFolderTreeQuery,
+  useGetFolderByIdQuery,
   useCreateFolderMutation,
   useRenameFolderMutation,
+  useMoveFolderMutation,
   useDeleteFolderMutation,
   useMoveFilesToFolderMutation,
 } = vendorManageApi;

@@ -19,12 +19,9 @@ test("agent chat is on by default (kill switch: \"0\" / \"false\") and the piece
   assert.match(box, /AGENT_CHAT_UI_ENABLED && isAgentConversation\(conversation\.conversation\.type\) && <AgentChatNotice \/>/);
 });
 
-test("the staff page reuses the existing UnifiedChat and only the agent admin API", () => {
+test("the old agent messages route redirects to the unified Live Chat page", () => {
   const page = read("app/admin-dashboard/@main/agents/messages/page.tsx");
-  assert.match(page, /import UnifiedChat from "@\/components\/chatbox\/UnifiedChat"/);
-  assert.match(page, /useListAgentChatsQuery/);
-  assert.match(page, /AgentChatNotice/);
-  assert.ok(!/useGetSupportQueueQuery|chatApi\.endpoints/.test(page));
+  assert.match(page, /redirect\("\/admin-dashboard\/chat\?tab=agents"\)/);
   const ui = read("components/agent-admin/AgentAdminUI.tsx");
   assert.match(ui, /AGENT_CHAT_UI_ENABLED \? \[\{ href: "\/admin-dashboard\/agents\/messages", label: "Messages" \}\] : \[\]/);
 });

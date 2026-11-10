@@ -2,7 +2,14 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useGetMyOrdersQuery, OrderStatus, PaymentStatus } from "@/features/userorderApi";
+import {
+  useGetMyOrdersQuery,
+  OrderStatus,
+  PaymentStatus,
+  OrderSummary,
+  VendorOrderSummary,
+  OrderItem,
+} from "@/features/userorderApi";
 import {
   Search, Package, ChevronRight, ChevronLeft, ChevronDown,
   SlidersHorizontal, X, ShoppingBag, Truck, RotateCcw,
@@ -47,6 +54,7 @@ const STATUS_STYLE: Record<OrderStatus, string> = {
 const PAYMENT_STYLE: Record<PaymentStatus, string> = {
   PENDING:  "text-amber-500",
   PAID:     "text-green-600",
+  PARTIALLY_REFUNDED: "text-teal-600",
   FAILED:   "text-red-500",
   REFUNDED: "text-teal-600",
 };
@@ -84,8 +92,8 @@ export default function OrdersPage() {
     limit: pageSize,
     status: statusParam,
   });
-  
-  const orders = useMemo(() => data?.data ?? [], [data]);
+
+  const orders: OrderSummary[] = useMemo(() => data?.data ?? [], [data]);
   const totalOrders = data?.pagination?.total ?? 0;
   const totalPages = data?.pagination?.totalPages ?? 1;
 
@@ -103,20 +111,20 @@ export default function OrdersPage() {
   // Filter and sort locally (since API doesn't support all these filters)
   const filtered = useMemo(() => {
     return orders
-      .filter((o: any) => {
+      .filter((o: OrderSummary) => {
         const matchTab    = tabStatuses.includes(o.status);
         const matchStatus = statusFilter ? o.status === statusFilter : true;
         const q = search.toLowerCase();
         const matchSearch = !q
           || (o.orderNumber ?? o.id).toLowerCase().includes(q)
-          || o.vendorOrders?.some((vo: any) =>
-              vo.items?.some((item: any) =>
+          || o.vendorOrders?.some((vo: VendorOrderSummary) =>
+              vo.items?.some((item: OrderItem) =>
                 item.variant?.product?.name?.toLowerCase().includes(q)
               ) || vo.vendor?.storeName?.toLowerCase().includes(q)
             );
         return matchTab && matchStatus && matchSearch;
       })
-      .sort((a: any, b: any) => {
+      .sort((a: OrderSummary, b: OrderSummary) => {
         if (sortField === "date") {
           const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
           return sortDir === "desc" ? -diff : diff;
@@ -132,7 +140,7 @@ export default function OrdersPage() {
   const tabCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     TAB_GROUPS.forEach((t) => {
-      counts[t.key] = orders.filter((o: any) => t.statuses.includes(o.status)).length;
+      counts[t.key] = orders.filter((o: OrderSummary) => t.statuses.includes(o.status)).length;
     });
     return counts;
   }, [orders]);
@@ -154,7 +162,7 @@ export default function OrdersPage() {
     setActiveTab(tabKey);
     setPage(1);
     setStatusFilter("");
-    
+
     // Optionally update API status param based on tab
     const tab = TAB_GROUPS.find(t => t.key === tabKey);
     if (tab && tab.statuses.length === 1) {
@@ -364,17 +372,17 @@ export default function OrdersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginated.map((order: any) => {
+                {paginated.map((order: OrderSummary) => {
                   /* Get all items from all vendor orders */
-                  const allItems = order.vendorOrders.flatMap((vo: any) => vo.items);
+                  const allItems: OrderItem[] = order.vendorOrders.flatMap((vo: VendorOrderSummary) => vo.items);
                   const previewImgs = allItems.slice(0, 3).map(
-                    (item: any) => item.variant?.images?.[0]?.url ?? null
+                    (item: OrderItem) => item.variant?.images?.[0]?.url ?? null
                   );
                   const extraItems = allItems.length - 3;
                   const sellers = [...new Set(
-                    order.vendorOrders.map((vo: any) => vo.vendor?.storeName).filter(Boolean)
+                    order.vendorOrders.map((vo: VendorOrderSummary) => vo.vendor?.storeName).filter(Boolean)
                   )] as string[];
-                  const totalQty = allItems.reduce((s: number, i: any) => s + i.quantity, 0);
+                  const totalQty = allItems.reduce((s: number, i: OrderItem) => s + i.quantity, 0);
 
                   return (
                     <tr
@@ -452,24 +460,24 @@ export default function OrdersPage() {
                         <p className="font-semibold text-slate-800 whitespace-nowrap">
                           ৳ {order.totalAmount.toLocaleString("en-BD", { minimumFractionDigits: 0 })}
                         </p>
-                        {order.discountAmount > 0 && (
+                        {(order.discountAmount ?? 0) > 0 && (
                           <p className="text-xs text-green-500 mt-0.5">
-                            −৳ {order.discountAmount.toLocaleString()}
+                            −৳ {(order.discountAmount ?? 0).toLocaleString()}
                           </p>
                         )}
                       </td>
 
                       {/* Payment */}
                       <td className="px-4 py-4 text-center">
-                        <span className={`text-xs font-semibold ${PAYMENT_STYLE[order.paymentStatus as PaymentStatus]}`}>
+                        <span className={`text-xs font-semibold ${PAYMENT_STYLE[order.paymentStatus]}`}>
                           {order.paymentStatus === "PENDING" ? "Unpaid" : order.paymentStatus}
                         </span>
                       </td>
 
                       {/* Order status */}
                       <td className="px-4 py-4 text-center">
-                        <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full border ${STATUS_STYLE[order.status as OrderStatus]}`}>
-                          {STATUS_LABEL[order.status as OrderStatus] ?? order.status}
+                        <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full border ${STATUS_STYLE[order.status]}`}>
+                          {STATUS_LABEL[order.status] ?? order.status}
                         </span>
                       </td>
 

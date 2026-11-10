@@ -1,6 +1,23 @@
 import React from 'react';
 import { ComponentHandler } from "../ComponentHandler";
 
+export interface VoucherItem {
+  id?: number;
+  discount?: string;
+  upTo?: string;
+  date?: string;
+  fullDate?: string;
+  event?: string;
+  time?: string;
+  code?: string;
+  serialNumber?: string;
+}
+
+export interface VoucherFormData {
+  vouchers?: VoucherItem[];
+  isVisible?: boolean;
+}
+
 interface VoucherProps {
   isActive?: boolean;
   onDragOver?: (e: React.DragEvent) => void;
@@ -10,7 +27,20 @@ interface VoucherProps {
   onCopy?: () => void;
   onDelete?: () => void;
   viewMode?: 'mobile' | 'desktop';
+  formData?: VoucherFormData;
 }
+
+const DEFAULT_VOUCHERS: VoucherItem[] = [
+  { id: 1, discount: '50%', upTo: 'UP TO 80% OFF', date: 'FRIDAY',   fullDate: '10.05.2024', event: 'Place Event',  time: '20:15', code: 'SAVE50NOW',  serialNumber: 'No. 0000123' },
+  { id: 2, discount: '40%', upTo: 'UP TO 70% OFF', date: 'SATURDAY', fullDate: '11.05.2024', event: 'Special Sale', time: '18:30', code: 'MEGA40OFF',  serialNumber: 'No. 0000124' },
+  { id: 3, discount: '60%', upTo: 'UP TO 90% OFF', date: 'SUNDAY',   fullDate: '12.05.2024', event: 'Flash Deal',   time: '14:00', code: 'SUPER60',    serialNumber: 'No. 0000125' },
+  { id: 4, discount: '35%', upTo: 'UP TO 65% OFF', date: 'MONDAY',   fullDate: '13.05.2024', event: 'Week Start',   time: '10:00', code: 'START35',    serialNumber: 'No. 0000126' },
+  { id: 5, discount: '45%', upTo: 'UP TO 75% OFF', date: 'TUESDAY',  fullDate: '14.05.2024', event: 'Mid Week',     time: '16:45', code: 'DEAL45NOW',  serialNumber: 'No. 0000127' },
+];
+
+// Deterministic pseudo-random bar heights (stable across re-renders, unlike Math.random())
+const barHeight = (seed: number) => (seed % 2 === 0 ? '100%' : '60%');
+const barOffset = (seed: number) => (seed % 2 === 0 ? '0' : 'auto');
 
 export const Voucher = ({
   isActive = false,
@@ -20,65 +50,10 @@ export const Voucher = ({
   onMoveDown,
   onCopy,
   onDelete,
-  viewMode = 'mobile'
+  viewMode = 'mobile',
+  formData = {},
 }: VoucherProps) => {
-  const vouchers = [
-    {
-      id: 1,
-      discount: '50%',
-      upTo: 'UP TO 80% OFF',
-      date: 'FRIDAY',
-      fullDate: '10.05.2024',
-      event: 'Place Event',
-      time: '20:15',
-      code: 'SAVE50NOW',
-      serialNumber: 'No. 0000123'
-    },
-    {
-      id: 2,
-      discount: '40%',
-      upTo: 'UP TO 70% OFF',
-      date: 'SATURDAY',
-      fullDate: '11.05.2024',
-      event: 'Special Sale',
-      time: '18:30',
-      code: 'MEGA40OFF',
-      serialNumber: 'No. 0000124'
-    },
-    {
-      id: 3,
-      discount: '60%',
-      upTo: 'UP TO 90% OFF',
-      date: 'SUNDAY',
-      fullDate: '12.05.2024',
-      event: 'Flash Deal',
-      time: '14:00',
-      code: 'SUPER60',
-      serialNumber: 'No. 0000125'
-    },
-    {
-      id: 4,
-      discount: '35%',
-      upTo: 'UP TO 65% OFF',
-      date: 'MONDAY',
-      fullDate: '13.05.2024',
-      event: 'Week Start',
-      time: '10:00',
-      code: 'START35',
-      serialNumber: 'No. 0000126'
-    },
-    {
-      id: 5,
-      discount: '45%',
-      upTo: 'UP TO 75% OFF',
-      date: 'TUESDAY',
-      fullDate: '14.05.2024',
-      event: 'Mid Week',
-      time: '16:45',
-      code: 'DEAL45NOW',
-      serialNumber: 'No. 0000127'
-    }
-  ];
+  const vouchers = formData.vouchers && formData.vouchers.length > 0 ? formData.vouchers : DEFAULT_VOUCHERS;
 
   // Mobile View Design
   const renderMobileView = () => (
@@ -87,7 +62,7 @@ export const Voucher = ({
         <div className="flex gap-4 min-w-max">
           {vouchers.map((voucher, index) => (
             <div
-              key={voucher.id}
+              key={voucher.id ?? index}
               className="flex-shrink-0 w-80"
             >
               {/* Compact Voucher Ticket */}
@@ -113,10 +88,7 @@ export const Voucher = ({
                           <div
                             key={i}
                             className="flex-1 bg-gray-600"
-                            style={{
-                              height: Math.random() > 0.5 ? '100%' : '60%',
-                              marginTop: Math.random() > 0.5 ? '0' : 'auto'
-                            }}
+                            style={{ height: barHeight(i), marginTop: barOffset(i) }}
                           ></div>
                         ))}
                       </div>
@@ -182,10 +154,7 @@ export const Voucher = ({
                             <div
                               key={i}
                               className="w-0.5 bg-gray-600"
-                              style={{
-                                height: Math.random() > 0.5 ? '100%' : '70%',
-                                marginTop: Math.random() > 0.5 ? '0' : 'auto'
-                              }}
+                              style={{ height: barHeight(i), marginTop: barOffset(i) }}
                             ></div>
                           ))}
                         </div>
@@ -218,7 +187,7 @@ export const Voucher = ({
         <div className="flex gap-6 min-w-max">
           {vouchers.map((voucher, index) => (
             <div
-              key={voucher.id}
+              key={voucher.id ?? index}
               className="flex-shrink-0 w-96"
             >
               {/* Voucher Ticket */}
@@ -244,10 +213,7 @@ export const Voucher = ({
                           <div
                             key={i}
                             className="flex-1 bg-gray-600"
-                            style={{
-                              height: Math.random() > 0.5 ? '100%' : '60%',
-                              marginTop: Math.random() > 0.5 ? '0' : 'auto'
-                            }}
+                            style={{ height: barHeight(i), marginTop: barOffset(i) }}
                           ></div>
                         ))}
                       </div>
@@ -313,10 +279,7 @@ export const Voucher = ({
                             <div
                               key={i}
                               className="w-0.5 bg-gray-600"
-                              style={{
-                                height: Math.random() > 0.5 ? '100%' : '70%',
-                                marginTop: Math.random() > 0.5 ? '0' : 'auto'
-                              }}
+                              style={{ height: barHeight(i), marginTop: barOffset(i) }}
                             ></div>
                           ))}
                         </div>
@@ -341,6 +304,8 @@ export const Voucher = ({
       </div>
     </div>
   );
+
+  if (formData.isVisible === false) return null;
 
   return (
     <div

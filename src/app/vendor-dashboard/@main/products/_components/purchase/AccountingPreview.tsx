@@ -45,7 +45,7 @@ function VoucherPreview({ title, narration, entries }: VoucherPreviewProps) {
               <div className="text-[10.5px] text-[#9B9890]">{e.note}</div>
             </div>
             <span className="font-mono text-[13px] font-semibold text-[#1A1916]">
-              ${e.amount.toFixed(2)}
+              {e.amount.toFixed(2)}
             </span>
           </div>
         ))}
@@ -95,8 +95,10 @@ export default function AccountingPreview({
   const narr2 = `Payment to ${supName} | Ref: ${poNumber}`;
 
   const v1entries: VoucherEntry[] = [
-    { type: "DR", account: "5010 – Inventory Asset (Goods)", amount: subtotal, note: "Purchase value" },
-    { type: "DR", account: vatLabel, amount: vat, note: `VAT ${vatPct}%` },
+    { type: "DR", account: "1200 – Inventory Asset", amount: subtotal, note: "Purchase value" },
+    ...(vat > 0
+      ? [{ type: "DR" as const, account: vatLabel, amount: vat, note: `VAT ${vatPct}%` }]
+      : []),
     { type: "CR", account: supCOA, amount: grand, note: "Total payable to supplier" },
   ];
 
@@ -108,6 +110,8 @@ export default function AccountingPreview({
         ]
       : [];
 
+  const voucherCount = paidAmount > 0 ? 2 : 1;
+
   return (
     <div className="bg-white border border-[#E4E2DB] rounded-[12px] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
       <div className="px-4 py-[13px] border-b border-[#E4E2DB] flex items-center justify-between">
@@ -115,7 +119,7 @@ export default function AccountingPreview({
           Accounting Preview
         </span>
         <span className="text-[11px] font-medium px-2 py-[2px] rounded-[20px] bg-[#EBF2FA] text-[#1A4F7A]">
-          2 Vouchers
+          {voucherCount} Voucher{voucherCount > 1 ? "s" : ""}
         </span>
       </div>
       <div className="px-[14px] py-[10px]">

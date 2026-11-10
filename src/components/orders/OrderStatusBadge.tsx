@@ -32,6 +32,7 @@ export const PAYMENT_STATUS_CONFIG: Record<
   PENDING:  { label: "Unpaid",   cls: "bg-amber-50 text-amber-600 border-amber-200" },
   PAID:     { label: "Paid",     cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   FAILED:   { label: "Failed",   cls: "bg-red-50 text-red-700 border-red-200" },
+  PARTIALLY_REFUNDED: { label: "Partially Refunded", cls: "bg-orange-50 text-orange-700 border-orange-200" },
   REFUNDED: { label: "Refunded", cls: "bg-rose-50 text-rose-700 border-rose-200" },
 };
 
@@ -59,6 +60,7 @@ const COURIER_STATUS_CONFIG: Record<
   IN_TRANSIT:       { label: "In Transit",       cls: "bg-sky-50 text-sky-700 border-sky-200" },
   OUT_FOR_DELIVERY: { label: "Out for Delivery", cls: "bg-violet-50 text-violet-700 border-violet-200" },
   DELIVERED:        { label: "Delivered",        cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  PARTIAL_DELIVERED: { label: "Partial Delivery", cls: "bg-yellow-50 text-yellow-700 border-yellow-200" },
   FAILED_DELIVERY:  { label: "Failed",           cls: "bg-red-50 text-red-700 border-red-200" },
   RETURNING:        { label: "Returning",        cls: "bg-orange-50 text-orange-700 border-orange-200" },
   RETURNED:         { label: "Returned",         cls: "bg-orange-50 text-orange-600 border-orange-200" },
@@ -77,9 +79,12 @@ export function OrderStatusBadge({
   size = "sm",
 }: BadgeProps & { status: OrderStatus }) {
   const cfg = ORDER_STATUS_CONFIG[status] ?? ORDER_STATUS_CONFIG.PENDING;
-  const textSize = size === "sm" ? "text-[11px]" : "text-xs";
+  const textSize = size === "sm" ? "text-[11px] h-5" : "text-xs h-6";
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border font-medium ${textSize} ${cfg.cls}`}>
+    <span
+      title={cfg.label}
+      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2 leading-none font-semibold ${textSize} ${cfg.cls}`}
+    >
       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
       {cfg.label}
     </span>
@@ -91,9 +96,12 @@ export function PaymentStatusBadge({
   size = "sm",
 }: BadgeProps & { status: PaymentStatus }) {
   const cfg = PAYMENT_STATUS_CONFIG[status] ?? PAYMENT_STATUS_CONFIG.PENDING;
-  const textSize = size === "sm" ? "text-[11px]" : "text-xs";
+  const textSize = size === "sm" ? "text-[11px] h-5" : "text-xs h-6";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full border font-medium ${textSize} ${cfg.cls}`}>
+    <span
+      title={cfg.label}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-2 leading-none font-semibold ${textSize} ${cfg.cls}`}
+    >
       {cfg.label}
     </span>
   );
@@ -104,9 +112,12 @@ export function FulfillmentStatusBadge({
   size = "sm",
 }: BadgeProps & { status: FulfillmentStatus }) {
   const cfg = FULFILLMENT_STATUS_CONFIG[status] ?? FULFILLMENT_STATUS_CONFIG.UNFULFILLED;
-  const textSize = size === "sm" ? "text-[11px]" : "text-xs";
+  const textSize = size === "sm" ? "text-[11px] h-5" : "text-xs h-6";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full border font-medium ${textSize} ${cfg.cls}`}>
+    <span
+      title={cfg.label}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-2 leading-none font-semibold ${textSize} ${cfg.cls}`}
+    >
       {cfg.label}
     </span>
   );
@@ -117,9 +128,12 @@ export function CourierStatusBadge({
   size = "sm",
 }: BadgeProps & { status: CourierOrderStatus }) {
   const cfg = COURIER_STATUS_CONFIG[status] ?? COURIER_STATUS_CONFIG.PENDING_PICKUP;
-  const textSize = size === "sm" ? "text-[11px]" : "text-xs";
+  const textSize = size === "sm" ? "text-[11px] h-5" : "text-xs h-6";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full border font-medium ${textSize} ${cfg.cls}`}>
+    <span
+      title={cfg.label}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-2 leading-none font-semibold ${textSize} ${cfg.cls}`}
+    >
       {cfg.label}
     </span>
   );

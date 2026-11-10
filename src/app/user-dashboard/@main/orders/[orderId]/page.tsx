@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { OrderCustomerActions } from "@/components/orders/customer/OrderCustomerActions";
+import { OrderRefundList } from "@/components/orders/customer/OrderRefundList";
 
 const orderStatusSteps: OrderStatus[] = [
   "PENDING", "CONFIRMED", "PROCESSING", "PACKAGING", "SHIPPED", "DELIVERED",
@@ -42,6 +44,7 @@ const orderStatusBadge: Record<string, string> = {
 const paymentStatusConfig: Record<PaymentStatus, { label: string; className: string }> = {
   PENDING:  { label: "Pending",  className: "text-slate-500" },
   PAID:     { label: "Paid",     className: "text-green-600" },
+  PARTIALLY_REFUNDED: { label: "Partially refunded", className: "text-teal-600" },
   FAILED:   { label: "Failed",   className: "text-red-500" },
   REFUNDED: { label: "Refunded", className: "text-teal-600" },
 };
@@ -130,7 +133,8 @@ export default function OrderDetailPage() {
     );
   }
 
-  const paymentCfg = paymentStatusConfig[order.paymentStatus];
+  const paymentCfg = paymentStatusConfig[order.paymentStatus] ?? paymentStatusConfig.PENDING;
+  const paymentMethodLabel = !order.paymentmethod ? "—" : order.paymentmethod === "COD" ? "Cash on delivery" : "Online payment";
   const orderNumber = order.orderNumber ?? `#${order.id.slice(-15).toUpperCase()}`;
 
   return (
@@ -155,6 +159,9 @@ export default function OrderDetailPage() {
           </Link>
         </div>
       </div>
+
+      {/* Pay Now / cancel — offered per the backend's customerActions */}
+      <OrderCustomerActions order={order} />
 
       {/* Delivery type bar */}
       <div className="bg-slate-50 border border-slate-200 rounded-t-xl px-5 py-3.5 flex items-center justify-between">
@@ -183,8 +190,9 @@ export default function OrderDetailPage() {
             </span>
           </div>
 
-          {/* Items table */}
-          <table className="w-full text-sm">
+          {/* Items table — scrolls inside its card on narrow screens */}
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b border-slate-100">
                 <th className="text-left px-5 py-3 text-slate-500 font-medium text-xs">Name</th>
@@ -198,7 +206,8 @@ export default function OrderDetailPage() {
             <tbody className="divide-y divide-slate-100">
               {vo.items.map((item) => {
                 const img = item.variant.images?.[0]?.url;
-                const effectivePrice = item.variant.specialPrice ?? item.variant.price;
+                // Phase 4 (H-4): the price actually paid (persisted on the order line), never today's catalog price.
+                const effectivePrice = Number(item.price);
                 const statusKey = (vo as any).status ?? order.status;
                 return (
                   <tr key={item.id}>
@@ -251,6 +260,7 @@ export default function OrderDetailPage() {
               })}
             </tbody>
           </table>
+          </div>
 
           {/* Courier info row */}
           {"courierOrder" in vo && vo.courierOrder && (
@@ -288,7 +298,11 @@ export default function OrderDetailPage() {
           <div className="px-5 py-4 space-y-3">
             <div className="flex justify-between items-center text-sm">
               <span className="text-slate-500">Payment Method</span>
-              <span className={`font-medium ${paymentCfg.className}`}>{paymentCfg.label}</span>
+              <span className="font-medium text-slate-800">{paymentMethodLabel}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-slate-500">Payment Status</span>
+              <span className={`font-medium ${paymentCfg.className}`}>{order.paymentStatus === "PENDING" ? "Unpaid" : paymentCfg.label}</span>
             </div>
             <div className="flex justify-between items-center text-sm">
               <span className="text-slate-500">Product Price</span>
@@ -327,8 +341,8 @@ export default function OrderDetailPage() {
                   <span className="text-slate-500">{p.method}</span>
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-slate-700">৳ {p.amount.toLocaleString()}</span>
-                    <span className={`${paymentStatusConfig[p.status].className} font-medium`}>
-                      {paymentStatusConfig[p.status].label}
+                    <span className={`${(paymentStatusConfig[p.status] ?? paymentStatusConfig.PENDING).className} font-medium`}>
+                      {(paymentStatusConfig[p.status] ?? paymentStatusConfig.PENDING).label}
                     </span>
                   </div>
                 </div>
@@ -382,37 +396,8 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Refunds */}
-      {order.refunds?.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl p-5 mt-4">
-          <div className="flex items-center gap-2 mb-4">
-            <RefreshCcw className="w-4 h-4 text-slate-400" />
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Refunds</p>
-          </div>
-          <div className="space-y-3">
-            {order.refunds.map((r) => (
-              <div key={r.id} className="flex items-center justify-between text-sm">
-                <div>
-                  <p className="font-medium text-slate-800">
-                    ৳ {r.amount.toLocaleString("en-BD", { minimumFractionDigits: 2 })}
-                  </p>
-                  {r.reason && <p className="text-xs text-slate-400 mt-0.5">{r.reason}</p>}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    r.status === "COMPLETED"
-                      ? "bg-green-50 text-green-600 border border-green-200"
-                      : "bg-amber-50 text-amber-600 border border-amber-200"
-                  }`}>
-                    {r.status}
-                  </span>
-                  <span className="text-xs text-slate-400">{fmt(r.createdAt)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Refunds — persisted rows and their stored status only */}
+      <OrderRefundList refunds={order.refunds} />
 
     </div>
   );

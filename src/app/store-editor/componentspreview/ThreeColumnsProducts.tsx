@@ -1,6 +1,24 @@
 import React from 'react';
 import { Star, Heart, ShoppingCart } from "lucide-react";
 import { ComponentHandler } from "../ComponentHandler";
+import { useAutoProducts, ProductSortBy } from "./useAutoProducts";
+
+export interface ThreeColumnProductItem {
+  name?: string;
+  image?: string;
+  price?: string;
+  rating?: number;
+}
+
+export interface ThreeColumnsProductsFormData {
+  title?: string;
+  products?: ThreeColumnProductItem[];
+  isVisible?: boolean;
+  showTitle?: boolean;
+  showProductName?: boolean;
+  productCount?: number;
+  sortBy?: ProductSortBy;
+}
 
 interface ThreeColumnsProductsProps {
   isActive?: boolean;
@@ -11,7 +29,26 @@ interface ThreeColumnsProductsProps {
   onCopy?: () => void;
   onDelete?: () => void;
   viewMode?: 'mobile' | 'desktop';
+  formData?: ThreeColumnsProductsFormData;
 }
+
+const DEFAULT_PRODUCTS: ThreeColumnProductItem[] = [
+  { name: "Wireless Earbuds", price: "$79.99",  rating: 4.8 },
+  { name: "Smart Watch",      price: "$199.99", rating: 4.6 },
+  { name: "Phone Case",       price: "$24.99",  rating: 4.4 },
+  { name: "Tablet Stand",     price: "$34.99",  rating: 4.7 },
+  { name: "Camera Lens",      price: "$149.99", rating: 4.9 },
+  { name: "USB Cable",        price: "$14.99",  rating: 4.3 },
+];
+
+const ProductImage = ({ src, iconClass }: { src?: string; iconClass: string }) =>
+  src ? (
+    <img src={src} alt="" className="w-full h-full object-cover" />
+  ) : (
+    <svg className={iconClass} fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+    </svg>
+  );
 
 export const ThreeColumnsProducts = ({
   isActive = false,
@@ -21,46 +58,27 @@ export const ThreeColumnsProducts = ({
   onMoveDown,
   onCopy,
   onDelete,
-  viewMode = 'mobile'
+  viewMode = 'mobile',
+  formData = {},
 }: ThreeColumnsProductsProps) => {
-  const products = [
-    { 
-      name: "Wireless Earbuds", 
-      price: "$79.99", 
-      rating: 4.8
-    },
-    { 
-      name: "Smart Watch", 
-      price: "$199.99", 
-      rating: 4.6
-    },
-    { 
-      name: "Phone Case", 
-      price: "$24.99", 
-      rating: 4.4
-    },
-    { 
-      name: "Tablet Stand", 
-      price: "$34.99", 
-      rating: 4.7
-    },
-    { 
-      name: "Camera Lens", 
-      price: "$149.99", 
-      rating: 4.9
-    },
-    { 
-      name: "USB Cable", 
-      price: "$14.99", 
-      rating: 4.3
-    }
-  ];
+  const title    = formData.title ?? 'Best Sellers';
+
+  const hasManualProducts = !!formData.products && formData.products.length > 0;
+  const productCount = Math.min(Math.max(formData.productCount ?? 8, 1), 54);
+  const { items: autoProducts } = useAutoProducts(formData.sortBy, productCount, !hasManualProducts);
+  const products = hasManualProducts
+    ? formData.products!
+    : autoProducts.length > 0
+      ? autoProducts.slice(0, productCount)
+      : DEFAULT_PRODUCTS;
 
   // Mobile View Design - 2 columns
   const renderMobileView = () => (
     <div className="w-full bg-white rounded-lg shadow-md p-3">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-bold text-sm text-gray-800">Best Sellers</h3>
+        {formData.showTitle !== false && (
+          <h3 className="font-bold text-sm text-gray-800">{title}</h3>
+        )}
         <button className="text-blue-500 text-xs font-semibold hover:text-blue-600 transition-colors">
           See All →
         </button>
@@ -76,16 +94,16 @@ export const ThreeColumnsProducts = ({
 
             {/* Product Image */}
             <div className="w-full h-32 overflow-hidden bg-gray-100 flex items-center justify-center">
-              <svg className="w-12 h-12 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-              </svg>
+              <ProductImage src={product.image} iconClass="w-12 h-12 text-gray-400" />
             </div>
 
             {/* Product Info */}
             <div className="p-2">
+{formData.showProductName !== false && (
               <h4 className="font-semibold text-xs text-gray-800 mb-1.5 line-clamp-2 leading-tight h-8">
                 {product.name}
               </h4>
+              )}
 
               {/* Rating */}
               <div className="flex items-center gap-1 mb-1.5">
@@ -111,7 +129,9 @@ export const ThreeColumnsProducts = ({
   const renderDesktopView = () => (
     <div className="w-full bg-white rounded-xl shadow-lg p-6">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="font-bold text-xl text-gray-800">Best Sellers</h3>
+        {formData.showTitle !== false && (
+          <h3 className="font-bold text-xl text-gray-800">{title}</h3>
+        )}
         <button className="text-blue-500 text-sm font-semibold hover:text-blue-600 transition-colors">
           See All →
         </button>
@@ -127,16 +147,16 @@ export const ThreeColumnsProducts = ({
 
             {/* Product Image */}
             <div className="w-full h-56 overflow-hidden bg-gray-100 flex items-center justify-center">
-              <svg className="w-16 h-16 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-              </svg>
+              <ProductImage src={product.image} iconClass="w-16 h-16 text-gray-400" />
             </div>
 
             {/* Product Info */}
             <div className="p-4">
+{formData.showProductName !== false && (
               <h4 className="font-semibold text-base text-gray-800 mb-3 line-clamp-2 leading-tight h-12">
                 {product.name}
               </h4>
+              )}
 
               {/* Rating */}
               <div className="flex items-center gap-1 mb-3">
@@ -157,6 +177,8 @@ export const ThreeColumnsProducts = ({
       </div>
     </div>
   );
+
+  if (formData.isVisible === false) return null;
 
   return (
     <div

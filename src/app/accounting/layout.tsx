@@ -8,7 +8,6 @@ export const metadata: Metadata = {
   description: 'Manage your accounting and finances',
 };
 
-// Use ReactNode instead of React.ReactNode
 export default function AccountingLayout({
   children,
 }: {

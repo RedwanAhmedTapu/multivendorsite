@@ -17,6 +17,38 @@ interface AccountTypeStepProps {
   completeProfile?: CompleteVendorProfile | null;
 }
 
+/* ── Small SVG helpers (shared visual language) ── */
+const SpinnerIcon = ({ className = 'h-5 w-5 text-white' }: { className?: string }) => (
+  <svg className={`animate-spin ${className}`} fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+  </svg>
+);
+
+const CheckIcon = () => (
+  <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const BulletCheck = () => (
+  <svg className="h-3.5 w-3.5 text-blue-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+  </svg>
+);
+
+const PersonIcon = () => (
+  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+);
+
+const BuildingIcon = () => (
+  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+  </svg>
+);
+
 const AccountTypeStep: React.FC<AccountTypeStepProps> = ({
   accountType,
   onAccountTypeChange,
@@ -24,17 +56,15 @@ const AccountTypeStep: React.FC<AccountTypeStepProps> = ({
   onBack,
   showBackButton = true,
   vendorId,
-  completeProfile
+  completeProfile,
 }) => {
-  const [updateVendorProfile, { isLoading: isUpdating }] = useUpdateVendorProfileMutation();
-  
+  const [updateVendorProfile] = useUpdateVendorProfileMutation();
+
   const [localAccountType, setLocalAccountType] = useState<AccountType>(accountType);
   const [isUpdatingServer, setIsUpdatingServer] = useState(false);
 
-  // Sync with parent component and server data from props
   useEffect(() => {
     if (completeProfile?.accountType) {
-      console.log('🔄 AccountTypeStep: Setting account type from completeProfile:', completeProfile.accountType);
       setLocalAccountType(completeProfile.accountType);
       onAccountTypeChange(completeProfile.accountType);
     }
@@ -43,28 +73,15 @@ const AccountTypeStep: React.FC<AccountTypeStepProps> = ({
   const handleAccountTypeChange = async (newType: AccountType) => {
     setLocalAccountType(newType);
     onAccountTypeChange(newType);
-    
+
     try {
       setIsUpdatingServer(true);
-      
-      // Create FormData to update vendor profile with account type
       const formData = new FormData();
       formData.append('accountType', newType);
-      
-      // Update vendor profile on server
-      await updateVendorProfile({
-        id: vendorId,
-        formData
-      }).unwrap();
-      
-      console.log(`✅ Account type updated to: ${newType}`);
+      await updateVendorProfile({ id: vendorId, formData }).unwrap();
     } catch (error: any) {
-      console.error('❌ Failed to update account type:', error);
-      // Revert local state if server update fails
       setLocalAccountType(accountType);
       onAccountTypeChange(accountType);
-      
-      // Show error message to user
       alert(`Failed to update account type: ${error.data?.message || 'Unknown error'}`);
     } finally {
       setIsUpdatingServer(false);
@@ -72,194 +89,161 @@ const AccountTypeStep: React.FC<AccountTypeStepProps> = ({
   };
 
   const handleNext = () => {
-    // Ensure account type is saved before proceeding
-    if (isUpdatingServer) {
-      alert('Please wait for account type to be saved before continuing.');
-      return;
-    }
+    if (isUpdatingServer) return;
     onNext();
   };
 
+  const OptionCard = ({
+    type,
+    icon,
+    title,
+    description,
+    bullets,
+  }: {
+    type: AccountType;
+    icon: React.ReactNode;
+    title: string;
+    description: string;
+    bullets: string[];
+  }) => {
+    const selected = localAccountType === type;
+    return (
+      <div
+        className={`relative rounded-2xl border-2 p-6 cursor-pointer transition-all ${
+          selected
+            ? 'border-blue-500 shadow-lg shadow-blue-500/10'
+            : 'border-slate-100 hover:border-slate-200'
+        } ${isUpdatingServer ? 'opacity-50 cursor-not-allowed' : ''}`}
+        style={{ backgroundColor: selected ? '#f2f3ff' : '#fff' }}
+        onClick={() => !isUpdatingServer && handleAccountTypeChange(type)}
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{
+              background: selected
+                ? 'linear-gradient(135deg,#2563eb,#7c3aed)'
+                : '#cbd5e1',
+            }}
+          >
+            {icon}
+          </div>
+          <h3 className="text-base font-black text-slate-900">{title}</h3>
+          <div
+            className={`ml-auto flex items-center justify-center h-6 w-6 rounded-full border-2 flex-shrink-0 ${
+              selected ? 'bg-blue-600 border-blue-600' : 'border-slate-300'
+            }`}
+          >
+            {selected && <CheckIcon />}
+          </div>
+        </div>
+        <p className="text-slate-500 text-sm mb-4">{description}</p>
+        <ul className="text-xs text-slate-500 space-y-2">
+          {bullets.map((b) => (
+            <li key={b} className="flex items-center">
+              <BulletCheck />
+              {b}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Account Type</h2>
-        <p className="text-gray-600">Choose your account type for verification</p>
-        
+    <div className="max-w-3xl mx-auto space-y-8">
+      {/* Title */}
+      <div className="text-center">
+        <h2 className="text-2xl font-black text-slate-900 tracking-tight">Account Type</h2>
+        <p className="text-slate-500 mt-1 text-sm">Choose your account type for verification</p>
+
         {isUpdatingServer && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-            <div className="flex items-center">
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span className="text-blue-700 text-sm">Saving account type...</span>
-            </div>
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-blue-100" style={{ backgroundColor: '#eef2ff' }}>
+            <SpinnerIcon className="h-4 w-4 text-blue-600" />
+            <span className="text-blue-700 text-xs font-semibold">Saving account type...</span>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div
-          className={`relative p-6 border-2 rounded-lg cursor-pointer transition-all ${
-            localAccountType === 'INDIVIDUAL'
-              ? 'border-blue-500 bg-blue-50 shadow-md'
-              : 'border-gray-200 hover:border-gray-300 bg-white'
-          } ${isUpdatingServer ? 'opacity-50 cursor-not-allowed' : ''}`}
-          onClick={() => !isUpdatingServer && handleAccountTypeChange('INDIVIDUAL')}
-        >
-          <div className="flex items-center mb-4">
-            <div className={`flex items-center justify-center h-6 w-6 rounded-full border-2 ${
-              localAccountType === 'INDIVIDUAL' 
-                ? 'bg-blue-500 border-blue-500' 
-                : 'border-gray-300'
-            }`}>
-              {localAccountType === 'INDIVIDUAL' && (
-                <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </div>
-            <h3 className="ml-3 text-lg font-semibold text-gray-900">Individual Account</h3>
-          </div>
-          <p className="text-gray-600 text-sm mb-3">
-            For individual sellers. Requires National ID (NID) or Passport for verification.
-          </p>
-          <ul className="text-xs text-gray-500 space-y-1">
-            <li className="flex items-center">
-              <svg className="h-3 w-3 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              National ID (NID) or Passport
-            </li>
-            <li className="flex items-center">
-              <svg className="h-3 w-3 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Personal information
-            </li>
-            <li className="flex items-center">
-              <svg className="h-3 w-3 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Faster verification process
-            </li>
-          </ul>
-        </div>
+      {/* Option cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <OptionCard
+          type="INDIVIDUAL"
+          icon={<PersonIcon />}
+          title="Individual Account"
+          description="For individual sellers. Requires National ID (NID) or Passport for verification."
+          bullets={['National ID (NID) or Passport', 'Personal information', 'Faster verification process']}
+        />
+        <OptionCard
+          type="BUSINESS"
+          icon={<BuildingIcon />}
+          title="Business Account"
+          description="For registered businesses. Requires business registration documents."
+          bullets={['Business registration documents', 'Trade license', 'Owner identification', 'Tax certificates']}
+        />
+      </div>
 
-        <div
-          className={`relative p-6 border-2 rounded-lg cursor-pointer transition-all ${
-            localAccountType === 'BUSINESS'
-              ? 'border-blue-500 bg-blue-50 shadow-md'
-              : 'border-gray-200 hover:border-gray-300 bg-white'
-          } ${isUpdatingServer ? 'opacity-50 cursor-not-allowed' : ''}`}
-          onClick={() => !isUpdatingServer && handleAccountTypeChange('BUSINESS')}
-        >
-          <div className="flex items-center mb-4">
-            <div className={`flex items-center justify-center h-6 w-6 rounded-full border-2 ${
-              localAccountType === 'BUSINESS' 
-                ? 'bg-blue-500 border-blue-500' 
-                : 'border-gray-300'
-            }`}>
-              {localAccountType === 'BUSINESS' && (
-                <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </div>
-            <h3 className="ml-3 text-lg font-semibold text-gray-900">Business Account</h3>
+      {/* Requirements card */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100" style={{ backgroundColor: '#f2f3ff' }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#2563eb,#7c3aed)' }}>
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
-          <p className="text-gray-600 text-sm mb-3">
-            For registered businesses. Requires business registration documents.
-          </p>
-          <ul className="text-xs text-gray-500 space-y-1">
-            <li className="flex items-center">
-              <svg className="h-3 w-3 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Business registration documents
-            </li>
-            <li className="flex items-center">
-              <svg className="h-3 w-3 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Trade license
-            </li>
-            <li className="flex items-center">
-              <svg className="h-3 w-3 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Owner identification
-            </li>
-            <li className="flex items-center">
-              <svg className="h-3 w-3 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Tax certificates
-            </li>
-          </ul>
+          <h3 className="text-sm font-black uppercase tracking-wider text-slate-700">What you'll need</h3>
+        </div>
+        <div className="p-6">
+          {localAccountType === 'INDIVIDUAL' ? (
+            <div className="text-sm text-slate-600">
+              <p className="font-bold text-slate-900 mb-2">For Individual Accounts:</p>
+              <ul className="space-y-1.5">
+                <li className="flex items-center"><BulletCheck />National ID (NID) — both front and back sides, OR</li>
+                <li className="flex items-center"><BulletCheck />Passport — photo page</li>
+                <li className="flex items-center"><BulletCheck />Personal information matching your ID</li>
+              </ul>
+            </div>
+          ) : (
+            <div className="text-sm text-slate-600">
+              <p className="font-bold text-slate-900 mb-2">For Business Accounts:</p>
+              <ul className="space-y-1.5">
+                <li className="flex items-center"><BulletCheck />Business registration certificate</li>
+                <li className="flex items-center"><BulletCheck />Trade license</li>
+                <li className="flex items-center"><BulletCheck />Owner's National ID (both sides)</li>
+                <li className="flex items-center"><BulletCheck />Tax identification documents (TIN/VAT)</li>
+                <li className="flex items-center"><BulletCheck />Company information</li>
+              </ul>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-5">
-        <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
-          <svg className="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          What you'll need:
-        </h4>
-        {localAccountType === 'INDIVIDUAL' ? (
-          <div className="text-sm text-gray-600">
-            <p className="font-medium text-gray-900 mb-2">For Individual Accounts:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>National ID (NID) - both front and back sides, OR</li>
-              <li>Passport - photo page</li>
-              <li>Personal information matching your ID</li>
-            </ul>
-          </div>
-        ) : (
-          <div className="text-sm text-gray-600">
-            <p className="font-medium text-gray-900 mb-2">For Business Accounts:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Business registration certificate</li>
-              <li>Trade license</li>
-              <li>Owner's National ID (both sides)</li>
-              <li>Tax identification documents (TIN/VAT)</li>
-              <li>Company information</li>
-            </ul>
-          </div>
-        )}
-      </div>
-
-      <div className="flex justify-between pt-6">
+      {/* Navigation */}
+      <div className="flex justify-between pt-2">
         {showBackButton ? (
           <button
             type="button"
             onClick={onBack}
             disabled={isUpdatingServer}
-            className="px-8 py-3 border-2 border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="px-6 py-3 border-2 border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 disabled:opacity-50 transition-all"
           >
             Back
           </button>
         ) : (
-          <div></div>
+          <div />
         )}
         <button
           type="button"
           onClick={handleNext}
           disabled={isUpdatingServer || !localAccountType}
-          className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-all shadow-md hover:shadow-lg"
+          className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all"
         >
-          {isUpdatingServer ? (
-            <>
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Saving...
-            </>
-          ) : (
-            'Continue to Documents'
+          {isUpdatingServer && <SpinnerIcon className="h-4 w-4 text-white" />}
+          {isUpdatingServer ? 'Saving...' : 'Continue to Documents'}
+          {!isUpdatingServer && (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
           )}
         </button>
       </div>

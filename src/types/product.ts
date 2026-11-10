@@ -1,4 +1,11 @@
-import { Vendor, Category, OrderItem, Attribute, AttributeValue, AttributeType } from "./type";
+import {
+  Vendor,
+  Category,
+  OrderItem,
+  Attribute,
+  AttributeValue,
+  AttributeType,
+} from "./type";
 
 // =====================
 // Review & Offer Interfaces
@@ -47,12 +54,12 @@ export interface ProductAttribute {
   attributeId: string;
   attribute: Attribute;
   isForVariant: boolean;
-  
+
   // For TEXT/NUMBER/BOOLEAN types (direct values for specifications)
   valueString?: string | null;
   valueNumber?: number | null;
   valueBoolean?: boolean | null;
-  
+
   // For SELECT/MULTISELECT types (selected value for specifications)
   attributeValueId?: string | null;
   attributeValue?: AttributeValue | null;
@@ -65,20 +72,20 @@ export interface ProductAttribute {
 export interface Product {
   id: string;
   name: string;
-  nameBn?:string,
+  nameBn?: string;
   description?: string | null;
   slug: string;
   vendorId: string;
   categoryId: string;
-  approvalStatus: 'PENDING' | 'ACTIVE' | 'REJECTED'|"DRAFT" | "INACTIVE";
+  approvalStatus: "PENDING" | "ACTIVE" | "REJECTED" | "DRAFT" | "INACTIVE";
   approvedById?: string | null;
-  
+
   // Relations
   vendor: Vendor;
   category: Category;
   variants: ProductVariant[];
   attributes: ProductAttribute[]; // Unified: contains both specifications (isForVariant: false)
-   videoUrl?: string;
+  videoUrl?: string;
   images: ProductImage[];
   warranty?: Warranty | null;
   reviews?: Review[];
@@ -88,7 +95,7 @@ export interface Product {
     name: string;
     email: string;
   };
-  
+
   createdAt: string;
   updatedAt: string;
 }
@@ -122,8 +129,10 @@ export interface ProductVariant {
   product?: Product;
   name?: string | null;
   sku: string;
+  barcode?:string;
   price: number;
   availability: boolean;
+  priceManuallyOverridden?: boolean;
   specialPrice?: number | null;
   discount?: number | null;
   stock: number;
@@ -180,28 +189,34 @@ export interface ProductImageInput {
 export interface ProductAttributeInput {
   attributeId: string;
   isForVariant?: boolean; // false = specification, true = variant attribute setting
-  
+
   // For specifications (TEXT/NUMBER/BOOLEAN types)
   valueString?: string | null;
   valueNumber?: number | null;
   valueBoolean?: boolean | null;
-  
+
   // For specifications (SELECT/MULTISELECT types)
   attributeValueId?: string | null;
 }
-
+export interface WarehouseStockItem {
+  id: string;
+  variantId: string;
+  warehouseId: string;
+  rackId?: string | null;
+  quantity: number;
+  reservedQty: number;
+  damagedQty: number;
+  warehouse?: { id: string; name?: string | null; code?: string | null };
+  rack?: { id: string; code: string; label?: string | null } | null;
+}
 export interface ProductVariantInput {
   id?: string;
   name?: string | null;
   sku: string;
-  price: number;
-  availability?:boolean
-  specialPrice?: number | null;
-  discount?: number;
-  stock?: number;
-  weight?: number | null;
-  attributes?: { attributeValueId: string,value?:string }[];
-  images?: (string | ProductImageInput)[]; // URLs or full image objects
+  availability?: boolean;
+  attributes?: { attributeValueId: string; value?: string }[];
+  images?: (string | ProductImageInput)[]; 
+  warehouseStock?: WarehouseStockItem[];
 }
 
 export interface ProductShippingWarrantyInput {
@@ -222,19 +237,22 @@ export interface ProductShippingWarrantyInput {
 // =====================
 export interface CreateProductData {
   name: string;
-  nameBn?: string;  
+  nameBn?: string;
   description?: string | null;
   categoryId: string;
   vendorId: string;
-   videoUrl?: string;
+  videoUrl?: string;
   images?: ProductImageInput[];
-  
-  // ✅ NEW: Unified attributes (replaces both specifications and attributeSettings)
+
+  // Unified attributes (replaces both specifications and attributeSettings)
   attributes?: ProductAttributeInput[];
-  
+
   variants?: ProductVariantInput[];
   shippingWarranty?: ProductShippingWarrantyInput;
-  
+
+  taxRate?: number;
+
+
   // For audit logging
   userId?: string;
 }
@@ -247,19 +265,19 @@ export interface UpdateProductData {
   description?: string | null;
   vendorId?: string;
   categoryId?: string;
-   videoUrl?: string;
+  videoUrl?: string;
   images?: ProductImageInput[];
-  
+
   // ✅ Unified attributes for updates
   attributes?: ProductAttributeInput[];
-  
+
   variants?: ProductVariantInput[];
   shippingWarranty?: ProductShippingWarrantyInput;
-  
+
   // Approval status
-  approvalStatus?: "PENDING" | "ACTIVE" | "REJECTED"|"DRAFT" | "INACTIVE";
+  approvalStatus?: "PENDING" | "ACTIVE" | "REJECTED" | "DRAFT" | "INACTIVE";
   approvedById?: string;
-  
+
   // For audit logging
   userId?: string;
 }
@@ -274,17 +292,17 @@ export interface BulkProductData {
   sku: string;
   price: number;
   stock: number;
-  approvalStatus?: 'PENDING' | 'ACTIVE' | 'REJECTED'|"DRAFT" | "INACTIVE";
+  approvalStatus?: "PENDING" | "ACTIVE" | "REJECTED" | "DRAFT" | "INACTIVE";
   variantGroupNo?: number;
   videoUrl?: string;
   images: string[];
-  
+
   attributes: ProductAttributeInput[];
   variantInputs: ProductVariantInput[];
   shippingWarranty?: ProductShippingWarrantyInput;
-  
+
   errors: Record<string, string>;
-  status: 'draft' | 'processing' | 'success' | 'error';
+  status: "draft" | "processing" | "success" | "error";
 }
 
 // =====================
@@ -301,18 +319,18 @@ export interface ProductFilter {
   onSale?: boolean;
   newArrivals?: boolean;
   search?: string;
-  
+
   ratings?: number[]; // filter by minimum ratings
   brands?: string[]; // filter by brand values
-  
+
   // Variant attributes (for filtering variants)
   attributes?: Record<string, string | string[]>; // attributeId -> attributeValueId(s)
-  
+
   // Product specifications (for filtering products)
   specifications?: Record<string, string | string[] | number>; // attributeId -> value(s)
-  
+
   // Approval status
-  approvalStatus?: "PENDING" | "ACTIVE" | "REJECTED"|"DRAFT" | "INACTIVE";
+  approvalStatus?: "PENDING" | "ACTIVE" | "REJECTED" | "DRAFT" | "INACTIVE";
 }
 
 // =====================
@@ -322,7 +340,7 @@ export interface ProductListItem {
   id: string;
   name: string;
   slug: string;
-  approvalStatus: 'PENDING' | 'ACTIVE' | 'REJECTED'|"DRAFT" | "INACTIVE";
+  approvalStatus: "PENDING" | "ACTIVE" | "REJECTED" | "DRAFT" | "INACTIVE";
   vendor: {
     id: string;
     storeName: string;
@@ -333,7 +351,7 @@ export interface ProductListItem {
     name: string;
     slug: string;
   };
-   videoUrl?: string;
+  videoUrl?: string;
   images: ProductImage[];
   variants: {
     id: string;
@@ -364,7 +382,7 @@ export interface ProductDetail extends Product {
       };
     })[];
   })[];
-  
+
   // ✅ Specifications are now part of the unified attributes array
   // Filter by isForVariant: false to get specifications
   attributes: (ProductAttribute & {
@@ -373,7 +391,7 @@ export interface ProductDetail extends Product {
     };
     attributeValue?: AttributeValue | null;
   })[];
-  
+
   warranty?: Warranty | null;
 }
 
@@ -413,8 +431,8 @@ export interface ProductSearchParams {
   minPrice?: number;
   maxPrice?: number;
   inStock?: boolean;
-  sortBy?: 'name' | 'price' | 'createdAt' | 'stock';
-  sortOrder?: 'asc' | 'desc';
+  sortBy?: "name" | "price" | "createdAt" | "stock";
+  sortOrder?: "asc" | "desc";
   page?: number;
   limit?: number;
 }
@@ -462,7 +480,9 @@ export type ProductSpecification = ProductAttribute & { isForVariant: false };
 /**
  * Helper to extract variant attribute settings from ProductAttribute array
  */
-export type ProductVariantAttributeSetting = ProductAttribute & { isForVariant: true };
+export type ProductVariantAttributeSetting = ProductAttribute & {
+  isForVariant: true;
+};
 
 /**
  * Used for UI to manage variant naming logic

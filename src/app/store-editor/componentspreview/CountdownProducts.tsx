@@ -1,5 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+// A single targeted product, as produced by StoreProductPicker.tsx and
+// persisted via the DecorationComponentProduct relation (setComponentProducts).
+export interface CountdownProductItem {
+  id?:            string;
+  name?:          string;
+  image?:         string;
+  price?:         string;
+  originalPrice?: string;
+  discount?:      string;
+  rating?:        number;
+  reviews?:       number;
+}
+
 interface CountdownFormData {
   countdownTitle?:           string;
   countdownBackgroundColor?: string;
@@ -12,6 +25,11 @@ interface CountdownFormData {
   showProductPrice?:         boolean;
   showProductRating?:        boolean;
   showAddToCart?:            boolean;
+  // ← new: the vendor's targeted products for this countdown, chosen via
+  // the product picker in ConfigurationForm. Falls back to placeholder
+  // cards below when empty so the canvas still looks good before any
+  // product has been picked.
+  products?:                 CountdownProductItem[];
 }
 
 interface CountdownProductsProps {
@@ -42,7 +60,7 @@ function useCountdown(endDate?: string) {
   };
 
   const [time, setTime] = useState(calc);
-  const ref = useRef<ReturnType<typeof setInterval>>();
+  const ref = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   useEffect(() => {
     setTime(calc());
@@ -117,6 +135,13 @@ export const CountdownProducts = ({
   const showPrice  = formData.showProductPrice  !== false;
   const showRating = formData.showProductRating !== false;
   const showCart   = formData.showAddToCart     !== false;
+
+  // Real targeted products win; otherwise fall back to placeholder cards
+  // so the canvas never looks empty before the vendor has picked anything.
+  const hasRealProducts = !!formData.products && formData.products.length > 0;
+  const productItems: CountdownProductItem[] = hasRealProducts
+    ? formData.products!
+    : Array.from({ length: 4 }, (_, i) => ({ name: `Premium Party Gown ${i + 1}` }));
 
   // Live countdown from the configured end date (or static fallback)
   const { d, h, m, s } = useCountdown(formData.countdownEndDate ?? undefined);
@@ -194,9 +219,9 @@ export const CountdownProducts = ({
 
   // ── Product card ──────────────────────────────────────────────────────────
 
-  const renderProductCard = (item: number) => (
+  const renderProductCard = (item: CountdownProductItem, index: number) => (
     <div
-      key={item}
+      key={item.id ?? index}
       style={{
         background:'#fff',
         borderRadius: mobile ? 10 : 12,
@@ -223,12 +248,16 @@ export const CountdownProducts = ({
         position:'relative',
         marginBottom: mobile ? 0 : 10,
       }}>
-        <svg width="36" height="36" viewBox="0 0 20 20" fill="#5DCAA5">
-          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd"/>
-        </svg>
-        {!mobile && (
+        {item.image ? (
+          <img src={item.image} alt={item.name ?? ''} style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius: mobile ? 8 : 10 }} />
+        ) : (
+          <svg width="36" height="36" viewBox="0 0 20 20" fill="#5DCAA5">
+            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd"/>
+          </svg>
+        )}
+        {!mobile && item.discount && (
           <div style={{ position:'absolute', top:6, right:6, background: bgColor, color:'#fff', borderRadius:6, padding:'2px 7px', fontSize:10, fontWeight:700 }}>
-            -56%
+            {item.discount}
           </div>
         )}
       </div>
@@ -236,19 +265,22 @@ export const CountdownProducts = ({
       {/* info */}
       <div style={{ flex:1 }}>
         <div style={{ fontSize: mobile ? 12 : 13, fontWeight:600, color:'#1f2937', marginBottom:4, lineHeight:1.3 }}>
-          Premium Party Gown {item}
+          {item.name ?? 'Untitled product'}
         </div>
 
-        {showRating && !mobile && (
+        {showRating && !mobile && item.rating !== undefined && (
           <div style={{ fontSize:12, color:'#f59e0b', marginBottom:6 }}>
-            ★★★★★ <span style={{ color:'#9ca3af', fontWeight:400 }}>(128)</span>
+            {'★'.repeat(Math.round(item.rating))}{'☆'.repeat(5 - Math.round(item.rating))}{' '}
+            <span style={{ color:'#9ca3af', fontWeight:400 }}>({item.reviews ?? 0})</span>
           </div>
         )}
 
-        {showPrice && (
+        {showPrice && (item.price || !hasRealProducts) && (
           <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
-            <span style={{ fontSize: mobile ? 15 : 17, fontWeight:700, color:'#dc2626' }}>৳344</span>
-            <span style={{ fontSize:11, color:'#9ca3af', textDecoration:'line-through' }}>৳688</span>
+            <span style={{ fontSize: mobile ? 15 : 17, fontWeight:700, color:'#dc2626' }}>{item.price ?? '৳344'}</span>
+            {item.originalPrice && (
+              <span style={{ fontSize:11, color:'#9ca3af', textDecoration:'line-through' }}>{item.originalPrice}</span>
+            )}
           </div>
         )}
 
@@ -288,7 +320,7 @@ export const CountdownProducts = ({
         <div
           style={{ display:'flex', gap:10, marginTop:12, overflowX:'auto', paddingBottom:4 }}
         >
-          {[1, 2, 3].map(renderProductCard)}
+          {productItems.slice(0, 3).map(renderProductCard)}
         </div>
       </div>
     );
@@ -307,7 +339,7 @@ export const CountdownProducts = ({
       <div
         style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:12, marginTop:16 }}
       >
-        {[1, 2, 3, 4].map(renderProductCard)}
+        {productItems.slice(0, 4).map(renderProductCard)}
       </div>
 
       {/* view all */}

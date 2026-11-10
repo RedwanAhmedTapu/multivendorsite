@@ -27,7 +27,8 @@ import {
   PenLine,
 } from "lucide-react";
 
-/* ─── Design tokens matching HTML dashboard ─── */
+/* ─── Design tokens — unified blue-600 → purple-600 gradient theme
+   (matches StoreInfoStep / WizardProgress / AddressStep / BankInfoStep) ─── */
 const C = {
   bg: "#faf8ff",
   surface: "#ffffff",
@@ -35,8 +36,8 @@ const C = {
   surfaceContainer: "#eaedff",
   surfaceHigh: "#e2e7ff",
   surfaceHighest: "#dae2fd",
-  primary: "#004ac6",
-  primaryContainer: "#2563eb",
+  primary: "#2563eb",        // blue-600
+  primaryContainer: "#7c3aed", // purple-600
   secondary: "#006c49",
   secondaryFixed: "#6ffbbe",
   onSecondaryContainer: "#00714d",
@@ -50,6 +51,8 @@ const C = {
   onSurface: "#131b2e",
   onSurfaceVariant: "#434655",
 };
+
+const GRADIENT = `linear-gradient(135deg, ${C.primary}, ${C.primaryContainer})`;
 
 /* ─── Reusable primitives ─── */
 const KPICard = ({
@@ -74,7 +77,7 @@ const KPICard = ({
     style={{ backgroundColor: C.surface, borderColor: "#f8f8ff" }}
   >
     <div className="flex justify-between items-start mb-4">
-      <div className={`p-3 rounded-lg`} style={{ backgroundColor: iconBg, color: iconColor }}>
+      <div className="p-3 rounded-lg" style={{ backgroundColor: iconBg, color: iconColor }}>
         {icon}
       </div>
       <span
@@ -92,8 +95,31 @@ const KPICard = ({
   </div>
 );
 
-const SectionTitle = ({ children }: { children: React.ReactNode }) => (
-  <h3 className="text-xl font-bold text-slate-900">{children}</h3>
+/* Section title with a small gradient icon badge — matches the
+   SectionCard header pattern used across the onboarding steps. */
+const SectionTitle = ({
+  children,
+  icon,
+  subtitle,
+}: {
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+  subtitle?: string;
+}) => (
+  <div className="flex items-center gap-3">
+    {icon && (
+      <div
+        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
+        style={{ background: GRADIENT }}
+      >
+        {icon}
+      </div>
+    )}
+    <div>
+      <h3 className="text-lg font-black text-slate-900 tracking-tight">{children}</h3>
+      {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+    </div>
+  </div>
 );
 
 const insightColors = [
@@ -106,16 +132,16 @@ export default function VendorDashboardHome() {
   const [activeFilter, setActiveFilter] = useState("This Week");
 
   const kpis1 = [
-    { icon: <DollarSign size={20} />, iconBg: "#eff6ff", iconColor: "#2563eb", label: "Net Sales", value: "$42,890.00", badge: "+12.5%", pos: true },
+    { icon: <DollarSign size={20} />, iconBg: "#eff6ff", iconColor: "#2563eb", label: "Net Sales", value: "৳42,890.00", badge: "+12.5%", pos: true },
     { icon: <ShoppingCart size={20} />, iconBg: "#f0fdf4", iconColor: "#16a34a", label: "Total Orders", value: "1,204", badge: "+8.2%", pos: true },
-    { icon: <BarChart3 size={20} />, iconBg: "#fff7ed", iconColor: "#ea580c", label: "Revenue Growth", value: "$12,450.00", badge: "-2.1%", pos: false },
-    { icon: <TrendingUp size={20} />, iconBg: "#eef2ff", iconColor: "#4f46e5", label: "Conversion Rate", value: "4.2%", badge: "+24%", pos: true },
+    { icon: <BarChart3 size={20} />, iconBg: "#fff7ed", iconColor: "#ea580c", label: "Revenue Growth", value: "৳12,450.00", badge: "-2.1%", pos: false },
+    { icon: <TrendingUp size={20} />, iconBg: "#f5f3ff", iconColor: "#7c3aed", label: "Conversion Rate", value: "4.2%", badge: "+24%", pos: true },
   ];
 
   const kpis2 = [
-    { icon: <DollarSign size={20} />, iconBg: "#f0fdfa", iconColor: "#0d9488", label: "Gross Revenue", value: "$58,230.00", badge: "+5.4%", pos: true },
-    { icon: <FileText size={20} />, iconBg: "#fff1f2", iconColor: "#e11d48", label: "Operational Cost", value: "$15,340.00", badge: "+1.2%", pos: false },
-    { icon: <DollarSign size={20} />, iconBg: "#f0fdf4", iconColor: "#16a34a", label: "Net Profit", value: "$42,890.00", badge: "+14%", pos: true },
+    { icon: <DollarSign size={20} />, iconBg: "#f0fdfa", iconColor: "#0d9488", label: "Gross Revenue", value: "৳58,230.00", badge: "+5.4%", pos: true },
+    { icon: <FileText size={20} />, iconBg: "#fff1f2", iconColor: "#e11d48", label: "Operational Cost", value: "৳15,340.00", badge: "+1.2%", pos: false },
+    { icon: <DollarSign size={20} />, iconBg: "#f0fdf4", iconColor: "#16a34a", label: "Net Profit", value: "৳42,890.00", badge: "+14%", pos: true },
     { icon: <BarChart3 size={20} />, iconBg: "#f5f3ff", iconColor: "#7c3aed", label: "Profit Margin", value: "73.6%", badge: "Target Met", pos: true },
   ];
 
@@ -125,9 +151,9 @@ export default function VendorDashboardHome() {
   ];
 
   const topProducts = [
-    { name: "Nordic Watch Series 7", cat: "Electronic", sold: 428, price: "$299", emoji: "⌚" },
-    { name: "Acoustic Pro Max", cat: "Audio", sold: 312, price: "$189", emoji: "🎧" },
-    { name: "Sprint Runner X-2", cat: "Footwear", sold: 298, price: "$120", emoji: "👟" },
+    { name: "Nordic Watch Series 7", cat: "Electronic", sold: 428, price: "৳299", emoji: "⌚" },
+    { name: "Acoustic Pro Max", cat: "Audio", sold: 312, price: "৳189", emoji: "🎧" },
+    { name: "Sprint Runner X-2", cat: "Footwear", sold: 298, price: "৳120", emoji: "👟" },
   ];
 
   const insights = [
@@ -144,25 +170,25 @@ export default function VendorDashboardHome() {
   ];
 
   const transactions = [
-    { id: "#ORD-90214", initials: "JD", initialsColor: "#1d4ed8", initialsBg: "#dbeafe", name: "Jane Doe", product: "Nordic Watch S7", type: "Online", typeBg: "#dbeafe", typeColor: "#1d4ed8", amount: "$299.00", status: "SHIPPED", statusBg: C.secondaryFixed, statusColor: C.onSecondaryContainer },
-    { id: "#ORD-90215", initials: "MK", initialsColor: "#15803d", initialsBg: "#dcfce7", name: "Marcus Kane", product: "Acoustic Pro Max", type: "POS", typeBg: "#dcfce7", typeColor: "#15803d", amount: "$189.00", status: "PROCESSING", statusBg: C.tertiaryFixed, statusColor: C.onTertiaryFixedVariant },
-    { id: "#ORD-90216", initials: "SC", initialsColor: "#be185d", initialsBg: "#fce7f3", name: "Sarah Connor", product: "Sprint Runner X-2", type: "Online", typeBg: "#dbeafe", typeColor: "#1d4ed8", amount: "$120.00", status: "CANCELLED", statusBg: C.errorContainer, statusColor: C.onErrorContainer },
+    { id: "#ORD-90214", initials: "JD", initialsColor: "#1d4ed8", initialsBg: "#dbeafe", name: "Jane Doe", product: "Nordic Watch S7", type: "Online", typeBg: "#dbeafe", typeColor: "#1d4ed8", amount: "৳299.00", status: "SHIPPED", statusBg: C.secondaryFixed, statusColor: C.onSecondaryContainer },
+    { id: "#ORD-90215", initials: "MK", initialsColor: "#15803d", initialsBg: "#dcfce7", name: "Marcus Kane", product: "Acoustic Pro Max", type: "POS", typeBg: "#dcfce7", typeColor: "#15803d", amount: "৳189.00", status: "PROCESSING", statusBg: C.tertiaryFixed, statusColor: C.onTertiaryFixedVariant },
+    { id: "#ORD-90216", initials: "SC", initialsColor: "#be185d", initialsBg: "#fce7f3", name: "Sarah Connor", product: "Sprint Runner X-2", type: "Online", typeBg: "#dbeafe", typeColor: "#1d4ed8", amount: "৳120.00", status: "CANCELLED", statusBg: C.errorContainer, statusColor: C.onErrorContainer },
   ];
 
   const activity = [
     { dot: C.primary, time: "2 mins ago", label: "New Order", desc: "#90217 from Jane Smith" },
     { dot: "#f59e0b", time: "15 mins ago", label: "Stock Low:", desc: "Acoustic Pro Max (2 units left)" },
     { dot: "#10b981", time: "1 hour ago", label: "Review:", desc: "Received 5-star rating for Nordic Watch" },
-    { dot: "#3b82f6", time: "2 hours ago", label: "Vendor:", desc: "Luxe Co. updated their profile" },
+    { dot: C.primaryContainer, time: "2 hours ago", label: "Vendor:", desc: "Luxe Co. updated their profile" },
   ];
 
   const quickActions = [
-    { icon: <Plus size={20} />, label: "Add New Product", iconBg: "#eff6ff", iconColor: C.primary, hoverBg: C.primary, hoverBorder: C.primary },
-    { icon: <UserPlus size={20} />, label: "Add Customer", iconBg: "#f0fdf4", iconColor: C.secondary, hoverBg: C.secondary, hoverBorder: C.secondary },
-    { icon: <Tag size={20} />, label: "Add New Voucher", iconBg: "#fff7ed", iconColor: "#f97316", hoverBg: "#f97316", hoverBorder: "#f97316" },
-    { icon: <FileText size={20} />, label: "Create Quotation", iconBg: "#eff6ff", iconColor: C.primary, hoverBg: C.primary, hoverBorder: C.primary },
-    { icon: <Truck size={20} />, label: "Add New Supplier", iconBg: "#eef2ff", iconColor: "#6366f1", hoverBg: "#6366f1", hoverBorder: "#6366f1" },
-    { icon: <Package size={20} />, label: "Add Stock", iconBg: "#f0fdf4", iconColor: C.secondary, hoverBg: C.secondary, hoverBorder: C.secondary },
+    { icon: <Plus size={20} />, label: "Add New Product", iconBg: "#eff6ff", iconColor: C.primary },
+    { icon: <UserPlus size={20} />, label: "Add Customer", iconBg: "#f0fdf4", iconColor: C.secondary },
+    { icon: <Tag size={20} />, label: "Add New Voucher", iconBg: "#fff7ed", iconColor: "#f97316" },
+    { icon: <FileText size={20} />, label: "Create Quotation", iconBg: "#f5f3ff", iconColor: C.primaryContainer },
+    { icon: <Truck size={20} />, label: "Add New Supplier", iconBg: "#eef2ff", iconColor: "#6366f1" },
+    { icon: <Package size={20} />, label: "Add Stock", iconBg: "#f0fdf4", iconColor: C.secondary },
   ];
 
   return (
@@ -179,14 +205,12 @@ export default function VendorDashboardHome() {
           </p>
         </div>
         <div className="flex gap-3">
-          <button
-            className="flex items-center gap-2 px-4 py-2 bg-white text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50 transition-all border border-slate-200"
-          >
+          <button className="flex items-center gap-2 px-4 py-2 bg-white text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 transition-all border-2 border-slate-200">
             <Download size={16} /> Export Data
           </button>
           <button
-            className="flex items-center gap-2 px-6 py-2 text-white text-sm font-bold rounded-lg shadow-lg transition-all hover:scale-95"
-            style={{ background: `linear-gradient(135deg, ${C.primary}, ${C.primaryContainer})`, boxShadow: `0 8px 20px ${C.primary}33` }}
+            className="flex items-center gap-2 px-6 py-2.5 text-white text-sm font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all"
+            style={{ background: GRADIENT, boxShadow: `0 8px 20px ${C.primary}33` }}
           >
             <Plus size={16} /> New Order
           </button>
@@ -214,15 +238,13 @@ export default function VendorDashboardHome() {
         <div className="lg:col-span-2 space-y-6">
 
           {/* Bar chart */}
-          <div className="rounded-xl p-8 relative overflow-hidden" style={{ backgroundColor: C.surfaceLow }}>
+          <div className="rounded-2xl p-8 relative overflow-hidden border border-slate-100" style={{ backgroundColor: C.surfaceLow }}>
             <div className="flex justify-between items-center mb-8">
-              <div>
-                <SectionTitle>Sales Performance</SectionTitle>
-                <p className="text-sm text-slate-500 mt-0.5">Daily transaction volume trends</p>
-              </div>
+              <SectionTitle icon={<BarChart3 size={16} />} subtitle="Daily transaction volume trends">
+                Sales Performance
+              </SectionTitle>
               <select
-                className="bg-white border border-slate-200 rounded-lg text-xs font-bold px-3 py-1.5 focus:outline-none focus:ring-2"
-                style={{ "--tw-ring-color": `${C.primary}33` } as React.CSSProperties}
+                className="bg-white border-2 border-slate-200 rounded-lg text-xs font-bold px-3 py-1.5 focus:outline-none focus:border-blue-400"
               >
                 <option>All Platforms</option>
                 <option>Direct Store</option>
@@ -237,7 +259,7 @@ export default function VendorDashboardHome() {
                     className="w-full rounded-t-lg transition-all duration-200"
                     style={{
                       height: `${(b.h / 100) * 200}px`,
-                      backgroundColor: b.active ? C.primary : `${C.primary}1a`,
+                      background: b.active ? GRADIENT : `${C.primary}1a`,
                       boxShadow: b.active ? `0 8px 24px ${C.primary}40` : "none",
                     }}
                   />
@@ -255,15 +277,15 @@ export default function VendorDashboardHome() {
           {/* Fulfillment + Customer insights row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Fulfillment health */}
-            <div className="rounded-xl p-6 shadow-sm border" style={{ backgroundColor: C.surface, borderColor: "#f8f8ff" }}>
-              <h4 className="text-sm font-black text-slate-900 mb-4 uppercase tracking-wider">Fulfillment Health</h4>
+            <div className="rounded-2xl p-6 shadow-sm border" style={{ backgroundColor: C.surface, borderColor: "#f8f8ff" }}>
+              <h4 className="text-sm font-black text-slate-900 mb-4 uppercase tracking-widest">Fulfillment Health</h4>
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between text-xs mb-1 font-bold">
                     <span className="text-slate-500">Delivery Success</span>
                     <span style={{ color: C.secondary }}>98.2%</span>
                   </div>
-                  <div className="w-full bg-slate-100 h-1 rounded-full">
+                  <div className="w-full bg-slate-100 h-1.5 rounded-full">
                     <div className="h-full rounded-full" style={{ width: "98%", backgroundColor: C.secondary }} />
                   </div>
                 </div>
@@ -279,25 +301,25 @@ export default function VendorDashboardHome() {
             </div>
 
             {/* Customer insights */}
-            <div className="rounded-xl p-6 shadow-sm border" style={{ backgroundColor: C.surface, borderColor: "#f8f8ff" }}>
-              <h4 className="text-sm font-black text-slate-900 mb-4 uppercase tracking-wider">Customer Insights</h4>
+            <div className="rounded-2xl p-6 shadow-sm border" style={{ backgroundColor: C.surface, borderColor: "#f8f8ff" }}>
+              <h4 className="text-sm font-black text-slate-900 mb-4 uppercase tracking-widest">Customer Insights</h4>
               <div className="space-y-4">
                 <div>
                   <div className="flex justify-between text-xs mb-1 font-bold">
                     <span className="text-slate-500">Returning Customers</span>
                     <span style={{ color: C.primary }}>42%</span>
                   </div>
-                  <div className="w-full bg-slate-100 h-1 rounded-full">
-                    <div className="h-full rounded-full" style={{ width: "42%", backgroundColor: C.primary }} />
+                  <div className="w-full bg-slate-100 h-1.5 rounded-full">
+                    <div className="h-full rounded-full" style={{ width: "42%", background: GRADIENT }} />
                   </div>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-500 font-medium">Avg. Basket Value</span>
-                  <span className="text-xs font-bold text-slate-900">$142.50</span>
+                  <span className="text-xs font-bold text-slate-900">৳142.50</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-500 font-medium">Lifetime Value</span>
-                  <span className="text-xs font-bold text-slate-900">$840.00</span>
+                  <span className="text-xs font-bold text-slate-900">৳840.00</span>
                 </div>
               </div>
             </div>
@@ -307,16 +329,16 @@ export default function VendorDashboardHome() {
         {/* Right: top sellers + review summary */}
         <div className="space-y-6">
           {/* Top performing */}
-          <div className="rounded-xl p-8 border border-blue-100/50" style={{ backgroundColor: C.surfaceHighest }}>
-            <SectionTitle>Top Performing</SectionTitle>
+          <div className="rounded-2xl p-8 border" style={{ backgroundColor: C.surfaceHighest, borderColor: "#dbe3ff" }}>
+            <SectionTitle icon={<Star size={16} />}>Top Performing</SectionTitle>
             <div className="space-y-4 mt-6">
               {topProducts.map((p) => (
                 <div
                   key={p.name}
-                  className="flex items-center gap-4 p-3 rounded-lg border"
-                  style={{ backgroundColor: "rgba(255,255,255,0.4)", borderColor: "rgba(255,255,255,0.6)" }}
+                  className="flex items-center gap-4 p-3 rounded-xl border"
+                  style={{ backgroundColor: "rgba(255,255,255,0.5)", borderColor: "rgba(255,255,255,0.7)" }}
                 >
-                  <div className="w-12 h-12 rounded-lg flex items-center justify-center text-2xl bg-white shadow-sm">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-white shadow-sm">
                     {p.emoji}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -328,7 +350,7 @@ export default function VendorDashboardHome() {
               ))}
             </div>
             <button
-              className="w-full mt-6 py-3 text-xs font-bold rounded-lg transition-colors"
+              className="w-full mt-6 py-3 text-xs font-black rounded-xl transition-colors"
               style={{ color: C.primary, backgroundColor: `${C.primary}0d` }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = `${C.primary}1a`)}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = `${C.primary}0d`)}
@@ -338,27 +360,27 @@ export default function VendorDashboardHome() {
           </div>
 
           {/* Review summary */}
-          <div className="rounded-xl p-6 shadow-sm border" style={{ backgroundColor: C.surface, borderColor: "#f8f8ff" }}>
+          <div className="rounded-2xl p-6 shadow-sm border" style={{ backgroundColor: C.surface, borderColor: "#f8f8ff" }}>
             <div className="flex justify-between items-center mb-4">
-              <h4 className="text-sm font-black text-slate-900 uppercase tracking-wider">Review Summary</h4>
+              <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Review Summary</h4>
               <div className="flex items-center gap-1 text-amber-500">
                 <Star size={14} fill="currentColor" />
                 <span className="text-xs font-bold">4.8</span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 bg-slate-50 rounded-lg">
+              <div className="p-3 rounded-xl" style={{ backgroundColor: C.surfaceLow }}>
                 <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">New Reviews</p>
                 <p className="text-lg font-black text-slate-900">124</p>
               </div>
-              <div className="p-3 rounded-lg border" style={{ backgroundColor: "#fff1f2", borderColor: "#fecdd3" }}>
+              <div className="p-3 rounded-xl border" style={{ backgroundColor: "#fff1f2", borderColor: "#fecdd3" }}>
                 <p className="text-[10px] font-bold uppercase mb-1" style={{ color: "#f43f5e" }}>Negative Alerts</p>
                 <p className="text-lg font-black" style={{ color: "#e11d48" }}>2</p>
               </div>
             </div>
             <div className="mt-4 flex items-center">
               <div className="flex -space-x-2">
-                {["#bfdbfe", "#d1fae5", "#fce7f3"].map((bg, i) => (
+                {["#bfdbfe", "#ddd6fe", "#fce7f3"].map((bg, i) => (
                   <div key={i} className="w-6 h-6 rounded-full border-2 border-white" style={{ backgroundColor: bg }} />
                 ))}
               </div>
@@ -373,10 +395,9 @@ export default function VendorDashboardHome() {
 
         {/* Smart Insights */}
         <div className="rounded-2xl p-8 shadow-sm border" style={{ backgroundColor: C.surface, borderColor: "#f8f8ff" }}>
-          <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <Lightbulb size={20} className="text-amber-500" />
-            Smart Insights
-          </h3>
+          <div className="mb-6">
+            <SectionTitle icon={<Lightbulb size={16} />}>Smart Insights</SectionTitle>
+          </div>
           <div className="space-y-4">
             {insights.map((ins) => (
               <div
@@ -399,15 +420,14 @@ export default function VendorDashboardHome() {
 
         {/* Pending Actions */}
         <div className="rounded-2xl p-8 shadow-sm border" style={{ backgroundColor: C.surface, borderColor: "#f8f8ff" }}>
-          <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <CheckCircle2 size={20} style={{ color: C.primary }} />
-            Pending Actions
-          </h3>
+          <div className="mb-6">
+            <SectionTitle icon={<CheckCircle2 size={16} />}>Pending Actions</SectionTitle>
+          </div>
           <div className="space-y-3">
             {pendingActions.map((a) => (
               <div
                 key={a.label}
-                className="flex items-center justify-between p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
+                className="flex items-center justify-between p-4 border-2 border-slate-100 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <span className="text-slate-400">{a.icon}</span>
@@ -430,13 +450,13 @@ export default function VendorDashboardHome() {
         className="rounded-2xl overflow-hidden shadow-sm border"
         style={{ backgroundColor: C.surface, borderColor: "#f8f8ff" }}
       >
-        <div className="p-8 flex justify-between items-center border-b border-slate-50">
-          <SectionTitle>Recent Transactions</SectionTitle>
+        <div className="p-8 flex flex-wrap justify-between items-center gap-4 border-b border-slate-50">
+          <SectionTitle icon={<ShoppingCart size={16} />}>Recent Transactions</SectionTitle>
           <div className="flex items-center gap-3">
-            <button className="px-3 py-1.5 text-xs font-bold bg-slate-100 text-slate-600 rounded-md hover:bg-slate-200 transition-colors">Filter</button>
-            <button className="px-3 py-1.5 text-xs font-bold bg-slate-100 text-slate-600 rounded-md hover:bg-slate-200 transition-colors">Columns</button>
+            <button className="px-3 py-1.5 text-xs font-bold bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">Filter</button>
+            <button className="px-3 py-1.5 text-xs font-bold bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">Columns</button>
             <button
-              className="px-4 py-1.5 text-xs font-bold rounded-md transition-colors border"
+              className="px-4 py-1.5 text-xs font-bold rounded-lg transition-colors border-2"
               style={{ color: C.primary, backgroundColor: `${C.primary}0d`, borderColor: `${C.primary}1a` }}
             >
               View All
@@ -493,7 +513,7 @@ export default function VendorDashboardHome() {
         {/* Top Vendors */}
         <div className="rounded-2xl p-8 shadow-sm border" style={{ backgroundColor: C.surface, borderColor: "#f8f8ff" }}>
           <div className="flex justify-between items-center mb-6">
-            <SectionTitle>Top Vendors</SectionTitle>
+            <SectionTitle icon={<Users size={16} />}>Top Vendors</SectionTitle>
             <div className="flex bg-slate-100 p-1 rounded-lg gap-0.5">
               {["D", "W", "M"].map((l, i) => (
                 <button
@@ -508,8 +528,8 @@ export default function VendorDashboardHome() {
           </div>
           <div className="space-y-4">
             {[
-              { rank: "01", name: "Luxe Co.", type: "Premium", revenue: "$24.5k", growth: "+18%" },
-              { rank: "02", name: "Urban Est.", type: "Retail", revenue: "$19.2k", growth: "+12%" },
+              { rank: "01", name: "Luxe Co.", type: "Premium", revenue: "৳24.5k", growth: "+18%" },
+              { rank: "02", name: "Urban Est.", type: "Retail", revenue: "৳19.2k", growth: "+12%" },
             ].map((v) => (
               <div key={v.rank} className="flex items-center justify-between p-4 rounded-xl hover:bg-slate-50/50 transition-colors">
                 <div className="flex items-center gap-4">
@@ -530,7 +550,7 @@ export default function VendorDashboardHome() {
 
         {/* Inventory Pulse */}
         <div className="rounded-2xl p-8 shadow-sm border" style={{ backgroundColor: C.surface, borderColor: "#f8f8ff" }}>
-          <SectionTitle>Inventory Pulse</SectionTitle>
+          <SectionTitle icon={<Package size={16} />}>Inventory Pulse</SectionTitle>
           <div className="space-y-8 mt-8">
             {[
               { dot: C.error, label: "Low Stock", count: 42, pct: 28, color: C.error },
@@ -558,7 +578,7 @@ export default function VendorDashboardHome() {
 
         {/* Live Activity */}
         <div className="rounded-2xl p-8 shadow-sm border" style={{ backgroundColor: C.surface, borderColor: "#f8f8ff" }}>
-          <SectionTitle>Live Activity</SectionTitle>
+          <SectionTitle icon={<Zap size={16} />}>Live Activity</SectionTitle>
           <div className="mt-6 space-y-6 relative">
             {/* Vertical line */}
             <div className="absolute left-2 top-2 bottom-2 w-px bg-slate-100" />
@@ -585,12 +605,9 @@ export default function VendorDashboardHome() {
           {quickActions.map((qa) => (
             <button
               key={qa.label}
-              className="flex flex-col items-center justify-center gap-3 p-6 bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-1 transition-all group"
+              className="flex flex-col items-center justify-center gap-3 p-6 bg-white border-2 border-slate-100 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-1 transition-all group"
             >
-              <div
-                className="p-3 rounded-xl transition-colors"
-                style={{ backgroundColor: qa.iconBg, color: qa.iconColor }}
-              >
+              <div className="p-3 rounded-xl transition-colors" style={{ backgroundColor: qa.iconBg, color: qa.iconColor }}>
                 {qa.icon}
               </div>
               <span className="text-xs font-bold text-slate-600 text-center leading-tight">{qa.label}</span>
@@ -602,7 +619,7 @@ export default function VendorDashboardHome() {
       {/* ── Floating Action Button ── */}
       <button
         className="fixed bottom-8 right-8 w-14 h-14 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50"
-        style={{ background: `linear-gradient(135deg, ${C.primary}, ${C.primaryContainer})` }}
+        style={{ background: GRADIENT, boxShadow: `0 12px 28px ${C.primary}4d` }}
       >
         <Zap size={22} fill="white" />
       </button>

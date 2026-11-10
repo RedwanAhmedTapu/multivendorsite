@@ -31,6 +31,13 @@ interface StoreHeaderProps {
   onDelete?:    () => void;
   viewMode?:    "mobile" | "desktop";
   styles?:      StoreHeaderStyles;
+  /** Only meaningful on the live storefront (app/store/[vendorId]/page.tsx)
+   *  — the admin editor preview doesn't pass these, so the tabs/chat button
+   *  render but are inert there, which is fine since nothing in the editor
+   *  canvas should actually navigate or open a chat. */
+  activeTab?:     "store" | "products";
+  onTabChange?:   (tab: "store" | "products") => void;
+  onChatClick?:   () => void;
 }
 
 export const StoreHeader = ({
@@ -43,6 +50,9 @@ export const StoreHeader = ({
   onDelete,
   viewMode  = "mobile",
   styles    = {},
+  activeTab = "store",
+  onTabChange,
+  onChatClick,
 }: StoreHeaderProps) => {
   const {
     headerBgColor        = "#0f172a",
@@ -63,8 +73,15 @@ export const StoreHeader = ({
     showChatButton       = true,
   } = styles;
 
-  // Pick the right background image for the current view
-  const bgImage = viewMode === "mobile" ? headerBgImageMobile : headerBgImageDesktop;
+  // Pick the right background image for the current view. Falls back to
+  // whichever ONE image is set, so a vendor only needs to upload a single
+  // image (cropped responsively via backgroundSize:cover below) — the
+  // separate mobile/desktop slots are there for vendors who want a
+  // different crop per device, not a requirement to upload twice.
+  const bgImage =
+    viewMode === "mobile"
+      ? headerBgImageMobile ?? headerBgImageDesktop
+      : headerBgImageDesktop ?? headerBgImageMobile;
 
   // Build the CSS background for the header band
   const headerBgStyle: React.CSSProperties = bgImage
@@ -156,6 +173,7 @@ export const StoreHeader = ({
 
               {showChatButton && (
                 <button
+                  onClick={onChatClick}
                   className="follow-btn border-none rounded px-3 py-2 text-xs font-medium flex items-center gap-1.5 flex-shrink-0"
                   style={{ backgroundColor: chatButtonColor, color: chatButtonTextColor }}
                 >
@@ -167,15 +185,34 @@ export const StoreHeader = ({
 
             {/* Tabs */}
             <div className="store-tabs flex justify-around px-4">
-              <div className="tab py-2 px-3 text-sm font-semibold relative cursor-pointer" style={{ color: storeNameColor }}>
+              <div
+                onClick={() => onTabChange?.("store")}
+                className="tab py-2 px-3 text-sm font-semibold relative cursor-pointer"
+                style={{ color: activeTab === "store" ? storeNameColor : followersColor }}
+              >
                 Store
-                <div
-                  className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-1 rounded"
-                  style={{ backgroundColor: storeNameColor }}
-                />
+                {activeTab === "store" && (
+                  <div
+                    className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-1 rounded"
+                    style={{ backgroundColor: storeNameColor }}
+                  />
+                )}
               </div>
-              <div className="tab py-2 px-3 text-sm cursor-pointer" style={{ color: followersColor }}>
+              <div
+                onClick={() => onTabChange?.("products")}
+                className="tab py-2 px-3 text-sm relative cursor-pointer"
+                style={{
+                  color: activeTab === "products" ? storeNameColor : followersColor,
+                  fontWeight: activeTab === "products" ? 600 : 400,
+                }}
+              >
                 Products
+                {activeTab === "products" && (
+                  <div
+                    className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-1 rounded"
+                    style={{ backgroundColor: storeNameColor }}
+                  />
+                )}
               </div>
             </div>
           </div>

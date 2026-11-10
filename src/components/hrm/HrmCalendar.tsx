@@ -1,0 +1,195 @@
+// src/components/hrm/HrmCalendar.tsx
+//
+// HR Calendar (PHASE D3): month grid with filter pills, weekly-off
+// highlight, Today panel and Legend - all events derived from existing
+// FinixMart HR data via /hrm/insights/calendar (no custom-event model
+// exists, so the grid is read-only; that is stated in the subtitle).
+
+"use client";
+
+import { useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, Cake, Info } from "lucide-react";
+import { useGetCalendarQuery } from "@/features/hrmApi";
+import { usePermissions } from "@/hooks/usePermissions";
+import { toArray } from "./hrm-utils";
+
+const DAY_LABELS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+type Filter = "all" | "birthday" | "anniversary" | "leave" | "doc-expiry" | "holiday" | "payroll" | "loan" | "probation";
+const FILTERS: Array<{ key: Filter; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "birthday", label: "Birthdays" },
+  { key: "anniversary", label: "Anniversaries" },
+  { key: "leave", label: "Leave" },
+  { key: "holiday", label: "Holidays" },
+  { key: "payroll", label: "Payroll" },
+  { key: "probation", label: "Probation end" },
+  { key: "doc-expiry", label: "Doc expiry" },
+];
+
+const DOT_COLORS: Record<string, string> = {
+  birthday: "#EC4899", anniversary: "#F59E0B", leave: "#10B981",
+  "doc-expiry": "#EF4444", holiday: "#EF4444", payroll: "#0D9488",
+  loan: "#0EA5E9", probation: "#8B5CF6",
+};
+
+export function HrmCalendar() {
+  const { can } = usePermissions();
+  const today = new Date();
+  const [cursor, setCursor] = useState({ y: today.getFullYear(), m: today.getMonth() });
+  const [filter, setFilter] = useState<Filter>("all");
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const first = new Date(Date.UTC(cursor.y, cursor.m, 1));
+  const last = new Date(Date.UTC(cursor.y, cursor.m + 1, 0));
+  const from = first.toISOString().slice(0, 10);
+  const to = last.toISOString().slice(0, 10);
+
+  const { data, isLoading } = useGetCalendarQuery({ from, to });
+  const events = toArray(data?.items);
+  const visible = filter === "all" ? events : events.filter((e) => e.type === filter);
+
+  // Bucket events by date.
+  const byDate = useMemo(() => {
+    const m: Record<string, typeof visible> = {};
+    visible.forEach((e) => { (m[e.date] ??= []).push(e); });
+    return m;
+  }, [visible]);
+
+  // Today panel: events happening today (client date).
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayEvents = events.filter((e) => e.date === todayIso);
+
+  // Grid cells: leading blanks + days.
+  const lead = first.getUTCDay();
+  const daysInMonth = last.getUTCDate();
+  const cells: Array<number | null> = [...Array(lead).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+
+  const dateFor = (day: number) => `${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const isToday = (day: number) => dateFor(day) === todayIso;
+  const isFriday = (day: number) => new Date(Date.UTC(cursor.y, cursor.m, day)).getUTCDay() === 5;
+
+  function shift(delta: number) {
+    setCursor((c) => {
+      const d = new Date(Date.UTC(c.y, c.m + delta, 1));
+      return { y: d.getUTCFullYear(), m: d.getUTCMonth() };
+    });
+  }
+
+  return (
+    <div>
+      <h1 className="hrm-page-title">HR Calendar</h1>
+      <p className="hrm-page-subtitle">
+        Events from your HR data (birthdays, anniversaries, leave, holidays, probation and document expiry) - the grid is read-only; custom events need an events model.
+      </p>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button className="hrm-pill" onClick={() => shift(-1)} aria-label="Previous month"><ChevronLeft size={13} /></button>
+        <span style={{ fontSize: 14, fontWeight: 800, color: "var(--hrm-text)", minWidth: 150, textAlign: "center" }}>
+          {MONTH_NAMES[cursor.m]} {cursor.y}
+        </span>
+        <button className="hrm-pill" onClick={() => shift(1)} aria-label="Next month"><ChevronRight size={13} /></button>
+        <button className="hrm-pill" onClick={() => setCursor({ y: today.getFullYear(), m: today.getMonth() })}>Today</button>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {FILTERS.map((f) => (
+          <button key={f.key} className={`hrm-pill ${filter === f.key ? "hrm-pill-active" : ""}`} onClick={() => setFilter(f.key)}>{f.label}</button>
+        ))}
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div className="xl:col-span-2">
+          <div className="hrm-card" style={{ overflow: "hidden" }}>
+            <div className="grid grid-cols-7" style={{ borderBottom: "1px solid var(--hrm-border)", background: "#FAFBFD" }}>
+              {DAY_LABELS.map((d, i) => (
+                <div key={d} style={{ padding: "8px 4px", fontSize: 10, fontWeight: 800, letterSpacing: "0.05em", color: i === 5 ? "#DC2626" : "var(--hrm-muted)", textAlign: "center" }}>
+                  {i === 5 ? "FRI - OFF" : d}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {cells.map((day, i) => {
+                if (day === null) return <div key={`b${i}`} style={{ minHeight: 96, background: "#FAFBFD" }} />;
+                const date = dateFor(day);
+                const evs = byDate[date] ?? [];
+                const friday = isFriday(day);
+                return (
+                  <div key={date}
+                    onClick={() => setSelected(date)}
+                    style={{
+                      minHeight: 96, padding: 6, cursor: "pointer",
+                      border: isToday(day) ? "2px solid var(--hrm-emerald)" : "1px solid #F0F4FA",
+                      background: friday ? "#FEF2F2" : "#fff",
+                      color: friday ? "#DC2626" : "var(--hrm-text)",
+                    }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: friday ? "#DC2626" : "var(--hrm-text)" }}>{day}</div>
+                    {friday && <div style={{ fontSize: 8, fontWeight: 800, color: "#FCA5A5", letterSpacing: "0.05em" }}>FRL.OFF</div>}
+                    {evs.slice(0, 3).map((e, j) => (
+                      <div key={j} className="truncate" style={{ fontSize: 10, marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: 999, background: DOT_COLORS[e.type] ?? "#94A3B8", flexShrink: 0 }} />
+                        <span className="truncate">{e.title}</span>
+                      </div>
+                    ))}
+                    {evs.length > 3 && <div style={{ fontSize: 9.5, color: "#059669", fontWeight: 700 }}>+{evs.length - 3} more</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {selected && (
+            <div className="hrm-card mt-3 p-4">
+              <p style={{ margin: 0, fontSize: 12.5, fontWeight: 800, color: "var(--hrm-text)" }}>Events on {selected}</p>
+              {(byDate[selected] ?? []).length === 0 && <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--hrm-muted)" }}>No events.</p>}
+              {(byDate[selected] ?? []).map((e, j) => (
+                <p key={j} style={{ margin: "4px 0 0", fontSize: 12, color: "#334155", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: 999, background: DOT_COLORS[e.type] ?? "#94A3B8" }} />
+                  {e.title}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-5">
+          <div className="hrm-card p-5">
+            <h2 style={{ fontSize: 14, fontWeight: 800, color: "var(--hrm-text)", margin: "0 0 10px" }}>Today's events</h2>
+            {todayEvents.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "12px 0" }}>
+                <Cake size={26} style={{ color: "#CBD5E1", margin: "0 auto 6px" }} />
+                <p style={{ fontSize: 12.5, fontWeight: 700, color: "#334155", margin: 0 }}>Nothing today</p>
+                <p style={{ fontSize: 11.5, color: "var(--hrm-muted)", marginTop: 4 }}>Birthdays, anniversaries and leave will appear here.</p>
+              </div>
+            ) : (
+              todayEvents.map((e, j) => (
+                <p key={j} style={{ margin: "4px 0", fontSize: 12.5, color: "#334155", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: 999, background: DOT_COLORS[e.type] ?? "#94A3B8" }} />{e.title}
+                </p>
+              ))
+            )}
+          </div>
+
+          <div className="hrm-card p-5">
+            <h2 style={{ fontSize: 14, fontWeight: 800, color: "var(--hrm-text)", margin: "0 0 10px" }}>Legend</h2>
+            <div className="grid grid-cols-2 gap-1.5">
+              {Object.entries(DOT_COLORS).map(([t, c]) => (
+                <div key={t} style={{ fontSize: 11, color: "#475569", display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 999, background: c }} />
+                  {t === "doc-expiry" ? "Document expiry" : t.charAt(0).toUpperCase() + t.slice(1).replace("-", " ")}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="hrm-card p-4 flex items-start gap-2.5" style={{ background: "#F0F9FF", border: "1px solid #BAE6FD" }}>
+            <Info size={15} style={{ color: "#0284C7", marginTop: 1, flexShrink: 0 }} />
+            <p style={{ fontSize: 12, color: "#075985", margin: 0 }}>
+              Payroll and loan-installment events are visible only with the salary-view capability.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

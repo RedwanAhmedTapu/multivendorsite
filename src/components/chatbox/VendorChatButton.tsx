@@ -1,12 +1,11 @@
-// components/chatbox/VendorChatButton.tsx
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/store/store';
-import { useFindOrCreateConversationMutation } from '@/features/chatApi';
-import { Button } from '@/components/ui/button';
-import ChatBox from './ChatBox';   // ✅ FIXED (default import)
+import React, { useState } from "react";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
+import UnifiedChat from "@/components/chatbox/UnifiedChat";
+import { Button } from "@/components/ui/button";
+import { LoginModal } from "@/components/loginmodal/loginModal";
 
 interface VendorChatButtonProps {
   vendorId: string;
@@ -21,72 +20,77 @@ export const VendorChatButton: React.FC<VendorChatButtonProps> = ({
   vendorName,
   vendorAvatar,
   productId,
-  productName
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [conversation, setConversation] = useState<any>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const accessToken = useSelector((state: RootState) => state.auth.accessToken);
   const user = useSelector((state: RootState) => state.auth.user);
 
-  const [findOrCreateConversation, { isLoading }] = useFindOrCreateConversationMutation();
+  const isAuthenticated = !!user && !!accessToken;
 
-  const handleOpenChat = async () => {
-    if (!user) return;
-
-    try {
-      const conversation = await findOrCreateConversation({
-        participantIds: [vendorId],
-        participantTypes: ['VENDOR'],
-        productId,
-        type: productId ? 'PRODUCT_INQUIRY' : 'GENERAL_CHAT',
-        title: productName ? `About ${productName}` : `Chat with ${vendorName}`,
-      }).unwrap();
-
-      setConversation(conversation);
-      setIsOpen(true);
-    } catch (error) {
-      console.error('Failed to open conversation:', error);
+  const handleButtonClick = () => {
+    if (isAuthenticated) {
+      setIsChatOpen(true);
+    } else {
+      setIsLoginModalOpen(true);
     }
   };
 
   return (
     <>
+      {/* Always show the button */}
       <Button
-        onClick={handleOpenChat}
+        onClick={handleButtonClick}
         className="flex items-center space-x-2"
         variant="outline"
-        disabled={isLoading}
+        size="sm"
       >
-        {isLoading ? (
-          <>
-            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            <span>Loading...</span>
-          </>
-        ) : (
-          <>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-              />
-            </svg>
-            <span>Chat with Seller</span>
-          </>
-        )}
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+          />
+        </svg>
+        <span>Chat</span>
       </Button>
 
-      {isOpen && conversation && (
+      {/* Show chat only when open AND authenticated */}
+      {isChatOpen && isAuthenticated && (
         <div className="fixed bottom-4 right-4 z-50">
-          <ChatBox
-            conversation={conversation}
-            onClose={() => {
-              setIsOpen(false);
-              setConversation(null);
+          <UnifiedChat
+            layout="popup"
+            role="USER"
+            accessToken={accessToken}
+            otherParticipant={{
+              id: vendorId,
+              type: "VENDOR",
+              displayName: vendorName,
+              displayImage: vendorAvatar || null,
             }}
+            productId={productId}
+            onClose={() => setIsChatOpen(false)}
           />
         </div>
       )}
+
+      {/* Login Modal - properly controlled with props */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onLoginSuccess={() => {
+          setIsLoginModalOpen(false);
+          // Optionally open chat after successful login
+          setIsChatOpen(true);
+        }}
+        message="Please login to chat with the seller"
+      />
     </>
   );
 };

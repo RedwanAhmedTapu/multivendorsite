@@ -78,10 +78,10 @@ export function RedxLocationFields({
   }, [areas, warehouseLocationHint]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       {/* District filter */}
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+      <div className="space-y-1">
+        <Label className="text-[11px] font-bold text-[#3D5068] uppercase tracking-wide">
           Filter by District
         </Label>
         <Select
@@ -91,7 +91,7 @@ export function RedxLocationFields({
             onChange({ ...location, districtFilter: val, areaId: null, areaName: "" });
           }}
         >
-          <SelectTrigger className="h-9 text-sm">
+          <SelectTrigger className="h-9 text-sm border-[#E5EAF2]">
             <SelectValue placeholder="All districts" />
           </SelectTrigger>
           <SelectContent className="max-h-52">
@@ -106,8 +106,8 @@ export function RedxLocationFields({
       </div>
 
       {/* Area */}
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+      <div className="space-y-1">
+        <Label className="text-[11px] font-bold text-[#3D5068] uppercase tracking-wide">
           Delivery Area <span className="text-red-500">*</span>
         </Label>
         <Select
@@ -118,7 +118,7 @@ export function RedxLocationFields({
             onChange({ ...location, areaId: id, areaName: area?.name || "" });
           }}
         >
-          <SelectTrigger className="h-9 text-sm">
+          <SelectTrigger className="h-9 text-sm border-[#E5EAF2]">
             {areasLoading ? (
               <span className="flex items-center gap-2 text-slate-400">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading areas…
@@ -144,9 +144,9 @@ export function RedxLocationFields({
 
       {/* Selected area chip */}
       {location.areaId && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-lg border border-red-200 text-sm">
-          <MapPin className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
-          <span className="text-red-700 font-medium">{location.areaName}</span>
+        <div className="flex items-center gap-2 px-2.5 py-2 bg-rose-50 rounded-lg border border-rose-200 text-sm">
+          <MapPin className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
+          <span className="text-rose-700 font-medium">{location.areaName}</span>
         </div>
       )}
     </div>

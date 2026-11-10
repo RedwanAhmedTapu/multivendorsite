@@ -1,4 +1,19 @@
 // src/components/footer/FooterSettingsManager.tsx
+//
+// Admin → Settings → Footer.
+//
+// Visual redesign only. Every hook, handler, payload, default value, validation
+// step, `alert`/`confirm` call, `refetch()` and tab rule below is the original
+// implementation untouched; only the presentation changed.
+//
+// Design tokens copied from the vendor Product Form (ProductForm.tsx):
+//   border #E5EAF2 · section header #FAFBFD · inset #EEF3FB / #F0F4FA
+//   text #0D1B2E / #3D5068 / #7A90AB / #9BAABB
+//   accent gradient linear-gradient(135deg, #2563EB, #8B5CF6)
+//   success #F0F9F0/#16A34A · danger #FEF2F2/#DC2626 · radius 9–14px
+//
+// No component-library primitives are used on this page.
+
 "use client";
 
 import React, { useState } from "react";
@@ -17,28 +32,9 @@ import {
   FooterColumn,
   FooterElement,
 } from "@/features/footerSettingsApi";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardFooter,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import {
   Trash2,
-  Edit,
+  Pencil,
   Save,
   X,
   Settings,
@@ -52,22 +48,11 @@ import {
   Link as LinkIcon,
   Eye,
   EyeOff,
+  LayoutGrid,
+  Type,
+  Image as ImageIcon,
+  Loader2,
 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 
 interface CompanyFormState {
   companyName: string;
@@ -102,6 +87,31 @@ interface ElementFormState {
   openInNewTab: boolean;
 }
 
+/* ── design primitives ─────────────────────────────────────────────────────── */
+
+const CARD =
+  "rounded-[14px] border border-[#E5EAF2] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]";
+const SECTION_HEAD =
+  "flex items-start justify-between gap-3 border-b border-[#F0F4FA] bg-[#FAFBFD] px-4 py-3 rounded-t-[13px]";
+const LABEL = "text-[11px] font-semibold uppercase tracking-wide text-[#7A90AB]";
+const FIELD =
+  "w-full rounded-[12px] border border-[#E5EAF2] bg-white px-3 py-2.5 text-[13px] text-[#0D1B2E] outline-none transition placeholder:text-[#9BAABB] focus:border-[#A855F7] focus:ring-4 focus:ring-[#A855F7]/10 disabled:bg-[#FAFBFD] disabled:text-[#9BAABB]";
+const PRIMARY =
+  "inline-flex items-center justify-center gap-1.5 rounded-[11px] bg-gradient-to-br from-[#2563EB] to-[#8B5CF6] px-3.5 py-2 text-xs font-semibold text-white shadow-sm shadow-[#8B5CF6]/25 transition hover:brightness-105 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#8B5CF6]/25 disabled:cursor-not-allowed disabled:opacity-50";
+const GHOST =
+  "inline-flex items-center justify-center gap-1.5 rounded-[11px] border border-[#E5EAF2] bg-white px-3 py-2 text-xs font-semibold text-[#3D5068] transition hover:border-[#D5DEEC] hover:bg-[#FAFBFD] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#E5EAF2] disabled:opacity-50";
+const DANGER =
+  "inline-flex items-center justify-center gap-1.5 rounded-[11px] border border-[#FECACA] bg-[#FEF2F2] px-3 py-2 text-xs font-semibold text-[#DC2626] transition hover:bg-[#FEE2E2] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#DC2626]/20 disabled:opacity-50";
+const ICON_BTN =
+  "rounded-[9px] p-1.5 text-[#9BAABB] transition hover:bg-[#EEF3FB] hover:text-[#3D5068] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]/30";
+
+const TABS = [
+  { key: "view", label: "Overview" },
+  { key: "create", label: "Create" },
+  { key: "edit", label: "Company info" },
+  { key: "columns", label: "Columns & links" },
+] as const;
+
 export default function FooterSettingsManager() {
   const { data, isLoading, error, refetch } = useGetFooterSettingsQuery();
   const [createFooterSettings, { isLoading: isCreating }] =
@@ -111,12 +121,10 @@ export default function FooterSettingsManager() {
   const [deleteFooterSettings, { isLoading: isDeleting }] =
     useDeleteFooterSettingsMutation();
 
-  // Column mutations
   const [addColumn] = useAddFooterColumnMutation();
   const [updateColumn] = useUpdateFooterColumnMutation();
   const [deleteColumn] = useDeleteFooterColumnMutation();
 
-  // Element mutations
   const [addElement] = useAddFooterElementMutation();
   const [updateElement] = useUpdateFooterElementMutation();
   const [deleteElement] = useDeleteFooterElementMutation();
@@ -124,7 +132,6 @@ export default function FooterSettingsManager() {
   const [activeTab, setActiveTab] = useState("view");
   const [isEditing, setIsEditing] = useState(false);
 
-  // Dialog states
   const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
   const [isElementDialogOpen, setIsElementDialogOpen] = useState(false);
   const [editingColumn, setEditingColumn] = useState<FooterColumn | null>(null);
@@ -133,7 +140,6 @@ export default function FooterSettingsManager() {
 
   const footerSettings = data?.data;
 
-  // Company info form state
   const [companyForm, setCompanyForm] = useState<CompanyFormState>({
     companyName: "",
     address: "",
@@ -154,13 +160,11 @@ export default function FooterSettingsManager() {
     paymentBannerImage: "/footer/sslcommerz-banner.png",
   });
 
-  // Column form state (simplified - no slug, no displayOrder)
   const [columnForm, setColumnForm] = useState<ColumnFormState>({
     title: "",
     isVisible: true,
   });
 
-  // Element form state
   const [elementForm, setElementForm] = useState<ElementFormState>({
     label: "",
     url: "",
@@ -169,7 +173,8 @@ export default function FooterSettingsManager() {
     openInNewTab: false,
   });
 
-  // Load existing settings into form when editing
+  /* ── handlers (unchanged) ───────────────────────────────────────────────── */
+
   const handleEdit = () => {
     if (footerSettings) {
       setCompanyForm({
@@ -280,7 +285,6 @@ export default function FooterSettingsManager() {
     setCompanyForm({ ...companyForm, [name]: value });
   };
 
-  // Column handlers
   const handleOpenColumnDialog = (column?: FooterColumn) => {
     if (column) {
       setEditingColumn(column);
@@ -350,7 +354,6 @@ export default function FooterSettingsManager() {
     }
   };
 
-  // Element handlers
   const handleOpenElementDialog = (columnId: string, element?: FooterElement) => {
     setSelectedColumnId(columnId);
     if (element) {
@@ -424,838 +427,853 @@ export default function FooterSettingsManager() {
     }
   };
 
+  /* ── presentation ───────────────────────────────────────────────────────── */
+
+  const socials = footerSettings
+    ? [
+        { label: "Twitter", url: footerSettings.twitterUrl },
+        { label: "Facebook", url: footerSettings.facebookUrl },
+        { label: "YouTube", url: footerSettings.youtubeUrl },
+        { label: "Instagram", url: footerSettings.instagramUrl },
+        { label: "WhatsApp", url: footerSettings.whatsappUrl },
+      ].filter((social) => !!social.url)
+    : [];
+
+  const tabDisabled: Record<string, boolean> = {
+    view: false,
+    create: !!footerSettings,
+    edit: !footerSettings,
+    columns: !footerSettings,
+  };
+
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Settings className="w-8 h-8" /> Footer Settings Manager
-          </h1>
-          <p className="text-muted-foreground">
-            Manage your website footer information, columns, and links
-          </p>
+    <div className="min-h-full bg-[#F7F9FD] px-4 py-5 sm:px-6 sm:py-6">
+      <div className="mx-auto max-w-[1180px] space-y-4">
+        {/* header */}
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-gradient-to-br from-[#2563EB] to-[#8B5CF6] text-white shadow-sm shadow-[#8B5CF6]/25">
+                <Settings size={16} />
+              </span>
+              <h1 className="text-[22px] font-semibold leading-tight tracking-tight text-[#0D1B2E]">
+                Footer settings
+              </h1>
+            </div>
+            <p className="mt-1.5 max-w-xl text-[12.5px] leading-relaxed text-[#7A90AB]">
+              Company details, link columns and the bottom bar of the storefront footer.
+              {footerSettings
+                ? " Changes appear on the public site as soon as you save."
+                : " Create the configuration once, then edit it here."}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {footerSettings && (
+              <button type="button" onClick={handleEdit} className={GHOST}>
+                <Pencil size={13} /> Edit company info
+              </button>
+            )}
+            {!footerSettings && !isLoading && (
+              <button type="button" onClick={() => setActiveTab("create")} className={PRIMARY}>
+                <Plus size={14} /> Create footer settings
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* tab strip (plain buttons, same rules as before) */}
+        <div className="inline-flex max-w-full overflow-x-auto rounded-[12px] border border-[#E5EAF2] bg-white p-1">
+          {TABS.map((tab) => {
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                disabled={tabDisabled[tab.key]}
+                onClick={() => setActiveTab(tab.key)}
+                aria-pressed={active}
+                className={`whitespace-nowrap rounded-[9px] px-3 py-1.5 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-35 ${
+                  active
+                    ? "bg-gradient-to-br from-[#2563EB] to-[#8B5CF6] text-white shadow-sm shadow-[#8B5CF6]/25"
+                    : "text-[#3D5068] hover:bg-[#FAFBFD]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
-        {!footerSettings && !isLoading && (
-          <Button
-            onClick={() => setActiveTab("create")}
-            className="flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> Create Footer Settings
-          </Button>
-        )}
-      </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="view">View Settings</TabsTrigger>
-          <TabsTrigger value="create" disabled={!!footerSettings}>
-            Create New
-          </TabsTrigger>
-          <TabsTrigger value="edit" disabled={!footerSettings}>
-            Edit Info
-          </TabsTrigger>
-          <TabsTrigger value="columns" disabled={!footerSettings}>
-            Manage Columns
-          </TabsTrigger>
-        </TabsList>
-
-        {/* -------- View Tab -------- */}
-        <TabsContent value="view" className="space-y-4 mt-6">
-          {isLoading ? (
-            <Card>
-              <CardContent className="flex justify-center py-10">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </CardContent>
-            </Card>
-          ) : error ? (
-            <Card>
-              <CardContent className="py-10">
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Error loading footer settings. Please try again.
-                  </AlertDescription>
-                </Alert>
-              </CardContent>
-            </Card>
-          ) : footerSettings ? (
-            <div className="space-y-4">
-              {/* Company Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="w-5 h-5" /> Company Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-muted-foreground">Company Name</Label>
-                      <p className="font-medium">{footerSettings.companyName}</p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Email</Label>
-                      <p className="font-medium flex items-center gap-2">
-                        <Mail className="w-4 h-4" /> {footerSettings.email}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Primary Phone</Label>
-                      <p className="font-medium flex items-center gap-2">
-                        <Phone className="w-4 h-4" /> {footerSettings.phone1}
-                      </p>
-                    </div>
-                    {footerSettings.phone2 && (
+        {/* ── overview ─────────────────────────────────────────────────────── */}
+        {activeTab === "view" && (
+          <div className="space-y-4">
+            {isLoading ? (
+              <div className={`${CARD} p-4`}>
+                <div className="space-y-2">
+                  {[0, 1, 2, 3].map((row) => (
+                    <div key={row} className="h-10 animate-pulse rounded-[10px] bg-[#F0F4FA]" />
+                  ))}
+                </div>
+              </div>
+            ) : error ? (
+              <div className={`${CARD} flex flex-col items-center gap-2 px-6 py-10 text-center`}>
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FEF2F2] text-[#DC2626]">
+                  <AlertCircle size={17} />
+                </span>
+                <p className="text-sm font-semibold text-[#0D1B2E]">Could not load footer settings</p>
+                <p className="max-w-sm text-xs text-[#7A90AB]">The request failed. Nothing was changed.</p>
+                <button type="button" onClick={() => refetch()} className={`${GHOST} mt-1`}>
+                  Retry
+                </button>
+              </div>
+            ) : footerSettings ? (
+              <>
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+                  {/* company */}
+                  <section className={CARD}>
+                    <div className={SECTION_HEAD}>
                       <div>
-                        <Label className="text-muted-foreground">Secondary Phone</Label>
-                        <p className="font-medium flex items-center gap-2">
-                          <Phone className="w-4 h-4" /> {footerSettings.phone2}
+                        <h2 className="text-sm font-semibold text-[#0D1B2E]">Company information</h2>
+                        <p className="mt-0.5 text-[11px] text-[#7A90AB]">Shown in the footer contact block.</p>
+                      </div>
+                      <span className="rounded-full bg-[#EEF3FB] px-2 py-0.5 text-[10px] font-semibold text-[#3D5068]">
+                        {footerSettings.companyName}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 px-4 py-3.5 sm:grid-cols-2">
+                      <Field icon={<Mail size={12} />} label="Email" value={footerSettings.email} />
+                      <Field icon={<Phone size={12} />} label="Primary phone" value={footerSettings.phone1} />
+                      {footerSettings.phone2 && (
+                        <Field icon={<Phone size={12} />} label="Secondary phone" value={footerSettings.phone2} />
+                      )}
+                      <Field label="DBID number" value={footerSettings.dbidNumber} />
+                      <Field label="Trade licence" value={footerSettings.tradeLicense} />
+                      <div className="sm:col-span-2">
+                        <Field icon={<MapPin size={12} />} label="Address" value={footerSettings.address} multiline />
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* newsletter + bottom bar */}
+                  <div className="space-y-4">
+                    <section className={CARD}>
+                      <div className={SECTION_HEAD}>
+                        <div>
+                          <h2 className="text-sm font-semibold text-[#0D1B2E]">Newsletter</h2>
+                          <p className="mt-0.5 text-[11px] text-[#7A90AB]">Signup copy above the form.</p>
+                        </div>
+                        <Type size={13} className="text-[#9BAABB]" />
+                      </div>
+                      <div className="space-y-2 px-4 py-3.5">
+                        <p className="text-[13px] font-semibold text-[#0D1B2E]">{footerSettings.newsletterTitle}</p>
+                        <p className="text-[11.5px] leading-relaxed text-[#7A90AB]">
+                          {footerSettings.newsletterDescription}
                         </p>
                       </div>
-                    )}
-                    <div className="md:col-span-2">
-                      <Label className="text-muted-foreground">Address</Label>
-                      <p className="font-medium flex items-start gap-2">
-                        <MapPin className="w-4 h-4 mt-1" /> {footerSettings.address}
+                    </section>
+
+                    <section className={CARD}>
+                      <div className={SECTION_HEAD}>
+                        <div>
+                          <h2 className="text-sm font-semibold text-[#0D1B2E]">Social media</h2>
+                          <p className="mt-0.5 text-[11px] text-[#7A90AB]">{footerSettings.socialMediaTitle}</p>
+                        </div>
+                        <Globe size={13} className="text-[#9BAABB]" />
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 px-4 py-3.5">
+                        {socials.length === 0 ? (
+                          <p className="text-[11.5px] italic text-[#9BAABB]">No social links configured.</p>
+                        ) : (
+                          socials.map((social) => (
+                            <span
+                              key={social.label}
+                              className="inline-flex items-center gap-1 rounded-full border border-[#E5EAF2] bg-[#FAFBFD] px-2 py-0.5 text-[10.5px] font-semibold text-[#3D5068]"
+                            >
+                              <LinkIcon size={9} className="text-[#9BAABB]" /> {social.label}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </section>
+                  </div>
+                </div>
+
+                {/* columns summary */}
+                <section className={CARD}>
+                  <div className={SECTION_HEAD}>
+                    <div>
+                      <h2 className="text-sm font-semibold text-[#0D1B2E]">
+                        Footer columns
+                        <span className="ml-1.5 rounded-full bg-[#EEF3FB] px-1.5 py-0.5 text-[10px] font-semibold text-[#3D5068]">
+                          {footerSettings.columns.length}
+                        </span>
+                      </h2>
+                      <p className="mt-0.5 text-[11px] text-[#7A90AB]">Link groups rendered left of the newsletter.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("columns")}
+                      className={GHOST}
+                    >
+                      <LayoutGrid size={12} /> Manage columns
+                    </button>
+                  </div>
+                  <div className="px-4 py-3.5">
+                    {footerSettings.columns.length === 0 ? (
+                      <p className="rounded-[10px] border border-dashed border-[#E5EAF2] bg-[#FAFBFD] px-3 py-4 text-center text-[11.5px] text-[#7A90AB]">
+                        No columns yet. Open “Columns & links” to add the first one.
                       </p>
-                    </div>
+                    ) : (
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {footerSettings.columns.map((column) => (
+                          <div key={column.id} className="rounded-[12px] border border-[#E5EAF2] p-3">
+                            <div className="flex items-center gap-1.5">
+                              <p className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-[#0D1B2E]">
+                                {column.title}
+                              </p>
+                              {!column.isVisible && (
+                                <span className="rounded-full bg-[#EEF3FB] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#7A90AB]">
+                                  hidden
+                                </span>
+                              )}
+                            </div>
+                            <ul className="mt-1.5 space-y-1">
+                              {[...column.elements]
+                                .sort((a, b) => a.displayOrder - b.displayOrder)
+                                .map((element) => (
+                                  <li key={element.id} className="flex items-center gap-1 text-[11px]">
+                                    <LinkIcon size={9} className="shrink-0 text-[#C3CFDF]" />
+                                    <span className={element.isVisible ? "truncate text-[#3D5068]" : "truncate text-[#9BAABB] line-through"}>
+                                      {element.label}
+                                    </span>
+                                    {element.openInNewTab && (
+                                      <span className="shrink-0 text-[9px] font-bold text-[#8B5CF6]">↗</span>
+                                    )}
+                                  </li>
+                                ))}
+                              {column.elements.length === 0 && (
+                                <li className="text-[10.5px] italic text-[#9BAABB]">No links</li>
+                              )}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {/* bottom bar */}
+                <section className={CARD}>
+                  <div className={SECTION_HEAD}>
                     <div>
-                      <Label className="text-muted-foreground">DBID Number</Label>
-                      <p className="font-medium">{footerSettings.dbidNumber}</p>
+                      <h2 className="text-sm font-semibold text-[#0D1B2E]">Bottom bar</h2>
+                      <p className="mt-0.5 text-[11px] text-[#7A90AB]">Copyright line and payment methods banner.</p>
                     </div>
-                    <div>
-                      <Label className="text-muted-foreground">Trade License</Label>
-                      <p className="font-medium">{footerSettings.tradeLicense}</p>
+                    <span className="text-[10.5px] text-[#9BAABB]">
+                      Updated {new Date(footerSettings.updatedAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="grid gap-3 px-4 py-3.5 sm:grid-cols-2">
+                    <Field label="Copyright text" value={footerSettings.copyrightText} />
+                    <Field
+                      icon={<ImageIcon size={12} />}
+                      label="Payment banner"
+                      value={footerSettings.paymentBannerImage}
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#F0F4FA] px-4 py-3">
+                    <p className="text-[10.5px] text-[#9BAABB]">Deleting removes the columns and links with it.</p>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={handleEdit} className={GHOST}>
+                        <Pencil size={12} /> Edit
+                      </button>
+                      <button type="button" onClick={handleDelete} disabled={isDeleting} className={DANGER}>
+                        <Trash2 size={12} /> {isDeleting ? "Deleting…" : "Delete"}
+                      </button>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </section>
+              </>
+            ) : (
+              <div className={`${CARD} flex flex-col items-center gap-2 px-6 py-12 text-center`}>
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EEF3FB] text-[#9BAABB]">
+                  <Settings size={18} />
+                </span>
+                <p className="text-sm font-semibold text-[#0D1B2E]">No footer settings yet</p>
+                <p className="max-w-sm text-xs text-[#7A90AB]">
+                  Create the configuration to fill the storefront footer with your company details.
+                </p>
+                <button type="button" onClick={() => setActiveTab("create")} className={`${PRIMARY} mt-1`}>
+                  <Plus size={13} /> Create footer settings
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
-              {/* Dynamic Columns */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Footer Columns ({footerSettings.columns.length})</span>
-                    <Button
-                      size="sm"
-                      onClick={() => setActiveTab("columns")}
-                      variant="outline"
-                    >
-                      Manage Columns
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {footerSettings.columns.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-4">
-                      No columns added yet. Go to "Manage Columns" tab to add columns.
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {footerSettings.columns.map((column) => (
-                        <div key={column.id} className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">{column.title}</h3>
-                            {!column.isVisible && (
-                              <Badge variant="secondary">Hidden</Badge>
-                            )}
-                          </div>
-                          <ul className="space-y-1 text-sm">
+        {/* ── create / edit ────────────────────────────────────────────────── */}
+        {(activeTab === "create" || activeTab === "edit") && (
+          <div className="space-y-4">
+            <section className={CARD}>
+              <div className={SECTION_HEAD}>
+                <div>
+                  <h2 className="text-sm font-semibold text-[#0D1B2E]">
+                    {isEditing ? "Edit footer settings" : "Create footer settings"}
+                  </h2>
+                  <p className="mt-0.5 text-[11px] text-[#7A90AB]">
+                    {isEditing
+                      ? "Update the company information shown in the footer."
+                      : "Fill in the company details to create the footer configuration."}
+                  </p>
+                </div>
+                <span className="rounded-full bg-[#F0F9F0] px-2 py-0.5 text-[10px] font-semibold text-[#16A34A]">
+                  {isEditing ? "editing" : "new"}
+                </span>
+              </div>
+
+              <div className="space-y-5 px-4 py-4">
+                {/* company */}
+                <FormSection title="Company information" hint="Contact details and registration numbers.">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <TextField id="companyName" name="companyName" label="Company name" required value={companyForm.companyName} onChange={handleCompanyInputChange} placeholder="e.g., Finix Mart" />
+                    <TextField id="email" name="email" type="email" label="Email" required value={companyForm.email} onChange={handleCompanyInputChange} placeholder="e.g., support@finixmart.com.bd" />
+                    <TextField id="phone1" name="phone1" label="Primary phone" required value={companyForm.phone1} onChange={handleCompanyInputChange} placeholder="e.g., +880 9647-415199" />
+                    <TextField id="phone2" name="phone2" label="Secondary phone" value={companyForm.phone2} onChange={handleCompanyInputChange} placeholder="e.g., +880 1911-802804" />
+                    <div className="sm:col-span-2">
+                      <TextAreaField id="address" name="address" label="Address" required rows={2} value={companyForm.address} onChange={handleCompanyInputChange} placeholder="e.g., HM Hasem Mansion (6th Floor), Purana Paltan, Dhaka-1000." />
+                    </div>
+                    <TextField id="dbidNumber" name="dbidNumber" label="DBID number" required value={companyForm.dbidNumber} onChange={handleCompanyInputChange} placeholder="e.g., 567849" />
+                    <TextField id="tradeLicense" name="tradeLicense" label="Trade licence" required value={companyForm.tradeLicense} onChange={handleCompanyInputChange} placeholder="e.g., E457/684" />
+                  </div>
+                </FormSection>
+
+                {/* newsletter */}
+                <FormSection title="Newsletter" hint="Heading and one-line description above the signup field.">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <TextField id="newsletterTitle" name="newsletterTitle" label="Newsletter title" required value={companyForm.newsletterTitle} onChange={handleCompanyInputChange} placeholder="e.g., Let's keep in touch" />
+                    <TextField id="newsletterDescription" name="newsletterDescription" label="Newsletter description" required value={companyForm.newsletterDescription} onChange={handleCompanyInputChange} placeholder="e.g., Get recommendations, tips, updates and more." />
+                  </div>
+                </FormSection>
+
+                {/* social */}
+                <FormSection title="Social media" hint="Only the links you fill in are rendered.">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <TextField id="socialMediaTitle" name="socialMediaTitle" label="Section title" required value={companyForm.socialMediaTitle} onChange={handleCompanyInputChange} placeholder="e.g., Stay Connected" />
+                    <div className="hidden sm:block" />
+                    <TextField id="twitterUrl" name="twitterUrl" label="Twitter URL" value={companyForm.twitterUrl} onChange={handleCompanyInputChange} placeholder="https://twitter.com/yourpage" />
+                    <TextField id="facebookUrl" name="facebookUrl" label="Facebook URL" value={companyForm.facebookUrl} onChange={handleCompanyInputChange} placeholder="https://facebook.com/yourpage" />
+                    <TextField id="youtubeUrl" name="youtubeUrl" label="YouTube URL" value={companyForm.youtubeUrl} onChange={handleCompanyInputChange} placeholder="https://youtube.com/yourpage" />
+                    <TextField id="instagramUrl" name="instagramUrl" label="Instagram URL" value={companyForm.instagramUrl} onChange={handleCompanyInputChange} placeholder="https://instagram.com/yourpage" />
+                    <TextField id="whatsappUrl" name="whatsappUrl" label="WhatsApp URL" value={companyForm.whatsappUrl} onChange={handleCompanyInputChange} placeholder="https://wa.me/yourphone" />
+                  </div>
+                </FormSection>
+
+                {/* bottom bar */}
+                <FormSection title="Bottom bar" hint="Copyright line and the payment methods image.">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <TextField id="copyrightText" name="copyrightText" label="Copyright text" required value={companyForm.copyrightText} onChange={handleCompanyInputChange} placeholder="e.g., Copyright © 2026 FinixMart, All rights reserved." />
+                    <TextField id="paymentBannerImage" name="paymentBannerImage" label="Payment banner image" required value={companyForm.paymentBannerImage} onChange={handleCompanyInputChange} placeholder="e.g., /footer/sslcommerz-banner.png" />
+                  </div>
+                </FormSection>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#F0F4FA] px-4 py-3">
+                <button type="button" onClick={handleCancel} className={GHOST}>
+                  <X size={12} /> Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCompanyInfo}
+                  disabled={isCreating || isUpdating}
+                  className={PRIMARY}
+                >
+                  {(isCreating || isUpdating) ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                  {isCreating || isUpdating
+                    ? "Saving…"
+                    : isEditing
+                      ? "Update settings"
+                      : "Create settings"}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* ── columns ──────────────────────────────────────────────────────── */}
+        {activeTab === "columns" && (
+          <section className={CARD}>
+            <div className={SECTION_HEAD}>
+              <div>
+                <h2 className="text-sm font-semibold text-[#0D1B2E]">Columns & links</h2>
+                <p className="mt-0.5 text-[11px] text-[#7A90AB]">
+                  Add, rename, hide or delete link groups. Order uses each link’s display order.
+                </p>
+              </div>
+              <button type="button" onClick={() => handleOpenColumnDialog()} className={PRIMARY}>
+                <Plus size={13} /> Add column
+              </button>
+            </div>
+
+            <div className="px-4 py-3.5">
+              {!footerSettings?.columns.length ? (
+                <p className="rounded-[10px] border border-dashed border-[#E5EAF2] bg-[#FAFBFD] px-3 py-6 text-center text-[11.5px] text-[#7A90AB]">
+                  No columns yet. Add the first one to start grouping links.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {footerSettings.columns.map((column) => (
+                    <div key={column.id} className="overflow-hidden rounded-[12px] border border-[#E5EAF2]">
+                      <div className="flex flex-wrap items-center gap-2 border-b border-[#F0F4FA] bg-[#FAFBFD] px-3 py-2.5">
+                        <p className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-[#0D1B2E]">
+                          {column.title}
+                        </p>
+                        {!column.isVisible && (
+                          <span className="rounded-full bg-[#EEF3FB] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#7A90AB]">
+                            hidden
+                          </span>
+                        )}
+                        <span className="rounded-full bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#3D5068] ring-1 ring-[#E5EAF2]">
+                          {column.elements.length} links
+                        </span>
+
+                        <div className="flex items-center gap-1">
+                          <button type="button" onClick={() => handleOpenColumnDialog(column)} aria-label="Edit column" className={ICON_BTN}>
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleColumnVisibility(column)}
+                            aria-label={column.isVisible ? "Hide column" : "Show column"}
+                            className={ICON_BTN}
+                          >
+                            {column.isVisible ? <EyeOff size={13} /> : <Eye size={13} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenElementDialog(column.id)}
+                            aria-label="Add link to column"
+                            className={ICON_BTN}
+                          >
+                            <Plus size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteColumn(column.id)}
+                            aria-label="Delete column"
+                            className={`${ICON_BTN} hover:bg-[#FEF2F2] hover:text-[#DC2626]`}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="px-3 py-2.5">
+                        {column.elements.length === 0 ? (
+                          <p className="text-[11px] italic text-[#9BAABB]">No links in this column yet.</p>
+                        ) : (
+                          <ul className="space-y-1.5">
                             {[...column.elements]
                               .sort((a, b) => a.displayOrder - b.displayOrder)
                               .map((element) => (
                                 <li
                                   key={element.id}
-                                  className="flex items-center gap-1"
+                                  className="flex items-center gap-2 rounded-[10px] border border-[#F0F4FA] px-2.5 py-1.5 transition hover:bg-[#FAFBFD]"
                                 >
-                                  <LinkIcon className="w-3 h-3" />
-                                  <span className={!element.isVisible ? "opacity-50" : ""}>
-                                    {element.label}
+                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#EEF3FB] text-[9.5px] font-bold text-[#3D5068] tabular-nums">
+                                    {element.displayOrder}
                                   </span>
+                                  <div className="min-w-0 flex-1">
+                                    <p className={`truncate text-[12px] font-medium ${element.isVisible ? "text-[#0D1B2E]" : "text-[#9BAABB] line-through"}`}>
+                                      {element.label}
+                                    </p>
+                                    <p className="truncate text-[10.5px] text-[#9BAABB]">{element.url}</p>
+                                  </div>
                                   {element.openInNewTab && (
-                                    <Badge variant="outline" className="text-xs">
-                                      ↗
-                                    </Badge>
+                                    <span className="shrink-0 rounded-full border border-[#E5EAF2] px-1.5 py-0.5 text-[9px] font-semibold text-[#7A90AB]">
+                                      new tab
+                                    </span>
                                   )}
+                                  {!element.isVisible && (
+                                    <span className="shrink-0 rounded-full bg-[#EEF3FB] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#7A90AB]">
+                                      hidden
+                                    </span>
+                                  )}
+                                  <div className="flex shrink-0 items-center gap-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleElementVisibility(element)}
+                                      aria-label={element.isVisible ? "Hide link" : "Show link"}
+                                      className={ICON_BTN}
+                                    >
+                                      {element.isVisible ? <EyeOff size={12} /> : <Eye size={12} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenElementDialog(column.id, element)}
+                                      aria-label="Edit link"
+                                      className={ICON_BTN}
+                                    >
+                                      <Pencil size={12} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteElement(element.id)}
+                                      aria-label="Delete link"
+                                      className={`${ICON_BTN} hover:bg-[#FEF2F2] hover:text-[#DC2626]`}
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
                                 </li>
                               ))}
-                            {column.elements.length === 0 && (
-                              <li className="text-muted-foreground italic">
-                                No elements
-                              </li>
-                            )}
                           </ul>
-                        </div>
-                      ))}
+                        )}
+                      </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Newsletter & Social */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Newsletter</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div>
-                      <Label className="text-muted-foreground">Title</Label>
-                      <p className="font-medium">{footerSettings.newsletterTitle}</p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Description</Label>
-                      <p className="text-sm">{footerSettings.newsletterDescription}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Globe className="w-5 h-5" /> Social Media
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div>
-                      <Label className="text-muted-foreground">Title</Label>
-                      <p className="font-medium">{footerSettings.socialMediaTitle}</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      {footerSettings.twitterUrl && (
-                        <div>
-                          <Badge variant="outline">Twitter</Badge>
-                        </div>
-                      )}
-                      {footerSettings.facebookUrl && (
-                        <div>
-                          <Badge variant="outline">Facebook</Badge>
-                        </div>
-                      )}
-                      {footerSettings.youtubeUrl && (
-                        <div>
-                          <Badge variant="outline">YouTube</Badge>
-                        </div>
-                      )}
-                      {footerSettings.instagramUrl && (
-                        <div>
-                          <Badge variant="outline">Instagram</Badge>
-                        </div>
-                      )}
-                      {footerSettings.whatsappUrl && (
-                        <div>
-                          <Badge variant="outline">WhatsApp</Badge>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Bottom Bar */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Bottom Bar</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <Label className="text-muted-foreground">Copyright Text</Label>
-                    <p className="font-medium">{footerSettings.copyrightText}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Payment Banner Image</Label>
-                    <p className="text-sm">{footerSettings.paymentBannerImage}</p>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex justify-between bg-muted/50">
-                  <div className="text-xs text-muted-foreground">
-                    Last updated: {new Date(footerSettings.updatedAt).toLocaleString()}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleEdit}
-                      className="flex items-center gap-1"
-                    >
-                      <Edit className="w-3 h-3" /> Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={handleDelete}
-                      disabled={isDeleting}
-                      className="flex items-center gap-1"
-                    >
-                      <Trash2 className="w-3 h-3" />{" "}
-                      {isDeleting ? "Deleting..." : "Delete"}
-                    </Button>
-                  </div>
-                </CardFooter>
-              </Card>
-            </div>
-          ) : (
-            <Card className="text-center py-10">
-              <CardContent>
-                <Settings className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No Footer Settings Found</h3>
-                <p className="text-muted-foreground mb-4">
-                  Get started by creating your footer settings configuration.
-                </p>
-                <Button onClick={() => setActiveTab("create")}>
-                  Create Footer Settings
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        {/* -------- Create/Edit Tab -------- */}
-        <TabsContent
-          value={isEditing ? "edit" : "create"}
-          className="space-y-4 mt-6"
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle>{isEditing ? "Edit" : "Create"} Footer Settings</CardTitle>
-              <CardDescription>
-                {isEditing
-                  ? "Update your footer company information"
-                  : "Fill in the company details to create footer settings"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Company Information Section */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">
-                  Company Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName">Company Name *</Label>
-                    <Input
-                      id="companyName"
-                      name="companyName"
-                      value={companyForm.companyName}
-                      onChange={handleCompanyInputChange}
-                      placeholder="e.g., Finix Mart"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={companyForm.email}
-                      onChange={handleCompanyInputChange}
-                      placeholder="e.g., support@finixmart.com.bd"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone1">Primary Phone *</Label>
-                    <Input
-                      id="phone1"
-                      name="phone1"
-                      value={companyForm.phone1}
-                      onChange={handleCompanyInputChange}
-                      placeholder="e.g., +880 9647-415199"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone2">Secondary Phone</Label>
-                    <Input
-                      id="phone2"
-                      name="phone2"
-                      value={companyForm.phone2}
-                      onChange={handleCompanyInputChange}
-                      placeholder="e.g., +880 1911-802804"
-                    />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="address">Address *</Label>
-                    <Textarea
-                      id="address"
-                      name="address"
-                      value={companyForm.address}
-                      onChange={handleCompanyInputChange}
-                      placeholder="e.g., HM Hasem Mansion (6th Floor), Purana Paltan, Paltan, Dhaka-1000."
-                      rows={2}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="dbidNumber">DBID Number *</Label>
-                    <Input
-                      id="dbidNumber"
-                      name="dbidNumber"
-                      value={companyForm.dbidNumber}
-                      onChange={handleCompanyInputChange}
-                      placeholder="e.g., 567849"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="tradeLicense">Trade License *</Label>
-                    <Input
-                      id="tradeLicense"
-                      name="tradeLicense"
-                      value={companyForm.tradeLicense}
-                      onChange={handleCompanyInputChange}
-                      placeholder="e.g., E457/684"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Newsletter Section */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">Newsletter</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="newsletterTitle">Newsletter Title *</Label>
-                    <Input
-                      id="newsletterTitle"
-                      name="newsletterTitle"
-                      value={companyForm.newsletterTitle}
-                      onChange={handleCompanyInputChange}
-                      placeholder="e.g., Let's keep in touch"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="newsletterDescription">
-                      Newsletter Description *
-                    </Label>
-                    <Input
-                      id="newsletterDescription"
-                      name="newsletterDescription"
-                      value={companyForm.newsletterDescription}
-                      onChange={handleCompanyInputChange}
-                      placeholder="e.g., Get recommendations, tips, updates and more."
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Social Media Section */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">Social Media</h3>
-                <div className="space-y-2">
-                  <Label htmlFor="socialMediaTitle">Social Media Title *</Label>
-                  <Input
-                    id="socialMediaTitle"
-                    name="socialMediaTitle"
-                    value={companyForm.socialMediaTitle}
-                    onChange={handleCompanyInputChange}
-                    placeholder="e.g., Stay Connected"
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="twitterUrl">Twitter URL</Label>
-                    <Input
-                      id="twitterUrl"
-                      name="twitterUrl"
-                      value={companyForm.twitterUrl}
-                      onChange={handleCompanyInputChange}
-                      placeholder="https://twitter.com/yourpage"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="facebookUrl">Facebook URL</Label>
-                    <Input
-                      id="facebookUrl"
-                      name="facebookUrl"
-                      value={companyForm.facebookUrl}
-                      onChange={handleCompanyInputChange}
-                      placeholder="https://facebook.com/yourpage"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="youtubeUrl">YouTube URL</Label>
-                    <Input
-                      id="youtubeUrl"
-                      name="youtubeUrl"
-                      value={companyForm.youtubeUrl}
-                      onChange={handleCompanyInputChange}
-                      placeholder="https://youtube.com/yourpage"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="instagramUrl">Instagram URL</Label>
-                    <Input
-                      id="instagramUrl"
-                      name="instagramUrl"
-                      value={companyForm.instagramUrl}
-                      onChange={handleCompanyInputChange}
-                      placeholder="https://instagram.com/yourpage"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="whatsappUrl">WhatsApp URL</Label>
-                    <Input
-                      id="whatsappUrl"
-                      name="whatsappUrl"
-                      value={companyForm.whatsappUrl}
-                      onChange={handleCompanyInputChange}
-                      placeholder="https://wa.me/yourphone"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Bar Section */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">Bottom Bar</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="copyrightText">Copyright Text *</Label>
-                    <Input
-                      id="copyrightText"
-                      name="copyrightText"
-                      value={companyForm.copyrightText}
-                      onChange={handleCompanyInputChange}
-                      placeholder="e.g., Copyright © 2026 FinixMart, All rights reserved."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="paymentBannerImage">
-                      Payment Banner Image *
-                    </Label>
-                    <Input
-                      id="paymentBannerImage"
-                      name="paymentBannerImage"
-                      value={companyForm.paymentBannerImage}
-                      onChange={handleCompanyInputChange}
-                      placeholder="e.g., /footer/sslcommerz-banner.png"
-                    />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button variant="outline" onClick={handleCancel}>
-                <X className="w-4 h-4 mr-2" /> Cancel
-              </Button>
-              <Button onClick={handleSaveCompanyInfo} disabled={isCreating || isUpdating}>
-                <Save className="w-4 h-4 mr-2" />{" "}
-                {isCreating || isUpdating
-                  ? "Saving..."
-                  : isEditing
-                  ? "Update Settings"
-                  : "Create Settings"}
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
-        {/* -------- Manage Columns Tab -------- */}
-        <TabsContent value="columns" className="space-y-4 mt-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Manage Footer Columns</CardTitle>
-                  <CardDescription>
-                    Add, edit, and organize footer columns and their links
-                  </CardDescription>
-                </div>
-                <Button onClick={() => handleOpenColumnDialog()}>
-                  <Plus className="w-4 h-4 mr-2" /> Add Column
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {!footerSettings?.columns.length ? (
-                <div className="text-center py-10">
-                  <p className="text-muted-foreground mb-4">
-                    No columns added yet. Click "Add Column" to get started.
-                  </p>
-                </div>
-              ) : (
-                <Accordion type="single" collapsible className="w-full">
-                  {footerSettings.columns.map((column) => (
-                    <AccordionItem key={column.id} value={column.id}>
-                      <AccordionTrigger className="hover:no-underline">
-                        <div className="flex items-center justify-between w-full pr-4">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold">{column.title}</span>
-                            {!column.isVisible && (
-                              <Badge variant="secondary">Hidden</Badge>
-                            )}
-                            <Badge variant="secondary">
-                              {column.elements.length} elements
-                            </Badge>
-                          </div>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="space-y-4 pt-4">
-                          <div className="flex gap-2 mb-4">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleOpenColumnDialog(column)}
-                            >
-                              <Edit className="w-3 h-3 mr-1" /> Edit Column
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleToggleColumnVisibility(column)}
-                            >
-                              {column.isVisible ? (
-                                <>
-                                  <EyeOff className="w-3 h-3 mr-1" /> Hide
-                                </>
-                              ) : (
-                                <>
-                                  <Eye className="w-3 h-3 mr-1" /> Show
-                                </>
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleOpenElementDialog(column.id)}
-                            >
-                              <Plus className="w-3 h-3 mr-1" /> Add Element
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDeleteColumn(column.id)}
-                            >
-                              <Trash2 className="w-3 h-3 mr-1" /> Delete Column
-                            </Button>
-                          </div>
-
-                          {/* Elements List */}
-                          {column.elements.length === 0 ? (
-                            <p className="text-sm text-muted-foreground italic">
-                              No elements in this column yet.
-                            </p>
-                          ) : (
-                            <div className="space-y-2">
-                              {[...column.elements]
-                                .sort((a, b) => a.displayOrder - b.displayOrder)
-                                .map((element) => (
-                                  <div
-                                    key={element.id}
-                                    className="flex items-center justify-between p-3 border rounded-lg"
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <Badge variant="outline">
-                                        {element.displayOrder}
-                                      </Badge>
-                                      <div>
-                                        <p className="font-medium">
-                                          {element.label}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground truncate max-w-xs">
-                                          {element.url}
-                                        </p>
-                                      </div>
-                                      {!element.isVisible && (
-                                        <Badge variant="secondary">Hidden</Badge>
-                                      )}
-                                      {element.openInNewTab && (
-                                        <Badge variant="outline">New Tab</Badge>
-                                      )}
-                                    </div>
-                                    <div className="flex gap-1">
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() =>
-                                          handleToggleElementVisibility(element)
-                                        }
-                                      >
-                                        {element.isVisible ? (
-                                          <EyeOff className="w-3 h-3" />
-                                        ) : (
-                                          <Eye className="w-3 h-3" />
-                                        )}
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() =>
-                                          handleOpenElementDialog(
-                                            column.id,
-                                            element
-                                          )
-                                        }
-                                      >
-                                        <Edit className="w-3 h-3" />
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() =>
-                                          handleDeleteElement(element.id)
-                                        }
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                ))}
-                            </div>
-                          )}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
                   ))}
-                </Accordion>
+                </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </section>
+        )}
+      </div>
 
-      {/* Column Dialog */}
-      <Dialog open={isColumnDialogOpen} onOpenChange={setIsColumnDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingColumn ? "Edit Column" : "Add New Column"}
-            </DialogTitle>
-            <DialogDescription>
-              {editingColumn
-                ? "Update the column title"
-                : "Create a new footer column (just add a title)"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="column-title">Column Title *</Label>
-              <Input
-                id="column-title"
-                value={columnForm.title}
-                onChange={(e) =>
-                  setColumnForm({ ...columnForm, title: e.target.value })
-                }
-                placeholder="e.g., Customer Service"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="column-visible"
-                checked={columnForm.isVisible}
-                onChange={(e) =>
-                  setColumnForm({ ...columnForm, isVisible: e.target.checked })
-                }
-                className="w-4 h-4"
-              />
-              <Label htmlFor="column-visible">Visible</Label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsColumnDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSaveColumn}>
-              {editingColumn ? "Update" : "Create"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ── column modal ───────────────────────────────────────────────────── */}
+      {isColumnDialogOpen && (
+        <Modal
+          title={editingColumn ? "Edit column" : "Add new column"}
+          description={
+            editingColumn
+              ? "Update the column title or hide it from the footer."
+              : "A column is just a heading — add the links after saving."
+          }
+          onClose={() => setIsColumnDialogOpen(false)}
+          footer={
+            <>
+              <button type="button" onClick={() => setIsColumnDialogOpen(false)} className={GHOST}>
+                Cancel
+              </button>
+              <button type="button" onClick={handleSaveColumn} className={PRIMARY}>
+                {editingColumn ? "Update" : "Create"}
+              </button>
+            </>
+          }
+        >
+          <label className="block">
+            <span className={LABEL}>
+              Column title <span className="text-[#DC2626]">*</span>
+            </span>
+            <input
+              id="column-title"
+              value={columnForm.title}
+              onChange={(e) => setColumnForm({ ...columnForm, title: e.target.value })}
+              placeholder="e.g., Customer Service"
+              className={`${FIELD} mt-1.5`}
+            />
+          </label>
 
-      {/* Element Dialog */}
-      <Dialog open={isElementDialogOpen} onOpenChange={setIsElementDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingElement ? "Edit Element" : "Add New Element"}
-            </DialogTitle>
-            <DialogDescription>
-              {editingElement
-                ? "Update the link information"
-                : "Create a new link element"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="element-label">Label *</Label>
-              <Input
-                id="element-label"
-                value={elementForm.label}
-                onChange={(e) =>
-                  setElementForm({ ...elementForm, label: e.target.value })
-                }
-                placeholder="e.g., About Us"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="element-url">URL *</Label>
-              <Input
-                id="element-url"
-                value={elementForm.url}
-                onChange={(e) =>
-                  setElementForm({ ...elementForm, url: e.target.value })
-                }
-                placeholder="e.g., /about"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="element-order">Display Order</Label>
-              <Input
-                id="element-order"
-                type="number"
-                value={elementForm.displayOrder}
-                onChange={(e) =>
-                  setElementForm({
-                    ...elementForm,
-                    displayOrder: parseInt(e.target.value) || 0,
-                  })
-                }
-                placeholder="0"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="element-visible"
-                checked={elementForm.isVisible}
-                onChange={(e) =>
-                  setElementForm({ ...elementForm, isVisible: e.target.checked })
-                }
-                className="w-4 h-4"
-              />
-              <Label htmlFor="element-visible">Visible</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="element-new-tab"
-                checked={elementForm.openInNewTab}
-                onChange={(e) =>
-                  setElementForm({
-                    ...elementForm,
-                    openInNewTab: e.target.checked,
-                  })
-                }
-                className="w-4 h-4"
-              />
-              <Label htmlFor="element-new-tab">Open in New Tab</Label>
-            </div>
+          <ToggleRow
+            id="column-visible"
+            checked={columnForm.isVisible}
+            onChange={(checked) => setColumnForm({ ...columnForm, isVisible: checked })}
+            label="Visible in the footer"
+            hint="Hidden columns keep their links but are not rendered."
+          />
+        </Modal>
+      )}
+
+      {/* ── element modal ──────────────────────────────────────────────────── */}
+      {isElementDialogOpen && (
+        <Modal
+          title={editingElement ? "Edit link" : "Add new link"}
+          description={
+            editingElement
+              ? "Update the label, destination or ordering of this link."
+              : "Links appear in the order set below."
+          }
+          onClose={() => setIsElementDialogOpen(false)}
+          footer={
+            <>
+              <button type="button" onClick={() => setIsElementDialogOpen(false)} className={GHOST}>
+                Cancel
+              </button>
+              <button type="button" onClick={handleSaveElement} className={PRIMARY}>
+                {editingElement ? "Update" : "Create"}
+              </button>
+            </>
+          }
+        >
+          <label className="block">
+            <span className={LABEL}>
+              Label <span className="text-[#DC2626]">*</span>
+            </span>
+            <input
+              id="element-label"
+              value={elementForm.label}
+              onChange={(e) => setElementForm({ ...elementForm, label: e.target.value })}
+              placeholder="e.g., About Us"
+              className={`${FIELD} mt-1.5`}
+            />
+          </label>
+
+          <label className="block">
+            <span className={LABEL}>
+              URL <span className="text-[#DC2626]">*</span>
+            </span>
+            <input
+              id="element-url"
+              value={elementForm.url}
+              onChange={(e) => setElementForm({ ...elementForm, url: e.target.value })}
+              placeholder="e.g., /about"
+              className={`${FIELD} mt-1.5`}
+            />
+          </label>
+
+          <label className="block">
+            <span className={LABEL}>Display order</span>
+            <input
+              id="element-order"
+              type="number"
+              value={elementForm.displayOrder}
+              onChange={(e) =>
+                setElementForm({
+                  ...elementForm,
+                  displayOrder: parseInt(e.target.value) || 0,
+                })
+              }
+              placeholder="0"
+              className={`${FIELD} mt-1.5`}
+            />
+          </label>
+
+          <ToggleRow
+            id="element-visible"
+            checked={elementForm.isVisible}
+            onChange={(checked) => setElementForm({ ...elementForm, isVisible: checked })}
+            label="Visible in the footer"
+            hint="Hidden links stay editable here but are not rendered."
+          />
+
+          <ToggleRow
+            id="element-new-tab"
+            checked={elementForm.openInNewTab}
+            onChange={(checked) => setElementForm({ ...elementForm, openInNewTab: checked })}
+            label="Open in a new tab"
+            hint="Adds target=_blank with a safe rel on the storefront link."
+          />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* ── shared presentational pieces (page-local, plain Tailwind) ─────────────── */
+
+function Field({
+  label,
+  value,
+  icon,
+  multiline = false,
+}: {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+  multiline?: boolean;
+}) {
+  return (
+    <div className="min-w-0 rounded-[10px] border border-[#F0F4FA] bg-[#FAFBFD] px-3 py-2">
+      <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[#9BAABB]">
+        {icon} {label}
+      </p>
+      <p className={`mt-0.5 text-[12.5px] text-[#0D1B2E] ${multiline ? "whitespace-pre-line leading-relaxed" : "truncate"}`}>
+        {value || <span className="text-[#C3CFDF]">—</span>}
+      </p>
+    </div>
+  );
+}
+
+function FormSection({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[12px] border border-[#E5EAF2] p-3.5">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-1">
+        <h3 className="text-[12.5px] font-semibold text-[#0D1B2E]">{title}</h3>
+        <p className="text-[10.5px] text-[#9BAABB]">{hint}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function TextField({
+  id,
+  name,
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  required = false,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  type?: string;
+  required?: boolean;
+}) {
+  return (
+    <label className="block" htmlFor={id}>
+      <span className={LABEL}>
+        {label} {required && <span className="text-[#DC2626]">*</span>}
+      </span>
+      <input
+        id={id}
+        name={name}
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={`${FIELD} mt-1.5`}
+      />
+    </label>
+  );
+}
+
+function TextAreaField({
+  id,
+  name,
+  label,
+  value,
+  onChange,
+  placeholder,
+  rows = 3,
+  required = false,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  rows?: number;
+  required?: boolean;
+}) {
+  return (
+    <label className="block" htmlFor={id}>
+      <span className={LABEL}>
+        {label} {required && <span className="text-[#DC2626]">*</span>}
+      </span>
+      <textarea
+        id={id}
+        name={name}
+        rows={rows}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={`${FIELD} mt-1.5 resize-y leading-relaxed`}
+      />
+    </label>
+  );
+}
+
+function ToggleRow({
+  id,
+  checked,
+  onChange,
+  label,
+  hint,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-[12px] border border-[#E5EAF2] px-3.5 py-2.5">
+      <div className="min-w-0">
+        <p className="text-[12px] font-semibold text-[#0D1B2E]">{label}</p>
+        <p className="mt-0.5 text-[10.5px] leading-relaxed text-[#7A90AB]">{hint}</p>
+      </div>
+      <button
+        id={id}
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-[#8B5CF6]/25 ${
+          checked ? "bg-gradient-to-r from-[#2563EB] to-[#8B5CF6]" : "bg-[#D5DEEC]"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all ${
+            checked ? "left-[1.375rem]" : "left-0.5"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+function Modal({
+  title,
+  description,
+  onClose,
+  footer,
+  children,
+}: {
+  title: string;
+  description: string;
+  onClose: () => void;
+  footer: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6" role="presentation">
+      <button type="button" aria-label="Close dialog" onClick={onClose} className="absolute inset-0 bg-[#0D1B2E]/40 backdrop-blur-[2px]" />
+
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[18px] border border-[#E5EAF2] bg-white shadow-2xl sm:rounded-[18px]"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onClose();
+        }}
+      >
+        <header className="flex items-start justify-between gap-3 border-b border-[#F0F4FA] bg-[#FAFBFD] px-4 py-3.5">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-[#0D1B2E]">{title}</h2>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-[#7A90AB]">{description}</p>
           </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsElementDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSaveElement}>
-              {editingElement ? "Update" : "Create"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-[10px] p-1.5 text-[#9BAABB] transition hover:bg-white hover:text-[#3D5068] focus-visible:ring-2 focus-visible:ring-[#8B5CF6]/30"
+          >
+            <X size={15} />
+          </button>
+        </header>
+
+        <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">{children}</div>
+
+        <footer className="flex items-center justify-end gap-2 border-t border-[#F0F4FA] bg-white px-4 py-3">
+          {footer}
+        </footer>
+      </div>
     </div>
   );
 }

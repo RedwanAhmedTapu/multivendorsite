@@ -13,9 +13,12 @@ import {
   Play,
   RotateCcw,
   Star,
+  LayoutGrid,
+  Youtube,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +42,7 @@ import {
   useCheckQuotaMutation,
   useGetStorageStatsQuery,
 } from "@/features/vendorManageApi";
+import MediaCenter, { type MediaCenterItem } from "./MediaCenter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,6 +79,16 @@ const VIDEO_MAX_DURATION = 60;
 const VIDEO_REQUIRED_WIDTH = 480;
 const VIDEO_REQUIRED_HEIGHT = 480;
 
+// Matches youtube.com/watch?v=, youtu.be/, youtube.com/embed/, youtube.com/shorts/
+const YOUTUBE_ID_PATTERN =
+  /(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
+
+function getYoutubeEmbedUrl(url: string): string | null {
+  const match = url.trim().match(YOUTUBE_ID_PATTERN);
+  if (!match || !match[1]) return null;
+  return `https://www.youtube.com/embed/${match[1]}`;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ProductMediaUploader({
@@ -94,6 +108,7 @@ export default function ProductMediaUploader({
   const [imgDragActive, setImgDragActive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const imgInputRef = useRef<HTMLInputElement>(null);
+  const [imageMediaCenterOpen, setImageMediaCenterOpen] = useState(false);
 
   // ── Video state ──
   const [vidDragActive, setVidDragActive] = useState(false);
@@ -117,6 +132,14 @@ export default function ProductMediaUploader({
   const vidPreviewRef = useRef<HTMLVideoElement>(null);
   const editorVideoRef = useRef<HTMLVideoElement>(null);
   const ffmpegRef = useRef<any>(null);
+
+  // Where the current video came from — decides how the preview renders and
+  // whether "remove" deletes the underlying R2 file or just unlinks it.
+  const [videoSource, setVideoSource] = useState<"upload" | "media" | "youtube" | null>(null);
+  const [videoTab, setVideoTab] = useState<"upload" | "media" | "youtube">("upload");
+  const [videoMediaCenterOpen, setVideoMediaCenterOpen] = useState(false);
+  const [youtubeInput, setYoutubeInput] = useState("");
+  const [youtubeError, setYoutubeError] = useState("");
 
   // ── Auth ──
   const { user } = useSelector((state: RootState) => state.auth);
@@ -263,6 +286,19 @@ export default function ProductMediaUploader({
     updated.unshift(img);
     setImages(updated);
     toast.success("Main image updated");
+  };
+
+  // Picking existing images from the Media Center instead of uploading new ones.
+  const handleMediaCenterImages = (items: MediaCenterItem[]) => {
+    const remaining = maxImages - images.length;
+    if (remaining <= 0) {
+      toast.error(`Maximum ${maxImages} images allowed.`);
+      return;
+    }
+    const picked = items.slice(0, remaining).map((i) => i.url);
+    if (!picked.length) return;
+    setImages([...images, ...picked]);
+    toast.success(`Added ${picked.length} image(s) from Media Center`);
   };
 
   const storagePercent = storageStats ? storageStats.usagePercent : 0;
@@ -432,6 +468,7 @@ export default function ProductMediaUploader({
           if (res.success) {
             setVideoUrl(res.data.url);
             setVideoKey(res.data.key);
+            setVideoSource("upload");
             setVidUploading(false);
             setVidProgress(100);
             setValidationResult(null);
@@ -473,8 +510,47 @@ export default function ProductMediaUploader({
     }
   };
 
+  // Picking an existing video from the Media Center — just links it, no upload.
+  const handleMediaCenterVideo = (items: MediaCenterItem[]) => {
+    const item = items[0];
+    if (!item) return;
+    setVideoUrl(item.url);
+    setVideoKey(null);
+    setVideoSource("media");
+    setVidError(null);
+    toast.success("Video linked from Media Center");
+  };
+
+  const handleUseYoutubeUrl = () => {
+    const embed = getYoutubeEmbedUrl(youtubeInput);
+    if (!embed) {
+      setYoutubeError("Please paste a valid YouTube URL");
+      return;
+    }
+    setYoutubeError("");
+    setVideoUrl(embed);
+    setVideoKey(null);
+    setVideoSource("youtube");
+    setYoutubeInput("");
+    toast.success("YouTube video linked");
+  };
+
   const handleDeleteVideo = async () => {
-    if (!videoKey) return;
+    // Videos linked from the Media Center or YouTube aren't owned by this
+    // uploader — just unlink them locally instead of deleting the source file.
+    if (videoSource !== "upload" || !videoKey) {
+      setVideoUrl(null);
+      setVideoKey(null);
+      setVideoSource(null);
+      setVidProgress(0);
+      setValidationResult(null);
+      setEditingVideo(null);
+      setYoutubeInput("");
+      setYoutubeError("");
+      if (vidInputRef.current) vidInputRef.current.value = "";
+      toast.success("Video removed");
+      return;
+    }
     try {
       if (!accessToken) throw new Error("Authentication required");
       const res = await fetch("http://localhost:5000/api/upload/video", {
@@ -489,6 +565,7 @@ export default function ProductMediaUploader({
       if (result.success) {
         setVideoUrl(null);
         setVideoKey(null);
+        setVideoSource(null);
         setVidProgress(0);
         setValidationResult(null);
         setEditingVideo(null);
@@ -497,6 +574,7 @@ export default function ProductMediaUploader({
       } else throw new Error(result.message);
     } catch (err: any) {
       setVidError(err.message || "Delete failed");
+      toast.error(err.message || "Delete failed");
     }
   };
 
@@ -522,6 +600,12 @@ export default function ProductMediaUploader({
 
   const trimDur = endTime - startTime;
   const trimValid = trimDur >= VIDEO_MIN_DURATION && trimDur <= VIDEO_MAX_DURATION;
+
+  const VIDEO_TABS: { key: "upload" | "media" | "youtube"; label: string; icon: any }[] = [
+    { key: "upload", label: "Upload File", icon: Upload },
+    { key: "media", label: "Media Center", icon: LayoutGrid },
+    { key: "youtube", label: "YouTube URL", icon: Youtube },
+  ];
 
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -678,6 +762,31 @@ export default function ProductMediaUploader({
             )}
           </div>
 
+          {/* Or pick from Media Center */}
+          <button
+            onClick={() => setImageMediaCenterOpen(true)}
+            disabled={imgUploading || images.length >= maxImages}
+            style={{
+              marginTop: 8,
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: "1.5px dashed #BDD0EE",
+              background: "#fff",
+              color: images.length >= maxImages ? "#BDD0EE" : "#1565C0",
+              fontSize: 11.5,
+              fontWeight: 700,
+              cursor: imgUploading || images.length >= maxImages ? "not-allowed" : "pointer",
+              opacity: imgUploading ? 0.6 : 1,
+            }}
+          >
+            <LayoutGrid size={13} /> Or choose from Media Center
+          </button>
+
           {/* Thumbnail grid */}
           {images.length > 0 && (
             <div
@@ -825,167 +934,282 @@ export default function ProductMediaUploader({
 
           {!videoUrl ? (
             <>
-              {/* Video drop zone */}
-              <div
-                onDragEnter={handleVidDrag}
-                onDragOver={handleVidDrag}
-                onDragLeave={handleVidDrag}
-                onDrop={handleVidDrop}
-                onClick={() =>
-                  !vidUploading && !(!ffmpegLoaded) && vidInputRef.current?.click()
-                }
-                style={{
-                  border: `1.5px dashed ${vidDragActive ? "#00ACC1" : "#BDD0EE"}`,
-                  borderRadius: 12,
-                  padding: "16px 12px",
-                  textAlign: "center",
-                  cursor:
-                    vidUploading || !ffmpegLoaded ? "not-allowed" : "pointer",
-                  transition: "all 0.2s",
-                  background: vidDragActive ? "#E0F7FA" : "#F5F8FF",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                  minHeight: 110,
-                  opacity: vidUploading ? 0.7 : 1,
-                }}
-              >
-                {vidUploading ? (
-                  <div style={{ width: "100%", maxWidth: 180 }}>
-                    <div
-                      style={{
-                        width: 28,
-                        height: 28,
-                        border: "3px solid #00ACC1",
-                        borderTopColor: "transparent",
-                        borderRadius: "50%",
-                        animation: "spin 0.8s linear infinite",
-                        margin: "0 auto 6px",
-                      }}
-                    />
-                    <p
-                      style={{
-                        fontSize: 12,
-                        color: "#00ACC1",
-                        fontWeight: 600,
-                        marginBottom: 6,
-                      }}
-                    >
-                      {processingProgress > 0 && processingProgress < 100
-                        ? `Processing… ${processingProgress}%`
-                        : `Uploading… ${vidProgress}%`}
-                    </p>
-                    <div
-                      style={{
-                        width: "100%",
-                        background: "#B2EBF2",
-                        borderRadius: 4,
-                        height: 6,
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: "100%",
-                          width: `${vidProgress || processingProgress}%`,
-                          background: "linear-gradient(90deg,#00ACC1,#00838F)",
-                          borderRadius: 4,
-                          transition: "width 0.3s",
-                        }}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <Video size={22} color={!ffmpegLoaded ? "#BDD0EE" : "#7A90AB"} />
-                    <div
-                      style={{
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        color: "#3D5068",
-                      }}
-                    >
-                      {!ffmpegLoaded
-                        ? "Loading editor…"
-                        : "Click to upload video"}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#7A90AB" }}>
-                      480×480 · 10–60 sec · Max 100MB
-                    </div>
-                  </>
-                )}
+              {/* Source tabs — upload a file, pick from Media Center, or link YouTube */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                {VIDEO_TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setVideoTab(tab.key)}
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 4,
+                      padding: "6px 4px",
+                      borderRadius: 7,
+                      border: `1.5px solid ${videoTab === tab.key ? "#1565C0" : "#D6E2F5"}`,
+                      background: videoTab === tab.key ? "#E3EEF9" : "#fff",
+                      color: videoTab === tab.key ? "#1565C0" : "#7A90AB",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <tab.icon size={12} /> {tab.label}
+                  </button>
+                ))}
               </div>
 
-              {/* Error */}
-              {vidError && (
+              {videoTab === "upload" && (
+                <>
+                  {/* Video drop zone */}
+                  <div
+                    onDragEnter={handleVidDrag}
+                    onDragOver={handleVidDrag}
+                    onDragLeave={handleVidDrag}
+                    onDrop={handleVidDrop}
+                    onClick={() =>
+                      !vidUploading && !(!ffmpegLoaded) && vidInputRef.current?.click()
+                    }
+                    style={{
+                      border: `1.5px dashed ${vidDragActive ? "#00ACC1" : "#BDD0EE"}`,
+                      borderRadius: 12,
+                      padding: "16px 12px",
+                      textAlign: "center",
+                      cursor:
+                        vidUploading || !ffmpegLoaded ? "not-allowed" : "pointer",
+                      transition: "all 0.2s",
+                      background: vidDragActive ? "#E0F7FA" : "#F5F8FF",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                      minHeight: 110,
+                      opacity: vidUploading ? 0.7 : 1,
+                    }}
+                  >
+                    {vidUploading ? (
+                      <div style={{ width: "100%", maxWidth: 180 }}>
+                        <div
+                          style={{
+                            width: 28,
+                            height: 28,
+                            border: "3px solid #00ACC1",
+                            borderTopColor: "transparent",
+                            borderRadius: "50%",
+                            animation: "spin 0.8s linear infinite",
+                            margin: "0 auto 6px",
+                          }}
+                        />
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: "#00ACC1",
+                            fontWeight: 600,
+                            marginBottom: 6,
+                          }}
+                        >
+                          {processingProgress > 0 && processingProgress < 100
+                            ? `Processing… ${processingProgress}%`
+                            : `Uploading… ${vidProgress}%`}
+                        </p>
+                        <div
+                          style={{
+                            width: "100%",
+                            background: "#B2EBF2",
+                            borderRadius: 4,
+                            height: 6,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: "100%",
+                              width: `${vidProgress || processingProgress}%`,
+                              background: "linear-gradient(90deg,#00ACC1,#00838F)",
+                              borderRadius: 4,
+                              transition: "width 0.3s",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <Video size={22} color={!ffmpegLoaded ? "#BDD0EE" : "#7A90AB"} />
+                        <div
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: 600,
+                            color: "#3D5068",
+                          }}
+                        >
+                          {!ffmpegLoaded
+                            ? "Loading editor…"
+                            : "Click to upload video"}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#7A90AB" }}>
+                          480×480 · 10–60 sec · Max 100MB
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Error */}
+                  {vidError && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 7,
+                        padding: "8px 10px",
+                        background: "#FFEBEE",
+                        border: "1px solid #FFCDD2",
+                        borderRadius: 7,
+                        marginTop: 7,
+                      }}
+                    >
+                      <AlertCircle size={13} color="#D32F2F" style={{ flexShrink: 0, marginTop: 1 }} />
+                      <span style={{ fontSize: 11, color: "#B71C1C" }}>
+                        {vidError}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Requirements box */}
+                  <div
+                    style={{
+                      background: "#F5F8FF",
+                      border: "1px solid #D6E2F5",
+                      borderRadius: 8,
+                      padding: "8px 10px",
+                      marginTop: 7,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 9.5,
+                        fontWeight: 700,
+                        color: "#7A90AB",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        marginBottom: 5,
+                      }}
+                    >
+                      Requirements
+                    </div>
+                    {[
+                      "480×480 pixels",
+                      "10–60 seconds",
+                      "Max 100MB",
+                      "MP4, MOV, AVI",
+                    ].map((req) => (
+                      <div
+                        key={req}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          fontSize: 11,
+                          color: "#00ACC1",
+                          padding: "1px 0",
+                        }}
+                      >
+                        <CheckCircle size={12} />
+                        {req}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {videoTab === "media" && (
                 <div
+                  onClick={() => setVideoMediaCenterOpen(true)}
                   style={{
+                    border: "1.5px dashed #BDD0EE",
+                    borderRadius: 12,
+                    padding: "16px 12px",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    background: "#F5F8FF",
                     display: "flex",
-                    alignItems: "flex-start",
-                    gap: 7,
-                    padding: "8px 10px",
-                    background: "#FFEBEE",
-                    border: "1px solid #FFCDD2",
-                    borderRadius: 7,
-                    marginTop: 7,
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    minHeight: 110,
                   }}
                 >
-                  <AlertCircle size={13} color="#D32F2F" style={{ flexShrink: 0, marginTop: 1 }} />
-                  <span style={{ fontSize: 11, color: "#B71C1C" }}>
-                    {vidError}
-                  </span>
+                  <LayoutGrid size={22} color="#7A90AB" />
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: "#3D5068" }}>
+                    Browse Media Center
+                  </div>
+                  <div style={{ fontSize: 11, color: "#7A90AB" }}>
+                    Link a video you've already uploaded
+                  </div>
                 </div>
               )}
 
-              {/* Requirements box */}
-              <div
-                style={{
-                  background: "#F5F8FF",
-                  border: "1px solid #D6E2F5",
-                  borderRadius: 8,
-                  padding: "8px 10px",
-                  marginTop: 7,
-                }}
-              >
+              {videoTab === "youtube" && (
                 <div
                   style={{
-                    fontSize: 9.5,
-                    fontWeight: 700,
-                    color: "#7A90AB",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    marginBottom: 5,
+                    border: "1.5px solid #D6E2F5",
+                    borderRadius: 12,
+                    padding: "14px 12px",
+                    background: "#F5F8FF",
                   }}
                 >
-                  Requirements
-                </div>
-                {[
-                  "480×480 pixels",
-                  "10–60 seconds",
-                  "Max 100MB",
-                  "MP4, MOV, AVI",
-                ].map((req) => (
                   <div
-                    key={req}
                     style={{
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      color: "#3D5068",
+                      marginBottom: 8,
                       display: "flex",
                       alignItems: "center",
-                      gap: 5,
-                      fontSize: 11,
-                      color: "#00ACC1",
-                      padding: "1px 0",
+                      gap: 6,
                     }}
                   >
-                    <CheckCircle size={12} />
-                    {req}
+                    <Youtube size={16} color="#FF0000" /> Paste a YouTube link
                   </div>
-                ))}
-              </div>
+                  <Input
+                    value={youtubeInput}
+                    onChange={(e) => {
+                      setYoutubeInput(e.target.value);
+                      if (youtubeError) setYoutubeError("");
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && handleUseYoutubeUrl()}
+                    placeholder="https://www.youtube.com/watch?v=…"
+                    style={{ fontSize: 12.5, marginBottom: 8 }}
+                  />
+                  <Button
+                    onClick={handleUseYoutubeUrl}
+                    disabled={!youtubeInput.trim()}
+                    style={{ width: "100%", background: "#1565C0", color: "#fff", border: "none" }}
+                  >
+                    Use this Video
+                  </Button>
+                  {youtubeError && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        marginTop: 8,
+                        fontSize: 11,
+                        color: "#D32F2F",
+                      }}
+                    >
+                      <AlertCircle size={12} /> {youtubeError}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           ) : (
-            /* Video uploaded preview */
+            /* Video linked/uploaded preview */
             <div style={{ position: "relative" }}>
               <div
                 style={{
@@ -998,13 +1222,22 @@ export default function ProductMediaUploader({
                   maxWidth: 180,
                 }}
               >
-                <video
-                  ref={vidPreviewRef}
-                  src={videoUrl}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  controls
-                  preload="metadata"
-                />
+                {videoSource === "youtube" ? (
+                  <iframe
+                    src={videoUrl}
+                    style={{ width: "100%", height: "100%", border: "none" }}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <video
+                    ref={vidPreviewRef}
+                    src={videoUrl}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    controls
+                    preload="metadata"
+                  />
+                )}
                 <button
                   onClick={handleDeleteVideo}
                   title="Remove video"
@@ -1037,7 +1270,11 @@ export default function ProductMediaUploader({
                 }}
               >
                 <CheckCircle size={11} color="#2E7D32" />
-                Video uploaded
+                {videoSource === "youtube"
+                  ? "YouTube video linked"
+                  : videoSource === "media"
+                    ? "Video linked from Media Center"
+                    : "Video uploaded"}
               </p>
             </div>
           )}
@@ -1491,6 +1728,26 @@ export default function ProductMediaUploader({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ═══ MEDIA CENTER PICKERS ═══ */}
+      <MediaCenter
+        open={imageMediaCenterOpen}
+        onOpenChange={setImageMediaCenterOpen}
+        fileType="IMAGE"
+        multiple
+        maxSelect={Math.max(0, maxImages - images.length)}
+        onSelect={handleMediaCenterImages}
+        title="Choose Product Images"
+        description={`Select up to ${Math.max(0, maxImages - images.length)} image(s) already in your media.`}
+      />
+      <MediaCenter
+        open={videoMediaCenterOpen}
+        onOpenChange={setVideoMediaCenterOpen}
+        fileType="VIDEO"
+        multiple={false}
+        onSelect={handleMediaCenterVideo}
+        title="Choose Product Video"
+      />
 
       {/* Spinner keyframe */}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

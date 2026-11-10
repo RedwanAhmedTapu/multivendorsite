@@ -1,5 +1,6 @@
 import React from 'react';
 import { DollarSign, Users, ShoppingCart } from 'lucide-react';
+import { HrmWorkspaceEntry } from '@/components/hrm/HrmWorkspaceEntry';
 
 export default function AdminDashboard() {
   const stats = [
@@ -43,6 +44,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen  ">
       <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex justify-end"><HrmWorkspaceEntry /></div>
         {/* Top Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat, index) => (

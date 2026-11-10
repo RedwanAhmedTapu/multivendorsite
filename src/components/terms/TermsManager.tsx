@@ -34,7 +34,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Editor } from "@tinymce/tinymce-react";
 import {
   Trash2,
@@ -285,11 +284,11 @@ export default function TermsManager() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="mx-auto max-w-[1180px] space-y-4 bg-[#F7F9FD] px-4 py-5 sm:px-6 sm:py-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Terms & Conditions Manager</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-[22px] font-semibold leading-tight tracking-tight text-[#0D1B2E]">Terms & Conditions Manager</h1>
+          <p className="mt-1.5 max-w-xl text-[12.5px] leading-relaxed text-[#7A90AB]">
             Create and manage terms of service, privacy policies, and other legal
             documents
           </p>
@@ -299,115 +298,107 @@ export default function TermsManager() {
             resetForm();
             setActiveTab("create");
           }}
-          className="flex items-center gap-2"
+          className="inline-flex items-center gap-1.5 rounded-[11px] bg-gradient-to-br from-[#2563EB] to-[#8B5CF6] px-3.5 py-2 text-xs font-semibold text-white shadow-sm shadow-[#8B5CF6]/25 transition hover:brightness-105"
         >
           <Plus className="w-4 h-4" /> New Document
         </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="browse">Browse Documents</TabsTrigger>
-          <TabsTrigger value="create">Create New</TabsTrigger>
-          <TabsTrigger value="edit" disabled={!editingId}>
+        <TabsList className="grid w-full grid-cols-3 gap-1 rounded-[12px] border border-[#E5EAF2] bg-[#FAFBFD] p-1">
+          <TabsTrigger value="browse" className="rounded-[9px] py-1.5 text-[11.5px] font-semibold text-[#3D5068] data-[state=active]:bg-white data-[state=active]:text-[#0D1B2E] data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-[#E5EAF2]">Browse Documents</TabsTrigger>
+          <TabsTrigger value="create" className="rounded-[9px] py-1.5 text-[11.5px] font-semibold text-[#3D5068] data-[state=active]:bg-white data-[state=active]:text-[#0D1B2E] data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-[#E5EAF2]">Create New</TabsTrigger>
+          <TabsTrigger value="edit" disabled={!editingId} className="rounded-[9px] py-1.5 text-[11.5px] font-semibold text-[#3D5068] data-[state=active]:bg-white data-[state=active]:text-[#0D1B2E] data-[state=active]:shadow-sm data-[state=active]:ring-1 data-[state=active]:ring-[#E5EAF2]">
             Edit Document
           </TabsTrigger>
         </TabsList>
 
         {/* -------- Browse Tab -------- */}
-        <TabsContent value="browse" className="space-y-4 mt-6">
+        <TabsContent value="browse" className="mt-4 space-y-4">
           {/* Filter Section */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-lg">Filters</CardTitle>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={clearFilters}
-                  className="flex items-center gap-1"
+          <section className="rounded-[14px] border border-[#E5EAF2] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-t-[13px] border-b border-[#F0F4FA] bg-[#FAFBFD] px-3.5 py-2.5">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-[8px] bg-[#EEF3FB] text-[#2563EB]">
+                  <Search size={12} />
+                </span>
+                <h2 className="text-[11px] font-semibold uppercase tracking-wide text-[#3D5068]">Filters</h2>
+              </div>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 rounded-[10px] border border-[#E5EAF2] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#3D5068] transition hover:border-[#D5DEEC] hover:bg-[#FAFBFD]"
+              >
+                <XCircle size={12} /> Clear
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 px-3.5 py-3 md:grid-cols-2 xl:grid-cols-4">
+              <label className="block">
+                <span className="text-[10.5px] font-semibold uppercase tracking-wide text-[#7A90AB]">Search</span>
+                <span className="relative mt-1 block">
+                  <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9BAABB]" />
+                  <input
+                    id="search"
+                    placeholder="Search documents..."
+                    value={filters.search}
+                    onChange={(e) => handleFilterChange("search", e.target.value)}
+                    className="w-full rounded-[12px] border border-[#E5EAF2] bg-white px-2.5 py-2 text-[12.5px] text-[#0D1B2E] outline-none transition focus:border-[#A855F7] focus:ring-4 focus:ring-[#A855F7]/10 pl-8"
+                  />
+                </span>
+              </label>
+
+              <label className="block">
+                <span className="text-[10.5px] font-semibold uppercase tracking-wide text-[#7A90AB]">Type</span>
+                <select
+                  id="filter-type"
+                  value={filters.type}
+                  onChange={(e) => handleFilterChange("type", e.target.value)}
+                  className="w-full rounded-[12px] border border-[#E5EAF2] bg-white px-2.5 py-2 text-[12.5px] text-[#0D1B2E] outline-none transition focus:border-[#A855F7] focus:ring-4 focus:ring-[#A855F7]/10 mt-1 cursor-pointer"
                 >
-                  <XCircle className="w-4 h-4" /> Clear
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="search">Search</Label>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="search"
-                      placeholder="Search documents..."
-                      value={filters.search}
-                      onChange={(e) => handleFilterChange("search", e.target.value)}
-                      className="pl-8"
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="filter-type">Type</Label>
-                  <Select
-                    value={filters.type}
-                    onValueChange={(value) => handleFilterChange("type", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="All types" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="GENERAL">General Terms</SelectItem>
-                      <SelectItem value="PRIVACY_POLICY">Privacy Policy</SelectItem>
-                      <SelectItem value="RETURN_POLICY">Return Policy</SelectItem>
-                      <SelectItem value="VENDOR_AGREEMENT">Vendor Agreement</SelectItem>
-                      <SelectItem value="CUSTOMER_TERMS">Customer Terms</SelectItem>
-                      <SelectItem value="DELIVERY_TERMS">Delivery Terms</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="filter-language">Language</Label>
-                  <Select
-                    value={filters.language}
-                    onValueChange={(value) => handleFilterChange("language", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="All languages" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Languages</SelectItem>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="es">Spanish</SelectItem>
-                      <SelectItem value="fr">French</SelectItem>
-                      <SelectItem value="de">German</SelectItem>
-                      <SelectItem value="bn">Bengali</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="filter-status">Status</Label>
-                  <Select
-                    value={filters.status}
-                    onValueChange={(value) => handleFilterChange("status", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="All statuses" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="draft">Draft</SelectItem>
-                      <SelectItem value="published">Published</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  <option value="all">All Types</option>
+                  <option value="GENERAL">General Terms</option>
+                  <option value="PRIVACY_POLICY">Privacy Policy</option>
+                  <option value="RETURN_POLICY">Return Policy</option>
+                  <option value="VENDOR_AGREEMENT">Vendor Agreement</option>
+                  <option value="CUSTOMER_TERMS">Customer Terms</option>
+                  <option value="DELIVERY_TERMS">Delivery Terms</option>
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-[10.5px] font-semibold uppercase tracking-wide text-[#7A90AB]">Language</span>
+                <select
+                  id="filter-language"
+                  value={filters.language}
+                  onChange={(e) => handleFilterChange("language", e.target.value)}
+                  className="w-full rounded-[12px] border border-[#E5EAF2] bg-white px-2.5 py-2 text-[12.5px] text-[#0D1B2E] outline-none transition focus:border-[#A855F7] focus:ring-4 focus:ring-[#A855F7]/10 mt-1 cursor-pointer"
+                >
+                  <option value="all">All Languages</option>
+                  <option value="en">English</option>
+                  <option value="es">Spanish</option>
+                  <option value="fr">French</option>
+                  <option value="de">German</option>
+                  <option value="bn">Bengali</option>
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-[10.5px] font-semibold uppercase tracking-wide text-[#7A90AB]">Status</span>
+                <select
+                  id="filter-status"
+                  value={filters.status}
+                  onChange={(e) => handleFilterChange("status", e.target.value)}
+                  className="w-full rounded-[12px] border border-[#E5EAF2] bg-white px-2.5 py-2 text-[12.5px] text-[#0D1B2E] outline-none transition focus:border-[#A855F7] focus:ring-4 focus:ring-[#A855F7]/10 mt-1 cursor-pointer"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                  <option value="active">Active</option>
+                </select>
+              </label>
+            </div>
+          </section>
 
           {/* Results Count */}
           {!isLoading && terms && (
@@ -421,114 +412,112 @@ export default function TermsManager() {
           {/* Documents Grid */}
           {isLoading ? (
             <div className="flex justify-center py-10">
-              <p>Loading documents...</p>
+              <div className="animate-pulse space-y-2 rounded-[14px] border border-[#E5EAF2] bg-white p-4"><div className="h-3 w-1/3 rounded bg-[#EEF3FB]" /><div className="h-2.5 w-full rounded bg-[#F4F7FC]" /><div className="h-2.5 w-2/3 rounded bg-[#F4F7FC]" /></div>
             </div>
           ) : filteredTerms && filteredTerms.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {filteredTerms.map((term: Terms) => (
-                <Card
+                <article
                   key={term.id}
-                  className="overflow-hidden hover:shadow-lg transition-shadow"
+                  className="group flex flex-col overflow-hidden rounded-[14px] border border-[#E5EAF2] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:border-[#D5DEEC] hover:shadow-md hover:shadow-[#8B5CF6]/10"
                 >
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{term.title}</CardTitle>
-                        <CardDescription className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="flex items-center gap-1">
-                            <Hash className="w-3 h-3" /> v{term.version}
-                          </Badge>
-                          <Badge variant="outline" className="flex items-center gap-1">
-                            <Globe className="w-3 h-3" />{" "}
-                            {term.language.toUpperCase()}
-                          </Badge>
-                          <Badge variant="outline" className="flex items-center gap-1">
-                            <Type className="w-3 h-3" /> {term.type.replace("_", " ")}
-                          </Badge>
-                        </CardDescription>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        {term.isActive && (
-                          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                            Active
-                          </Badge>
-                        )}
-                        {term.isPublished && (
-                          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-                            Published
-                          </Badge>
-                        )}
+                  <div className="flex items-start justify-between gap-2 border-b border-[#F0F4FA] bg-[#FAFBFD] px-3.5 py-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-[13.5px] font-semibold text-[#0D1B2E]">{term.title}</h3>
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-[#E5EAF2] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#3D5068]">
+                          <Hash size={9} className="text-[#9BAABB]" /> v{term.version}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-[#E5EAF2] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#3D5068]">
+                          <Globe size={9} className="text-[#9BAABB]" /> {term.language.toUpperCase()}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-[#E5EAF2] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#3D5068]">
+                          <Type size={9} className="text-[#9BAABB]" /> {term.type.replace("_", " ")}
+                        </span>
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="pb-3">
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      {term.isActive && (
+                        <span className="rounded-full bg-[#F0F9F0] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#16A34A] ring-1 ring-[#BBF7D0]">
+                          Active
+                        </span>
+                      )}
+                      {term.isPublished && (
+                        <span className="rounded-full bg-[#EEF3FB] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#2563EB] ring-1 ring-[#D5DEEC]">
+                          Published
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 px-3.5 py-3">
                     <div
-                      className="text-sm text-muted-foreground line-clamp-3 prose prose-sm max-w-none"
+                      className="line-clamp-3 text-[12px] leading-relaxed text-[#3D5068] prose prose-sm max-w-none"
                       dangerouslySetInnerHTML={{
                         __html: term.content || "<p>No content yet</p>",
                       }}
                     />
-                  </CardContent>
-                  <CardFooter className="flex justify-between bg-muted/50 py-3">
-                    <div className="text-xs text-muted-foreground">
-                      Last updated:{" "}
-                      {new Date(term.updatedAt).toLocaleDateString()}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 border-t border-[#F0F4FA] px-3.5 py-2.5">
+                    <span className="text-[10px] text-[#9BAABB]">
+                      Updated {new Date(term.updatedAt).toLocaleDateString()}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
                         onClick={() => handleEdit(term)}
-                        className="h-8 px-2"
+                        aria-label={`Edit ${term.title}`}
+                        className="rounded-[9px] p-1.5 text-[#9BAABB] transition hover:bg-[#EEF3FB] hover:text-[#2563EB]"
                       >
-                        <Edit className="w-3 h-3" />
-                      </Button>
+                        <Edit size={13} />
+                      </button>
                       {!term.isPublished && (
-                        <Button
-                          size="sm"
-                          variant="outline"
+                        <button
+                          type="button"
                           onClick={() => handlePublish(term.id)}
-                          className="h-8 px-2"
+                          aria-label={`Publish ${term.title}`}
+                          className="rounded-[9px] p-1.5 text-[#9BAABB] transition hover:bg-[#EEF3FB] hover:text-[#16A34A]"
                         >
-                          <Upload className="w-3 h-3" />
-                        </Button>
+                          <Upload size={13} />
+                        </button>
                       )}
                       {!term.isActive && term.isPublished && (
-                        <Button
-                          size="sm"
-                          variant="outline"
+                        <button
+                          type="button"
                           onClick={() => handleActivate(term.id, term.type as TermType)}
-                          className="h-8 px-2"
+                          aria-label={`Activate ${term.title}`}
+                          className="rounded-[9px] p-1.5 text-[#9BAABB] transition hover:bg-[#F0F9F0] hover:text-[#16A34A]"
                         >
-                          <CheckCircle className="w-3 h-3 text-green-600" />
-                        </Button>
+                          <CheckCircle size={13} />
+                        </button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="destructive"
+                      <button
+                        type="button"
                         onClick={() => handleDelete(term.id)}
-                        className="h-8 px-2"
+                        aria-label={`Delete ${term.title}`}
+                        className="rounded-[9px] p-1.5 text-[#9BAABB] transition hover:bg-[#FEF2F2] hover:text-[#DC2626]"
                       >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                        <Trash2 size={13} />
+                      </button>
                     </div>
-                  </CardFooter>
-                </Card>
+                  </div>
+                </article>
               ))}
             </div>
           ) : (
-            <Card className="text-center py-10">
-              <CardContent>
-                <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">
+            <Card className="rounded-[14px] border border-dashed border-[#E5EAF2] bg-[#FAFBFD] px-4 py-12 text-center">
+              <CardContent className="flex flex-col items-center">
+                <FileText className="mx-auto mb-4 h-12 w-12 text-[#C3CEDD]" />
+                <h3 className="mb-2 text-[15px] font-semibold text-[#0D1B2E]">
                   {terms && terms.length > 0 ? "No matching documents" : "No terms documents yet"}
                 </h3>
-                <p className="text-muted-foreground mb-4">
+                <p className="mb-4 max-w-sm text-[12px] leading-relaxed text-[#7A90AB]">
                   {terms && terms.length > 0 
                     ? "Try adjusting your filters to find what you're looking for."
                     : "Get started by creating your first terms and conditions document."}
                 </p>
-                <Button onClick={() => {
+                <Button className="h-8 rounded-[10px] border-0 bg-[linear-gradient(135deg,#2563EB,#8B5CF6)] px-3.5 text-[11.5px] font-semibold text-white shadow-sm hover:opacity-95" onClick={() => {
                   if (terms && terms.length > 0) {
                     clearFilters();
                   } else {
@@ -543,16 +532,16 @@ export default function TermsManager() {
         </TabsContent>
 
         {/* -------- Create Tab -------- */}
-        <TabsContent value="create" className="space-y-4 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Create New Terms Document</CardTitle>
-              <CardDescription>
+        <TabsContent value="create" className="mt-4 space-y-4">
+          <Card className="overflow-hidden rounded-[14px] border border-[#E5EAF2] bg-white shadow-[0_18px_40px_-24px_rgba(13,27,46,0.35)]">
+            <CardHeader className="border-b border-[#E5EAF2] bg-[#FAFBFD] px-4 py-3">
+              <CardTitle className="text-[14.5px] font-semibold tracking-tight text-[#0D1B2E]">Create New Terms Document</CardTitle>
+              <CardDescription className="mt-0.5 text-[11.5px] text-[#7A90AB]">
                 Fill in the details below to create a new terms and conditions
                 document
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3.5 px-4 py-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="title">Title *</Label>
@@ -699,11 +688,11 @@ export default function TermsManager() {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button variant="outline" onClick={handleCancel}>
+            <CardFooter className="flex flex-col-reverse gap-2 border-t border-[#E5EAF2] bg-[#FAFBFD] px-4 py-3 sm:flex-row sm:justify-between">
+              <Button variant="outline" onClick={handleCancel} className="h-8 rounded-[10px] border border-[#E5EAF2] bg-white px-3 text-[11.5px] font-semibold text-[#3D5068] hover:bg-[#FAFBFD]">
                 <X className="w-4 h-4 mr-2" /> Cancel
               </Button>
-              <Button onClick={handleSave}>
+              <Button onClick={handleSave} className="h-8 rounded-[10px] border-0 bg-[linear-gradient(135deg,#2563EB,#8B5CF6)] px-3.5 text-[11.5px] font-semibold text-white shadow-sm hover:opacity-95">
                 <Save className="w-4 h-4 mr-2" /> Create Document
               </Button>
             </CardFooter>
@@ -711,15 +700,15 @@ export default function TermsManager() {
         </TabsContent>
 
         {/* -------- Edit Tab -------- */}
-        <TabsContent value="edit" className="space-y-4 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Edit Terms Document</CardTitle>
-              <CardDescription>
+        <TabsContent value="edit" className="mt-4 space-y-4">
+          <Card className="overflow-hidden rounded-[14px] border border-[#E5EAF2] bg-white shadow-[0_18px_40px_-24px_rgba(13,27,46,0.35)]">
+            <CardHeader className="border-b border-[#E5EAF2] bg-[#FAFBFD] px-4 py-3">
+              <CardTitle className="text-[14.5px] font-semibold tracking-tight text-[#0D1B2E]">Edit Terms Document</CardTitle>
+              <CardDescription className="mt-0.5 text-[11.5px] text-[#7A90AB]">
                 Make changes to your terms and conditions document
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3.5 px-4 py-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-title">Title *</Label>
@@ -866,12 +855,12 @@ export default function TermsManager() {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button variant="outline" onClick={() => setActiveTab("browse")}>
+            <CardFooter className="flex flex-col-reverse gap-2 border-t border-[#E5EAF2] bg-[#FAFBFD] px-4 py-3 sm:flex-row sm:justify-between">
+              <Button variant="outline" onClick={() => setActiveTab("browse")} className="h-8 rounded-[10px] border border-[#E5EAF2] bg-white px-3 text-[11.5px] font-semibold text-[#3D5068] hover:bg-[#FAFBFD]">
                 <X className="w-4 h-4 mr-2" /> Cancel
               </Button>
               <div className="flex gap-2">
-                <Button
+                <Button className="h-8 rounded-[10px] border border-[#E5EAF2] bg-white px-3 text-[11.5px] font-semibold text-[#3D5068] hover:bg-[#FAFBFD]"
                   variant="outline"
                   onClick={() => handlePublish(editingId!)}
                   disabled={form.isPublished}
@@ -879,7 +868,7 @@ export default function TermsManager() {
                   <Upload className="w-4 h-4 mr-2" />{" "}
                   {form.isPublished ? "Published" : "Publish"}
                 </Button>
-                <Button
+                <Button className="h-8 rounded-[10px] border border-[#E5EAF2] bg-white px-3 text-[11.5px] font-semibold text-[#3D5068] hover:bg-[#FAFBFD]"
                   variant="outline"
                   onClick={() => handleActivate(editingId!, form.type)}
                   disabled={form.isActive}
@@ -887,7 +876,7 @@ export default function TermsManager() {
                   <CheckCircle className="w-4 h-4 mr-2" />{" "}
                   {form.isActive ? "Active" : "Activate"}
                 </Button>
-                <Button onClick={handleSave}>
+              <Button onClick={handleSave} className="h-8 rounded-[10px] border-0 bg-[linear-gradient(135deg,#2563EB,#8B5CF6)] px-3.5 text-[11.5px] font-semibold text-white shadow-sm hover:opacity-95">
                   <Save className="w-4 h-4 mr-2" /> Save Changes
                 </Button>
               </div>

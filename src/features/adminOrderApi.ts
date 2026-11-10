@@ -27,7 +27,14 @@ export type FulfillmentStatus =
   | "RETURNED"
   | "CANCELLED";
 
-export type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+// 1C-9: complete backend payment-state union — includes PARTIALLY_REFUNDED
+// produced by partial refunds since 1C-5D.
+export type PaymentStatus =
+  | "PENDING"
+  | "PAID"
+  | "PARTIALLY_REFUNDED"
+  | "FAILED"
+  | "REFUNDED";
 
 export type RefundStatus =
   | "PENDING"
@@ -56,11 +63,15 @@ export type CourierOrderStatus =
   | "IN_TRANSIT"
   | "OUT_FOR_DELIVERY"
   | "DELIVERED"
+  | "PARTIAL_DELIVERED"
   | "FAILED_DELIVERY"
   | "RETURNING"
   | "RETURNED"
   | "CANCELLED"
   | "ON_HOLD";
+
+/** REGULAR = normal forward shipment. Only REGULAR legs trigger the delivery accounting voucher. */
+export type CourierShipmentKind = "REGULAR" | "EXCHANGE" | "RETURN";
 
 // =============================
 // REQUEST TYPES
@@ -88,10 +99,18 @@ export interface VendorOrdersByVendorFilters {
 export interface FraudReviewFilters {
   page?: number;
   limit?: number;
+  /** "cod" = COD orders awaiting confirmation, "paid" = paid online orders awaiting confirmation (incl. stock-released holds). */
+  queue?: "cod" | "paid";
+  /** Order-number search (contains, case-insensitive; server caps at 64 chars). */
+  search?: string;
 }
 
 export interface RefundListFilters {
   status?: RefundStatus;
+  /** 1C-7B G3: optional — refunds of one order */
+  orderId?: string;
+  /** 1C-7B G3: optional — exact refund id lookup */
+  refundId?: string;
   page?: number;
   limit?: number;
 }
@@ -127,19 +146,40 @@ export interface UpdateVendorOrderStatusRequest {
   note?: string;
 }
 
+/**
+ * Non-goodwill refunds on shipped orders are blocked server-side until the
+ * vendor has confirmed physical receipt of the returned parcel
+ * (vendor.confirmReturnReceipt). Set isGoodwill=true to bypass for
+ * platform-funded refunds.
+ */
 export interface ProcessRefundRequest {
   amount: number;
   reason: string;
   refundType: RefundType;
+  isGoodwill?: boolean;
 }
 
 export interface ApproveRefundRequest {
   amount: number;
   note?: string;
+  isGoodwill?: boolean;
 }
 
 export interface RejectRefundRequest {
   reason: string;
+}
+
+/** Dev/QA-only: manually replay a courier webhook event for a given courier order. */
+export interface SimulateCourierWebhookRequest {
+  newStatus: CourierOrderStatus;
+  courierStatus: string;
+  shipmentKind?: CourierShipmentKind;
+  messageEn?: string;
+  messageBn?: string;
+  location?: string;
+  timestamp: string;
+  rawData?: unknown;
+  returnConsignmentId?: string;
 }
 
 // =============================
@@ -229,6 +269,7 @@ export interface OrderItem {
   variantId: string;
   quantity: number;
   price: number;
+  deliveredQuantity?: number;
   variant: OrderVariant;
 }
 
@@ -262,7 +303,14 @@ export interface CourierOrderDetail {
   courierTrackingId?: string;
   courierOrderId?: string;
   status: CourierOrderStatus;
+  shipmentKind?: CourierShipmentKind;
   lastStatusUpdate: string;
+  pickedUpAt?: string;
+  inTransitAt?: string;
+  deliveredAt?: string;
+  returnedAt?: string;
+  vendorConfirmedReturnAt?: string;
+  cancelledAt?: string;
   courier_tracking_history: TrackingHistoryEntry[];
   courier_providers: CourierProvider;
 }
@@ -270,24 +318,126 @@ export interface CourierOrderDetail {
 export interface Payment {
   method: string;
   status: PaymentStatus;
-  amount: number;
+  /** Prisma Decimal(18,4) serialized — always a string. */
+  amount: string;
   paidAt?: string;
 }
 
 export interface Refund {
   id: string;
   orderId: string;
-  amount: number;
+  /** Prisma Decimal(18,4) serialized — always a string, never a number. */
+  amount: string;
   reason?: string;
   status: RefundStatus;
   createdAt: string;
   processedAt?: string;
   order?: {
     orderNumber: string;
-    totalAmount: number;
+    /** Prisma Decimal(18,4) serialized — always a string. */
+    totalAmount: string;
     paymentStatus: PaymentStatus;
     user: { id: string; name: string; email: string; phone: string };
   };
+}
+
+// ── 1C-7B contract: refund mutation terminal response ──────────────────────
+// POST /admin-orders/:id/refund, PATCH .../approve, PATCH .../reject all
+// return the enriched terminal state of the affected refund (null status
+// fields mean the backend had nothing persisted for them — never fabricated).
+
+export interface RefundMutationResult {
+  success: boolean;
+  refundId: string;
+  orderId: string;
+  paymentStatus: PaymentStatus | null;
+  refundStatus: RefundStatus | null;
+  /** RefundRecord status — null when no record exists. */
+  refundRecordStatus: RefundStatus | null;
+}
+
+// ── 1C-7B contract: RefundRecord (detail) ──────────────────────────────────
+// Includes the 1C-5C failure state (failedReason/failedAt) and gateway
+// reference fields. Money fields are Decimal-serialized strings.
+
+export interface RefundRecord {
+  id: string;
+  refundId: string;
+  refundNumber: string;
+  vendorId: string;
+  customerId: string;
+  refundType: RefundType;
+  /** Decimal-serialized strings. */
+  originalAmount: string;
+  refundAmount: string;
+  refundReason: string;
+  status: RefundStatus;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  rejectionReason?: string;
+  rejectedAt?: string;
+  processedAt?: string;
+  completedAt?: string;
+  /** 1C-5C failure state — present when a gateway refund definitively failed. */
+  failedReason?: string;
+  failedAt?: string;
+  sslTranId?: string | null;
+  sslRefundRefId?: string | null;
+  sslRefundStatus?: string | null;
+  initiatedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── 1C-7B contract: VendorReturn linkage on refund detail ──────────────────
+// The backend exposes the VendorReturns consumed by a refund via the
+// Refund.returns back-relation (VendorReturn.refundId).
+
+export interface RefundVendorReturnItem {
+  id: string;
+  orderItemId: string;
+  variantId: string;
+  quantity: number;
+}
+
+export interface RefundVendorReturn {
+  id: string;
+  vendorOrderId: string;
+  vendorId: string;
+  refundId: string | null;
+  condition: "SELLABLE" | "DAMAGED";
+  status: string;
+  confirmedAt: string;
+  confirmedBy?: string | null;
+  note?: string | null;
+  items: RefundVendorReturnItem[];
+}
+
+export interface RefundDetail extends Omit<Refund, "order"> {
+  /** RefundRecord — null when the backend has none (never fabricated). */
+  detail: RefundRecord | null;
+  order: {
+    id: string;
+    orderNumber: string | null;
+    totalAmount: string;
+    paymentStatus: PaymentStatus;
+  };
+  returns: RefundVendorReturn[];
+}
+
+// ── 1C-7B contract: remaining-refundable summary (READ-ONLY) ───────────────
+// GET /admin-orders/refunds/summary/:orderId — mirrors the H1 consumed
+// definition (PENDING+APPROVED+PROCESSING+REFUNDED). All money = strings.
+
+export interface RefundSummary {
+  orderId: string;
+  paymentId: string | null;
+  paymentAmount: string;
+  consumedRefundAmount: string;
+  remainingRefundableAmount: string;
+  paymentStatus: PaymentStatus | null;
+  orderPaymentStatus: PaymentStatus;
 }
 
 export interface OfferUsageSummary {
@@ -379,6 +529,94 @@ export interface FraudReviewOrder {
   }>;
 }
 
+// ---- Review queue item (GET /admin-orders/fraud-review) ----
+// Every field is derived by the backend (toReviewItem). `actions` are the
+// transitions the backend will accept for this order right now; the UI must
+// not offer anything outside them. Money values are Decimal strings.
+
+export type ReviewReason =
+  | "HIGH_RISK_COD"
+  | "COD_AWAITING_CONFIRMATION"
+  | "PAID_AWAITING_CONFIRMATION"
+  | "PAID_STOCK_RELEASED";
+
+export interface ReviewQueueItem {
+  id: string;
+  orderNumber: string;
+  createdAt: string;
+  totalAmount: string;
+  paymentMethod: string;
+  orderStatus: OrderStatus;
+  paymentStatus: PaymentStatus;
+  /** null = order placed before risk scoring existed. */
+  riskScore: number | null;
+  highRisk: boolean;
+  reviewReason: ReviewReason;
+  /** True only while every live item still holds its stock allocation. */
+  stockReserved: boolean;
+  reservationReleasedAt: string | null;
+  payment: {
+    method: string;
+    status: string;
+    amount: string;
+    paidAt: string | null;
+    /** Payment arrived after the stock reservation was released. */
+    stockHold: boolean;
+  } | null;
+  customer: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    verified: boolean;
+    memberSince: string;
+    /** Cancelled / returned / failed-to-deliver orders by this customer. */
+    problemOrders: number;
+  } | null;
+  shipTo: { name: string; city: string; address: string } | null;
+  vendors: { id: string; storeName: string; subtotal: string; items: number }[];
+  actions: { canApprove: boolean; canReject: boolean; canCancel: boolean };
+}
+
+export interface ReviewQueueResponse extends PaginatedResponse<ReviewQueueItem> {
+  /** Totals per queue, independent of the current queue filter and search. */
+  counts: { cod: number; paid: number };
+}
+
+// ---- Payment reconciliation (GET /admin-orders/payment-reconciliation) ----
+// Verified gateway payments the backend could NOT apply to their order
+// (payment-reconciliation.ts). Read-only: nothing here applies or refunds
+// them — the payment row keeps its status and the order is untouched.
+
+export type UnappliedReason = "ORDER_ALREADY_PAID" | "ORDER_CANCELLED" | "ORDER_NOT_PAYABLE";
+
+export interface UnappliedPayment {
+  id: string;
+  method: string;
+  /** Unchanged by the reconciliation record (usually PENDING; FAILED for a session that had been marked failed). */
+  status: string;
+  /** Decimal string. */
+  amount: string;
+  createdAt: string;
+  reconciliation: {
+    state: "NEEDS_REVIEW";
+    reason: UnappliedReason;
+    receivedAt: string;
+    gateway: string;
+    gatewayRef: string | null;
+    amount: string;
+  } | null;
+  order: {
+    id: string;
+    orderNumber: string | null;
+    status: OrderStatus;
+    paymentStatus: PaymentStatus;
+    user: { id: string; name: string | null; email: string | null } | null;
+  } | null;
+}
+
+export type UnappliedPaymentsResponse = PaginatedResponse<UnappliedPayment>;
+
 // ---- Statistics ----
 
 export interface AdminOrderStatistics {
@@ -427,6 +665,19 @@ export interface StatusUpdateResult {
   newStatus: OrderStatus;
 }
 
+// ---- Courier webhook simulation / COA seeding results ----
+
+export interface SimulateCourierWebhookResult {
+  success: boolean;
+}
+
+export interface SeedCoaResult {
+  success: boolean;
+  message?: string;
+  created?: number;
+  skipped?: number;
+}
+
 // =============================
 // ADMIN ORDER API
 // =============================
@@ -440,8 +691,10 @@ export const adminOrderApi = createApi({
     "AdminOrderStatistics",
     "AdminOrderAnalytics",
     "FraudQueue",
+    "PaymentReconciliation",
     "AdminVendorOrders",
     "Refund",
+    "RefundSummary",
   ],
   endpoints: (builder) => ({
     // =====================================================
@@ -509,11 +762,20 @@ export const adminOrderApi = createApi({
     }),
 
     /**
+     * GET /api/admin-orders/payment-reconciliation?page=1&limit=20
+     * Phase 6: verified payments that couldn't be applied (read-only queue).
+     */
+    getUnappliedPayments: builder.query<UnappliedPaymentsResponse, { page?: number; limit?: number }>({
+      query: (params) => ({ url: "/admin-orders/payment-reconciliation", method: "GET", params }),
+      providesTags: ["PaymentReconciliation"],
+    }),
+
+    /**
      * GET /api/admin-orders/fraud-review?page=1
-     * Orders held in the fraud review queue: PENDING + no payment record
+     * PENDING orders awaiting admin review (COD, and paid online orders incl. stock-released holds). Params: queue, search, page, limit
      */
     getAdminFraudReview: builder.query<
-      PaginatedResponse<FraudReviewOrder>,
+      ReviewQueueResponse,
       FraudReviewFilters
     >({
       query: (params) => ({
@@ -546,6 +808,30 @@ export const adminOrderApi = createApi({
               { type: "Refund", id: "LIST" },
             ]
           : [{ type: "Refund", id: "LIST" }],
+    }),
+
+    /**
+     * GET /api/admin-orders/refunds/:refundId   (1C-7B G3)
+     * Single refund incl. RefundRecord (null when absent) and the associated
+     * VendorReturns consumed by it.
+     */
+    getAdminRefundById: builder.query<ApiResponse<RefundDetail>, string>({
+      query: (refundId) => `/admin-orders/refunds/${refundId}`,
+      providesTags: (_result, _error, refundId) => [
+        { type: "Refund", id: refundId },
+      ],
+    }),
+
+    /**
+     * GET /api/admin-orders/refunds/summary/:orderId   (1C-7B G6)
+     * READ-ONLY remaining-refundable summary (H1 consumed definition).
+     * All money fields are Decimal-serialized strings.
+     */
+    getAdminRefundSummary: builder.query<ApiResponse<RefundSummary>, string>({
+      query: (orderId) => `/admin-orders/refunds/summary/${orderId}`,
+      providesTags: (_result, _error, orderId) => [
+        { type: "RefundSummary", id: orderId },
+      ],
     }),
 
     /**
@@ -588,7 +874,9 @@ export const adminOrderApi = createApi({
 
     /**
      * PATCH /api/admin-orders/:id/confirm
-     * Confirm a PENDING order (COD or fraud-cleared). Body: { note? }
+     * Confirm a PENDING order — non-COD (fraud-cleared / gateway-paid) only.
+     * COD orders must go through PATCH /vendor-orders/:vendorOrderId/confirm-cod.
+     * Body: { note? }
      */
     confirmAdminOrder: builder.mutation<
       ApiResponse<{ success: boolean }>,
@@ -654,7 +942,9 @@ export const adminOrderApi = createApi({
 
     /**
      * PATCH /api/admin-orders/:id/cancel
-     * Force cancel any non-final order. Body: { reason }
+     * Force cancel any non-final order (courier-aware: blocks if already
+     * picked up, otherwise cancels the courier booking + releases the
+     * stock reservation). Body: { reason }
      */
     cancelAdminOrder: builder.mutation<
       ApiResponse<{ success: boolean }>,
@@ -696,7 +986,9 @@ export const adminOrderApi = createApi({
 
     /**
      * PATCH /api/admin-orders/:id/vendor-orders/:vendorOrderId/status
-     * Override a specific VendorOrder status. Body: { status, note? }
+     * Override a specific VendorOrder status. DELIVERED is blocked unless a
+     * courierOrder is already linked (phantom-delivery guard).
+     * Body: { status, note? }
      */
     updateAdminVendorOrderStatus: builder.mutation<
       ApiResponse<StatusUpdateResult>,
@@ -722,10 +1014,14 @@ export const adminOrderApi = createApi({
 
     /**
      * POST /api/admin-orders/:id/refund
-     * Initiate a refund for a paid order. Body: { amount, reason, refundType }
+     * Initiate a refund for a paid order. Non-goodwill refunds on shipped
+     * orders are blocked until the vendor confirms physical receipt of the
+     * returned parcel. Body: { amount, reason, refundType, isGoodwill? }
      */
+    // 1C-7B G1: returns the enriched terminal state (refundId/orderId/
+    // paymentStatus/refundStatus/refundRecordStatus), not a Refund row.
     processAdminRefund: builder.mutation<
-      ApiResponse<Refund>,
+      ApiResponse<RefundMutationResult>,
       { id: string } & ProcessRefundRequest
     >({
       query: ({ id, ...body }) => ({
@@ -737,16 +1033,21 @@ export const adminOrderApi = createApi({
         { type: "AdminOrder", id },
         { type: "AdminOrderDetail", id },
         { type: "Refund", id: "LIST" },
+        { type: "RefundSummary", id },
         "AdminOrderStatistics",
       ],
     }),
 
     /**
      * PATCH /api/admin-orders/refunds/:refundId/approve
-     * Approve a customer-submitted return/refund request. Body: { amount, note? }
+     * Approve a customer-submitted return/refund request. Same physical-return
+     * gate as processRefund unless isGoodwill=true.
+     * Body: { amount, note?, isGoodwill? }
      */
+    // 1C-7B G1: enriched terminal response; the result carries orderId so the
+    // affected RefundSummary cache entry can be invalidated precisely.
     approveAdminRefund: builder.mutation<
-      ApiResponse<{ success: boolean }>,
+      ApiResponse<RefundMutationResult>,
       { refundId: string } & ApproveRefundRequest
     >({
       query: ({ refundId, ...body }) => ({
@@ -757,16 +1058,22 @@ export const adminOrderApi = createApi({
       invalidatesTags: (result, error, { refundId }) => [
         { type: "Refund", id: refundId },
         { type: "Refund", id: "LIST" },
+        ...(result?.data?.orderId
+          ? [{ type: "RefundSummary" as const, id: result.data.orderId }]
+          : []),
         "AdminOrderStatistics",
       ],
     }),
 
     /**
      * PATCH /api/admin-orders/refunds/:refundId/reject
-     * Reject a customer-submitted return/refund request. Body: { reason }
+     * Reject a return/refund request. Body: { reason }
      */
+    // 1C-7B G1: enriched terminal response; rejection does not change the
+    // consumed balance, but the order's payment state is invalidated via the
+    // result's orderId when the backend provides it.
     rejectAdminRefund: builder.mutation<
-      ApiResponse<{ success: boolean }>,
+      ApiResponse<RefundMutationResult>,
       { refundId: string } & RejectRefundRequest
     >({
       query: ({ refundId, ...body }) => ({
@@ -777,8 +1084,59 @@ export const adminOrderApi = createApi({
       invalidatesTags: (result, error, { refundId }) => [
         { type: "Refund", id: refundId },
         { type: "Refund", id: "LIST" },
+        ...(result?.data?.orderId
+          ? [{ type: "RefundSummary" as const, id: result.data.orderId }]
+          : []),
         "AdminOrderStatistics",
       ],
+    }),
+
+    // =====================================================
+    // COURIER WEBHOOK (DEV/QA) & ACCOUNTING SETUP
+    // =====================================================
+
+    /**
+     * POST /api/admin-orders/courier-webhook-test/:courierOrderId
+     * Dev/QA-only: manually replay a courier status webhook to exercise
+     * processCourierStatusUpdate without waiting for the real provider.
+     * Body: { newStatus, courierStatus, shipmentKind?, messageEn?, messageBn?, location?, timestamp, rawData?, returnConsignmentId? }
+     */
+    simulateCourierWebhook: builder.mutation<
+      ApiResponse<SimulateCourierWebhookResult>,
+      { courierOrderId: string } & SimulateCourierWebhookRequest
+    >({
+      query: ({ courierOrderId, ...body }) => ({
+        url: `/admin-orders/courier-webhook-test/${courierOrderId}`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [
+        { type: "AdminOrder", id: "LIST" },
+        "AdminOrderStatistics",
+      ],
+    }),
+
+    /**
+     * POST /api/admin-orders/seed-platform-coa
+     * Run ONCE — idempotent, safe to call again (skips existing accounts).
+     * Seeds the platform-level chart of accounts used by the accounting service.
+     */
+    seedPlatformCoa: builder.mutation<ApiResponse<SeedCoaResult>, void>({
+      query: () => ({
+        url: "/admin-orders/seed-platform-coa",
+        method: "POST",
+      }),
+    }),
+
+    /**
+     * POST /api/admin-orders/seed-vendor-coa/:vendorId
+     * Run once per vendor before that vendor's first delivery/refund voucher.
+     */
+    seedVendorCoa: builder.mutation<ApiResponse<SeedCoaResult>, { vendorId: string }>({
+      query: ({ vendorId }) => ({
+        url: `/admin-orders/seed-vendor-coa/${vendorId}`,
+        method: "POST",
+      }),
     }),
   }),
 });
@@ -795,6 +1153,7 @@ export const {
   // Order Listing & Details
   useGetAllAdminOrdersQuery,
   useGetAdminFraudReviewQuery,
+  useGetUnappliedPaymentsQuery,
   useGetAllAdminRefundsQuery,
   useGetAdminOrdersByVendorQuery,
   useGetAdminOrderByIdQuery,
@@ -811,4 +1170,11 @@ export const {
   useProcessAdminRefundMutation,
   useApproveAdminRefundMutation,
   useRejectAdminRefundMutation,
+  useGetAdminRefundByIdQuery,
+  useGetAdminRefundSummaryQuery,
+
+  // Courier Webhook (Dev/QA) & Accounting Setup
+  useSimulateCourierWebhookMutation,
+  useSeedPlatformCoaMutation,
+  useSeedVendorCoaMutation,
 } = adminOrderApi;

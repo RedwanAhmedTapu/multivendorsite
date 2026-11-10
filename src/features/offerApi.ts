@@ -551,7 +551,15 @@ export const offerApi = createApi({
     // =============================
     // PUBLIC ENDPOINTS
     // =============================
-    
+    getOffersForProduct: builder.query<ApiResponse<Offer[]>, string>({
+  query: (productId) => ({
+    url: `/offers/public/product/${productId}`,
+    method: "GET",
+  }),
+  providesTags: (result, error, productId) => [
+    { type: "PublicOffer", id: productId }
+  ],
+}),
     getPublicOffers: builder.query<PaginatedResponse<Offer>, OfferFilters>({
       query: (params) => ({
         url: "/offers/public",
@@ -657,12 +665,13 @@ createOffer: builder.mutation<ApiResponse<Offer>, FormData>({
 
     approveVendorOffer: builder.mutation<
       ApiResponse<Offer>,
-      { offerId: string; approved: boolean }
+      // A rejection requires a non-empty reason (validated server-side).
+      { offerId: string; approved: boolean; reason?: string }
     >({
-      query: ({ offerId, approved }) => ({
+      query: ({ offerId, approved, reason }) => ({
         url: `/offers/admin/${offerId}/approve`,
         method: "PATCH",
-        body: { approved },
+        body: reason === undefined ? { approved } : { approved, reason },
       }),
       invalidatesTags: (result, error, { offerId }) => [
         { type: "Offer", id: offerId },
@@ -1053,6 +1062,7 @@ createOffer: builder.mutation<ApiResponse<Offer>, FormData>({
 
 export const {
   // Public
+  useGetOffersForProductQuery,
   useGetPublicOffersQuery,
   useGetFlashSalesQuery,
   useGetBuyXGetYOffersQuery,

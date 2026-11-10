@@ -1,90 +1,56 @@
 // components/vendor/offers/vendor-offers-analytics.tsx
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, TrendingUp, Users, Clock, Target } from "lucide-react";
-import type { Offer, OfferAnalytics, VendorPermissions } from "@/features/offerApi";
+//
+// Stat cards computed from the vendor's own offers (the vendor list endpoint,
+// scoped server-side to the signed-in vendor). The vendor summary/analytics
+// endpoints aren't usable here (see the offer redesign notes), so no revenue
+// figure is shown rather than a made-up one.
+import { CircleDot, Clock, Gift, ShieldCheck, Users } from "lucide-react";
+import type { Offer, VendorPermissions } from "@/features/offerApi";
+import { countByStatus, formatTaka, totalRedemptions } from "@/lib/offers/offer-view";
+import { OfferStatCard } from "@/components/offers/shared/offer-ui";
 
 interface VendorOffersAnalyticsProps {
+  /** The vendor's most recent offers (up to `windowSize`). */
   offers: Offer[];
-  analytics: OfferAnalytics[];
+  windowSize: number;
+  isLoading: boolean;
   permissions?: VendorPermissions;
 }
 
-export function VendorOffersAnalytics({ offers, analytics, permissions }: VendorOffersAnalyticsProps) {
-  const totalUsage = analytics.reduce((sum, a) => sum + a.totalUsage, 0);
-  const totalRevenue = analytics.reduce((sum, a) => sum + a.totalRevenue, 0);
-  const activeOffers = offers.filter(o => o.isActive).length;
-  const pendingApproval = offers.filter(o => o.createdByType === "VENDOR" && !o.isActive).length;
+export function VendorOffersAnalytics({ offers, windowSize, isLoading, permissions }: VendorOffersAnalyticsProps) {
+  const counts = countByStatus(offers);
+  const capped = offers.length >= windowSize;
+  const live = counts.active + counts.scheduled;
+  const redemptions = totalRedemptions(offers);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Active Offers</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{activeOffers}</div>
-          <p className="text-xs text-muted-foreground">
-            {permissions ? `${activeOffers} / ${permissions.maxActiveOffers} limit` : 'Total active'}
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Usage</CardTitle>
-          <Users className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {totalUsage.toLocaleString()}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            All time redemptions
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Revenue Impact</CardTitle>
-          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            ${totalRevenue.toLocaleString()}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            From offer redemptions
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Pending Approval</CardTitle>
-          <Clock className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {pendingApproval}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Waiting admin review
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Max Discount</CardTitle>
-          <Target className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {permissions?.maxDiscountPercent}%
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Maximum allowed
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <section aria-label="Offer summary" className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-5">
+      <OfferStatCard
+        label="Offers"
+        icon={Gift}
+        tone="indigo"
+        loading={isLoading}
+        value={capped ? `${offers.length}+` : offers.length}
+        hint={capped ? `Latest ${windowSize} shown in these cards` : "All offers you've created"}
+      />
+      <OfferStatCard
+        label="Live now"
+        icon={CircleDot}
+        tone="emerald"
+        loading={isLoading}
+        value={live}
+        hint={counts.scheduled ? `${counts.scheduled} scheduled to start` : "Active and within dates"}
+      />
+      <OfferStatCard label="Pending review" icon={Clock} tone="amber" loading={isLoading} value={counts.pending} hint="Waiting for FinixMart approval" />
+      <OfferStatCard label="Redemptions" icon={Users} tone="violet" loading={isLoading} value={redemptions.toLocaleString("en-BD")} hint="Times customers used your offers" />
+      <OfferStatCard
+        label="Discount cap"
+        icon={ShieldCheck}
+        tone="cyan"
+        loading={isLoading && !permissions}
+        value={permissions ? `${permissions.maxDiscountPercent}%` : "—"}
+        hint={permissions ? `or ${formatTaka(permissions.maxDiscountAmount)} fixed` : "Permissions unavailable"}
+      />
+    </section>
   );
 }

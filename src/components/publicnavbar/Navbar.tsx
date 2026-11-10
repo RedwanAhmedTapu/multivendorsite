@@ -42,7 +42,7 @@ interface Category {
 function CountBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none pointer-events-none">
+    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-[var(--fm-danger,#ef4444)] text-white text-[10px] font-bold leading-none pointer-events-none">
       {count > 99 ? "99+" : count}
     </span>
   );
@@ -71,7 +71,7 @@ function SearchSuggestions({ query, onSelect, width }: SearchSuggestionsProps) {
     >
       {isFetching ? (
         <div className="px-4 py-3 flex items-center gap-2 text-gray-400 text-sm">
-          <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-teal-500 rounded-full animate-spin" />
+          <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-[var(--fm-accent-light,#14b8a6)] rounded-full animate-spin" />
           Searching…
         </div>
       ) : (
@@ -80,14 +80,14 @@ function SearchSuggestions({ query, onSelect, width }: SearchSuggestionsProps) {
             <li key={cat.id}>
               <button
                 onMouseDown={(e) => { e.preventDefault(); onSelect(cat.slug, cat.name); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-teal-50 text-left group"
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--fm-accent-tint,#f0fdfa)] text-left group"
               >
-                <Tag className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
+                <Tag className="w-3.5 h-3.5 text-[var(--fm-accent-light,#14b8a6)] flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium text-gray-800 group-hover:text-teal-600 truncate block">{cat.name}</span>
+                  <span className="text-sm font-medium text-gray-800 group-hover:text-[var(--fm-accent,#0d9488)] truncate block">{cat.name}</span>
                   {cat.parentId === null && <span className="text-xs text-gray-400">Top-level category</span>}
                 </div>
-                <Search className="w-3 h-3 text-gray-300 group-hover:text-teal-400 flex-shrink-0" />
+                <Search className="w-3 h-3 text-gray-300 group-hover:text-[var(--fm-accent-light,#2dd4bf)] flex-shrink-0" />
               </button>
               <div className="border-b border-gray-100 last:border-0" />
             </li>
@@ -134,11 +134,9 @@ export default function Navbar(): JSX.Element {
   // ── Cart & Wishlist counts ─────────────────────────────────────────────────
   const { data: cartCountData } = useGetCartCountQuery(undefined, {
     skip: !isAuthenticated,
-    pollingInterval: 30000,
   });
   const { data: wishlistCountData } = useGetWishlistCountQuery(undefined, {
     skip: !isAuthenticated,
-    pollingInterval: 30000,
   });
 
   const cartCount = cartCountData?.data?.totalItems ?? 0;
@@ -179,14 +177,8 @@ export default function Navbar(): JSX.Element {
     setShowSuggestions(true);
   };
 
-  const handleCategoryClick = (slug: string) => {
-    if (pathname === "/products") {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("category", slug);
-      router.replace(`/products?${params.toString()}`, { scroll: false });
-    } else {
-      router.push(`/products?category=${slug}`);
-    }
+ const handleCategoryClick = (slug: string) => {
+    router.push(`/category/${slug}`);  
     setIsPopoverOpen(false);
     setIsCategoryMenuOpen(false);
   };
@@ -243,7 +235,8 @@ export default function Navbar(): JSX.Element {
     pathname.includes("admin-dashboard") || pathname.includes("vendor-dashboard") ||
     pathname.includes("user-dashboard") || pathname.includes("register") ||
     pathname.includes("reset-password") || pathname.includes("login") ||
-    pathname.includes("accounting") || pathname.includes("vendor-store-decoration")||pathname.includes("store-editor")
+    pathname.includes("accounting") || pathname.includes("vendor-store-decoration")||pathname.includes("store-editor") ||
+    pathname === "/hrm" || pathname.startsWith("/hrm/") || pathname === "/pos" || pathname.startsWith("/pos/")
   ) return <></>;
 
   if (isVendorAuth) {
@@ -251,11 +244,14 @@ export default function Navbar(): JSX.Element {
       <header className="w-full bg-white border-b border-gray-100 shadow-sm">
         <Container className="h-16 flex items-center justify-between px-4 lg:px-0">
           <Link href="/"><Image src="/navlogo/IMG_3794.PNG" alt="FinixMart Logo" width={110} height={40} className="w-auto" /></Link>
-          <Link href="/" className="text-xs font-medium text-gray-400 hover:text-teal-600 transition-colors">← Back to shop</Link>
+          <Link href="/" className="text-xs font-medium text-gray-400 hover:text-[var(--fm-accent,#0d9488)] transition-colors">← Back to shop</Link>
         </Container>
       </header>
     );
   }
+
+  // --fm-* accent vars carry today's exact colors as fallbacks; the homepage's
+  // palette injection overrides them for "/" only (other routes unchanged).
 
   // ════════════════════════════════════════════════════════════════════════════
   // DEFAULT THEME
@@ -311,7 +307,7 @@ export default function Navbar(): JSX.Element {
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-xs text-gray-700">
                         {rootCategories.map((cat) => (
-                          <button key={cat.id} onClick={() => handleCategoryClick(cat.slug)} className="text-left hover:text-emerald-600 cursor-pointer truncate">{cat.name}</button>
+                          <button key={cat.id} onClick={() => handleCategoryClick(cat.slug)} className="text-left hover:text-[var(--fm-accent,#10b981)] cursor-pointer truncate">{cat.name}</button>
                         ))}
                       </div>
                     </div>
@@ -326,7 +322,7 @@ export default function Navbar(): JSX.Element {
                 </div>
 
                 <input type="text" value={search} onChange={handleSearchChange} onKeyDown={handleKeyPress} onFocus={() => search.trim() && setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} placeholder="Search for anything" className="flex-1 h-10 md:h-12 px-3 md:px-4 text-gray-700 text-xs md:text-sm outline-none placeholder:text-gray-400" />
-                <button onClick={handleSearchSubmit} className="bg-emerald-500 hover:bg-emerald-600 h-10 md:h-12 px-3 md:px-6 text-white flex items-center justify-center min-w-[40px] md:min-w-[60px]"><Search size={18} /></button>
+                <button onClick={handleSearchSubmit} className="bg-[var(--fm-accent,#10b981)] hover:bg-[var(--fm-accent-hover,#059669)] h-10 md:h-12 px-3 md:px-6 text-white flex items-center justify-center min-w-[40px] md:min-w-[60px]"><Search size={18} /></button>
               </div>
 
               {isCategoryMenuOpen && (
@@ -344,28 +340,28 @@ export default function Navbar(): JSX.Element {
               {isAuthenticated ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="hidden sm:flex items-center gap-2 text-gray-700 hover:text-emerald-600 p-1">
-                      <User size={22} /><span className="hidden lg:block text-sm font-medium max-w-[120px] truncate">{getUserDisplayName()}</span>
+                    <button className="hidden sm:flex items-center gap-2 text-gray-700 hover:text-[var(--fm-accent,#10b981)] p-1">
+                      <User size={22} /><span data-replay-mask className="hidden lg:block text-sm font-medium max-w-[120px] truncate">{getUserDisplayName()}</span>
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuItem onClick={handleUserDashboardClick} className="cursor-pointer"><User className="mr-2 h-4 w-4" /><span>Dashboard</span></DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600"><LogOut className="mr-2 h-4 w-4" /><span>Logout</span></DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-[var(--fm-danger-hover,#dc2626)]"><LogOut className="mr-2 h-4 w-4" /><span>Logout</span></DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <button onClick={() => setShowLoginModal(true)} className="hidden sm:flex items-center text-gray-700 hover:text-emerald-600 p-1"><User size={22} /></button>
+                <button onClick={() => setShowLoginModal(true)} className="hidden sm:flex items-center text-gray-700 hover:text-[var(--fm-accent,#10b981)] p-1"><User size={22} /></button>
               )}
 
               {/* Wishlist */}
-              <button onClick={handleWishlistClick} className="hidden sm:flex relative items-center justify-center text-gray-700 hover:text-emerald-600 p-1 w-8 h-8">
+              <button onClick={handleWishlistClick} className="hidden sm:flex relative items-center justify-center text-gray-700 hover:text-[var(--fm-accent,#10b981)] p-1 w-8 h-8">
                 <Heart size={22} />
                 <CountBadge count={wishlistCount} />
               </button>
 
               {/* Cart */}
-              <button onClick={handleCartClick} className="hidden sm:flex relative items-center gap-1 md:gap-2 bg-red-400 hover:bg-red-500 text-white px-3 md:px-4 h-10 md:h-12 rounded-lg whitespace-nowrap">
+              <button onClick={handleCartClick} className="hidden sm:flex relative items-center gap-1 md:gap-2 bg-[var(--fm-cart,#f87171)] hover:bg-[var(--fm-cart-hover,#ef4444)] text-white px-3 md:px-4 h-10 md:h-12 rounded-lg whitespace-nowrap">
                 <span className="relative flex items-center">
                   <ShoppingBag size={18} />
                   <CountBadge count={cartCount} />
@@ -388,7 +384,7 @@ export default function Navbar(): JSX.Element {
         <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} onLoginSuccess={handleLoginSuccess} redirectPath={loginRedirectPath} message={loginRedirectPath ? "Please sign in to continue" : undefined} />
         {isNavbarFixed && <div className="h-28 md:h-36" />}
 
-        <header className={`w-full bg-[#0b5052] text-white ${isNavbarFixed ? "fixed top-0 left-0 z-50 shadow-lg animate-in slide-in-from-top duration-300" : "relative"}`}>
+        <header className={`w-full bg-[var(--fm-accent-dark,#0b5052)] text-white ${isNavbarFixed ? "fixed top-0 left-0 z-50 shadow-lg animate-in slide-in-from-top duration-300" : "relative"}`}>
           <div className="h-14 md:h-24 flex items-center">
             <div className="flex items-center justify-between w-full px-3 md:px-4">
 
@@ -410,7 +406,7 @@ export default function Navbar(): JSX.Element {
                     <span>All Categories</span><ChevronDown className="h-3 w-3 ml-2 text-gray-600" />
                   </button>
                   <Input value={search} onChange={handleSearchChange} onKeyDown={handleKeyPress} onFocus={() => search.trim() && setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} placeholder="Search for anything" className="h-9 lg:h-10 px-3 text-gray-700 flex-1 border-0 rounded-none text-xs focus-visible:ring-0 focus-visible:ring-offset-0" />
-                  <Button onClick={handleSearchSubmit} className="bg-orange-500 hover:bg-orange-600 h-9 lg:h-10 px-3 min-w-[40px] rounded-none border-0"><Search size={16} /></Button>
+                  <Button onClick={handleSearchSubmit} className="bg-[var(--fm-accent,#f97316)] hover:bg-[var(--fm-accent-hover,#ea580c)] h-9 lg:h-10 px-3 min-w-[40px] rounded-none border-0"><Search size={16} /></Button>
                 </div>
 
                 {isCategoryMenuOpen && (
@@ -429,13 +425,13 @@ export default function Navbar(): JSX.Element {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="link" className="text-white hidden sm:flex items-center gap-1 text-xs px-2">
-                        <User size={14} /><span className="max-w-[100px] truncate">{getUserDisplayName()}</span>
+                        <User size={14} /><span data-replay-mask className="max-w-[100px] truncate">{getUserDisplayName()}</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
                       <DropdownMenuItem onClick={handleUserDashboardClick} className="cursor-pointer"><User className="mr-2 h-4 w-4" /><span>Dashboard</span></DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600"><LogOut className="mr-2 h-4 w-4" /><span>Logout</span></DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-[var(--fm-danger-hover,#dc2626)]"><LogOut className="mr-2 h-4 w-4" /><span>Logout</span></DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
@@ -462,10 +458,10 @@ export default function Navbar(): JSX.Element {
           </div>
 
           {/* Mobile Search */}
-          <div className="md:hidden px-2 py-1 bg-[#0b5052]">
+          <div className="md:hidden px-2 py-1 bg-[var(--fm-accent-dark,#0b5052)]">
             <div ref={mobileSearchContainerRef} className="relative flex w-full gap-x-1">
               <Input value={search} onChange={handleSearchChange} onKeyDown={handleKeyPress} onFocus={() => search.trim() && setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} placeholder="Search for anything" className="bg-white rounded-l-md border border-gray-300 text-gray-700 text-xs h-8 flex-1" />
-              <Button onClick={handleSearchSubmit} className="bg-orange-500 hover:bg-orange-600 rounded-r-md px-2 h-8 min-w-[36px]"><Search size={14} /></Button>
+              <Button onClick={handleSearchSubmit} className="bg-[var(--fm-accent,#f97316)] hover:bg-[var(--fm-accent-hover,#ea580c)] rounded-r-md px-2 h-8 min-w-[36px]"><Search size={14} /></Button>
               {showSuggestions && (
                 <SearchSuggestions query={suggestionQuery} onSelect={handleSuggestionSelect} onClose={() => setShowSuggestions(false)} width={mobileSearchContainerRef.current?.clientWidth} />
               )}

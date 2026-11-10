@@ -1,3 +1,17 @@
+// @/features/storeEditorApi.ts
+//
+// CHANGES FROM ORIGINAL:
+//   1. Added `uploadStoreImage` mutation — posts a FormData file to the
+//      existing R2 upload route (POST /vendor-storage/upload) and returns
+//      the real, persistent URL. This replaces the old fake
+//      `URL.createObjectURL(file)` flow in ConfigurationForm's
+//      ImageUploadSlot, which never uploaded anything.
+//   2. Exported `useUploadStoreImageMutation` hook alongside the existing
+//      hooks.
+//
+// Nothing else changed — all existing endpoints/types are untouched, so
+// this is a drop-in replacement for the current file.
+
 import { createApi } from "@reduxjs/toolkit/query/react";
 import baseQueryWithReauth from "./baseQueryWithReauth";
 
@@ -76,13 +90,7 @@ export interface BannerImage {
   alt?: string;
 }
 
-/**
- * Promoted scalar columns live as typed fields.
- * Everything else (voucher details, countdown config,
- * timer position, banner images array, etc.) goes into `settings`.
- */
 export interface ComponentConfigInput {
-  // Promoted scalars
   bannerImage?: string;
   bannerBackgroundType?: BackgroundType;
   bannerBackgroundColor?: string;
@@ -91,25 +99,21 @@ export interface ComponentConfigInput {
   categoriesPerRow?: number;
   autoSlide?: boolean;
   slideInterval?: number;
-  countdownEndDate?: string;   // ISO string → backend converts to Date
+  countdownEndDate?: string;
   showProductPrice?: boolean;
   showProductRating?: boolean;
   showAddToCart?: boolean;
   showCategoryCount?: boolean;
-  // Styling
   customCSS?: string;
   padding?: string;
   margin?: string;
   borderRadius?: string;
   boxShadow?: string;
-  // Flexible bag for type-specific fields
   settings?: {
-    // Banner
     bannerType?: BannerType;
     bannerLayout?: BannerLayout;
     bannerHeight?: string;
     bannerImages?: BannerImage[];
-    // Countdown
     countdownBannerImage?: string;
     timerPosition?: TimerPosition;
     showDays?: boolean;
@@ -118,7 +122,6 @@ export interface ComponentConfigInput {
     showSeconds?: boolean;
     countdownTitle?: string;
     countdownBackgroundColor?: string;
-    // Voucher
     voucherBannerImage?: string;
     voucherCode?: string;
     voucherTitle?: string;
@@ -132,7 +135,6 @@ export interface ComponentConfigInput {
     voucherValidTo?: string;
     showVoucherCode?: boolean;
     useDefaultDesign?: boolean;
-    // Store banner toggles (less-queried ones)
     showChatButton?: boolean;
     showRating?: boolean;
     showVerifiedBadge?: boolean;
@@ -287,7 +289,6 @@ export interface DecorationComponent {
   categories: DecorationComponentCategory[];
 }
 
-/** Full decoration — returned by getDecoration and getStorefront */
 export interface StoreDecoration {
   id: string;
   vendorId: string;
@@ -303,7 +304,6 @@ export interface StoreDecoration {
   components: DecorationComponent[];
 }
 
-/** Lightweight decoration — returned by listDecorations */
 export interface StoreDecorationSummary {
   id: string;
   vendorId: string;
@@ -344,12 +344,29 @@ export interface LayoutTemplate {
   isPremium: boolean;
   usageCount: number;
   rating?: number;
-  // `structure` intentionally omitted from list — fetched only on apply
 }
 
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
+  message?: string;
+}
+
+// NEW: actual shape returned by POST /vendor-storage/upload —
+// note it's `file`, not `data`, and `file.url` is the raw R2 KEY
+// (e.g. "vendors/xxx/productimages/....jpg"), not a full https:// URL.
+export interface UploadedFile {
+  id?:       string;
+  fileName?: string;
+  url:       string;   // R2 key/path — needs a public-domain prefix to be a usable <img src>
+  fileSize?: string | number;
+  mimeType?: string;
+  folderId?: string | null;
+}
+
+export interface UploadFileResponse {
+  success: boolean;
+  file: UploadedFile;
   message?: string;
 }
 
@@ -372,7 +389,6 @@ export const storeDecorationApi = createApi({
 
     // ── Decoration CRUD ──────────────────────
 
-    /** GET /store-decoration — lightweight gallery list */
     listDecorations: builder.query<ApiResponse<StoreDecorationSummary[]>, void>({
       query: () => BASE,
       providesTags: (result) =>
@@ -384,25 +400,21 @@ export const storeDecorationApi = createApi({
           : [{ type: "Decoration", id: "LIST" }],
     }),
 
-    /** GET /store-decoration/:id — full decoration for the builder */
     getDecoration: builder.query<ApiResponse<StoreDecoration>, string>({
       query: (id) => `${BASE}/${id}`,
       providesTags: (_, __, id) => [{ type: "Decoration", id }],
     }),
 
-    /** GET /store-decoration/storefront/:vendorId — public, no auth */
     getStorefront: builder.query<ApiResponse<StoreDecoration>, string>({
       query: (vendorId) => `${BASE}/storefront/${vendorId}`,
       providesTags: (_, __, vendorId) => [{ type: "Decoration", id: `storefront-${vendorId}` }],
     }),
 
-    /** POST /store-decoration */
     createDecoration: builder.mutation<ApiResponse<StoreDecorationSummary>, CreateDecorationRequest>({
       query: (body) => ({ url: BASE, method: "POST", body }),
       invalidatesTags: [{ type: "Decoration", id: "LIST" }],
     }),
 
-    /** PATCH /store-decoration/:id */
     updateDecoration: builder.mutation<
       ApiResponse<StoreDecorationSummary>,
       { id: string; data: UpdateDecorationRequest }
@@ -414,7 +426,6 @@ export const storeDecorationApi = createApi({
       ],
     }),
 
-    /** DELETE /store-decoration/:id */
     deleteDecoration: builder.mutation<ApiResponse<{ message: string }>, string>({
       query: (id) => ({ url: `${BASE}/${id}`, method: "DELETE" }),
       invalidatesTags: (_, __, id) => [
@@ -423,7 +434,6 @@ export const storeDecorationApi = createApi({
       ],
     }),
 
-    /** POST /store-decoration/:id/publish */
     publishDecoration: builder.mutation<ApiResponse<StoreDecorationSummary>, string>({
       query: (id) => ({ url: `${BASE}/${id}/publish`, method: "POST" }),
       invalidatesTags: (_, __, id) => [
@@ -432,7 +442,6 @@ export const storeDecorationApi = createApi({
       ],
     }),
 
-    /** POST /store-decoration/:id/archive */
     archiveDecoration: builder.mutation<ApiResponse<StoreDecorationSummary>, string>({
       query: (id) => ({ url: `${BASE}/${id}/archive`, method: "POST" }),
       invalidatesTags: (_, __, id) => [
@@ -441,7 +450,6 @@ export const storeDecorationApi = createApi({
       ],
     }),
 
-    /** POST /store-decoration/:id/duplicate */
     duplicateDecoration: builder.mutation<
       ApiResponse<StoreDecorationSummary>,
       { id: string; data: DuplicateDecorationRequest }
@@ -452,7 +460,6 @@ export const storeDecorationApi = createApi({
 
     // ── Component mutations ──────────────────
 
-    /** POST /store-decoration/:decorationId/components */
     addComponent: builder.mutation<
       ApiResponse<DecorationComponent>,
       { decorationId: string; data: CreateComponentRequest }
@@ -467,7 +474,6 @@ export const storeDecorationApi = createApi({
       ],
     }),
 
-    /** PATCH /store-decoration/:decorationId/components/:componentId */
     updateComponent: builder.mutation<
       ApiResponse<DecorationComponent>,
       { decorationId: string; componentId: string; data: UpdateComponentRequest }
@@ -482,7 +488,6 @@ export const storeDecorationApi = createApi({
       ],
     }),
 
-    /** DELETE /store-decoration/:decorationId/components/:componentId */
     deleteComponent: builder.mutation<
       ApiResponse<{ message: string }>,
       { decorationId: string; componentId: string }
@@ -496,7 +501,6 @@ export const storeDecorationApi = createApi({
       ],
     }),
 
-    /** PUT /store-decoration/:decorationId/components/reorder */
     reorderComponents: builder.mutation<
       ApiResponse<{ message: string }>,
       { decorationId: string; orderedIds: string[] }
@@ -506,13 +510,13 @@ export const storeDecorationApi = createApi({
         method: "PUT",
         body: { orderedIds },
       }),
-      // Optimistic update — reorder is UI-driven so invalidate to sync
       invalidatesTags: (_, __, { decorationId }) => [
         { type: "Decoration", id: decorationId },
       ],
     }),
 
-    /** PUT /store-decoration/:decorationId/components/:componentId/products */
+    // Sets the FULL product list for a component (replace semantics) —
+    // used by the new product picker in ConfigurationForm.
     setComponentProducts: builder.mutation<
       ApiResponse<DecorationComponent>,
       { decorationId: string; componentId: string; productIds: string[] }
@@ -527,7 +531,6 @@ export const storeDecorationApi = createApi({
       ],
     }),
 
-    /** PUT /store-decoration/:decorationId/components/:componentId/categories */
     setComponentCategories: builder.mutation<
       ApiResponse<DecorationComponent>,
       { decorationId: string; componentId: string; categoryIds: string[] }
@@ -544,13 +547,11 @@ export const storeDecorationApi = createApi({
 
     // ── Banner Customization ─────────────────
 
-    /** GET /store-decoration/banner-customization */
     getBannerCustomization: builder.query<ApiResponse<BannerCustomization | null>, void>({
       query: () => `${BASE}/banner-customization`,
       providesTags: ["BannerCustomization"],
     }),
 
-    /** PUT /store-decoration/banner-customization */
     upsertBannerCustomization: builder.mutation<
       ApiResponse<BannerCustomization>,
       UpdateBannerCustomizationRequest
@@ -565,7 +566,6 @@ export const storeDecorationApi = createApi({
 
     // ── Templates ───────────────────────────
 
-    /** GET /store-decoration/templates?category=xyz */
     getLayoutTemplates: builder.query<
       ApiResponse<LayoutTemplate[]>,
       { category?: string } | void
@@ -577,7 +577,6 @@ export const storeDecorationApi = createApi({
       providesTags: ["LayoutTemplate"],
     }),
 
-    /** POST /store-decoration/templates/apply */
     applyTemplate: builder.mutation<ApiResponse<StoreDecoration>, ApplyTemplateRequest>({
       query: (body) => ({
         url: `${BASE}/templates/apply`,
@@ -585,6 +584,19 @@ export const storeDecorationApi = createApi({
         body,
       }),
       invalidatesTags: [{ type: "Decoration", id: "LIST" }],
+    }),
+
+    // ── NEW: file upload (real R2 upload, replaces blob: URLs) ─────────
+    // Hits the existing vendor-storage route: router.post("/upload", ...)
+    // which is wired to imageUpload("product","VENDOR") + uploadToR2().
+    // Pass a FormData with a single "file" field.
+    // Response is { success, file: { url, ... } } — see UploadFileResponse.
+    uploadStoreImage: builder.mutation<UploadFileResponse, FormData>({
+      query: (formData) => ({
+        url: "vendor-storage/upload",
+        method: "POST",
+        body: formData,
+      }),
     }),
   }),
 });
@@ -594,7 +606,6 @@ export const storeDecorationApi = createApi({
 // ─────────────────────────────────────────────
 
 export const {
-  // Decoration queries
   useListDecorationsQuery,
   useLazyListDecorationsQuery,
   useGetDecorationQuery,
@@ -602,7 +613,6 @@ export const {
   useGetStorefrontQuery,
   useLazyGetStorefrontQuery,
 
-  // Decoration mutations
   useCreateDecorationMutation,
   useUpdateDecorationMutation,
   useDeleteDecorationMutation,
@@ -610,7 +620,6 @@ export const {
   useArchiveDecorationMutation,
   useDuplicateDecorationMutation,
 
-  // Component mutations
   useAddComponentMutation,
   useUpdateComponentMutation,
   useDeleteComponentMutation,
@@ -618,13 +627,14 @@ export const {
   useSetComponentProductsMutation,
   useSetComponentCategoriesMutation,
 
-  // Banner customization
   useGetBannerCustomizationQuery,
   useLazyGetBannerCustomizationQuery,
   useUpsertBannerCustomizationMutation,
 
-  // Templates
   useGetLayoutTemplatesQuery,
   useLazyGetLayoutTemplatesQuery,
   useApplyTemplateMutation,
+
+  // NEW
+  useUploadStoreImageMutation,
 } = storeDecorationApi;

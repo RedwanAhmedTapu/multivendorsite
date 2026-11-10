@@ -23,9 +23,8 @@ import {
   RefreshCw,
   ChevronDown,
 } from "lucide-react";
-import type { VendorOrderFilters } from "@/types/vendorOrderTypes";
+import type { VendorOrderUiFilters } from "./useVendorOrderFilters";
 
-// Only the statuses a vendor will see in practice
 const ORDER_STATUS_OPTIONS = [
   { value: "CONFIRMED",  label: "New Order",   dot: "bg-blue-500" },
   { value: "PROCESSING", label: "Processing",  dot: "bg-indigo-500" },
@@ -45,8 +44,8 @@ const FULFILLMENT_OPTIONS = [
 ] as const;
 
 interface Props {
-  filters: VendorOrderFilters;
-  setFilter: <K extends keyof VendorOrderFilters>(key: K, value: VendorOrderFilters[K]) => void;
+  filters: VendorOrderUiFilters;
+  setFilter: <K extends keyof VendorOrderUiFilters>(key: K, value: VendorOrderUiFilters[K]) => void;
   resetFilters: () => void;
   activeFilterCount: number;
   isLoading?: boolean;
@@ -228,32 +227,12 @@ export function VendorOrderFiltersBar({
           </PopoverContent>
         </Popover>
 
-        {/* Sort */}
-        <Select
-          value={`${filters.sortBy}:${filters.sortOrder}`}
-          onValueChange={(v) => {
-            const [by, order] = v.split(":") as any;
-            setFilter("sortBy", by);
-            setFilter("sortOrder", order);
-          }}
-        >
-          <SelectTrigger className="h-8 text-xs border-slate-200 bg-slate-50 w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="createdAt:desc">Newest First</SelectItem>
-            <SelectItem value="createdAt:asc">Oldest First</SelectItem>
-            <SelectItem value="subtotal:desc">Highest Value</SelectItem>
-            <SelectItem value="subtotal:asc">Lowest Value</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Per page */}
+        {/* Per page — the only "sort-like" control the backend actually supports */}
         <Select
           value={String(filters.limit)}
-          onValueChange={(v) => setFilter("limit", Number(v) as any)}
+          onValueChange={(v) => setFilter("limit", Number(v))}
         >
-          <SelectTrigger className="h-8 text-xs border-slate-200 bg-slate-50 w-20">
+          <SelectTrigger className="h-8 text-xs border-slate-200 bg-slate-50 w-24">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

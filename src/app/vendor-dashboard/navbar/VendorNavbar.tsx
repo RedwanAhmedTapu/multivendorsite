@@ -19,20 +19,15 @@ type FlatMenuItem = {
 };
 
 type VendorNavbarProps = {
+  /** Opens the mobile drawer — the only navigation trigger this bar keeps,
+   *  since it's the sole way to reach the sidebar on small screens. */
   onMobileMenuClick: () => void;
-  onMenuClick: () => void;
-  isSidebarOpen: boolean;
   menuItems?: FlatMenuItem[];
   isVisible?: boolean;
 };
 
-const TIME_FILTERS = ["Today", "This Week", "This Month", "This Year"] as const;
-type TimeFilter = (typeof TIME_FILTERS)[number];
-
 export function VendorNavbar({
   onMobileMenuClick,
-  onMenuClick,
-  isSidebarOpen,
   menuItems = [],
   isVisible = true,
 }: VendorNavbarProps) {
@@ -41,7 +36,6 @@ export function VendorNavbar({
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [activeFilter, setActiveFilter] = useState<TimeFilter>("This Week");
   const searchRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -130,65 +124,58 @@ export function VendorNavbar({
   const highlightText = (text: string, query: string) => {
     if (!query) return text;
     const regex = new RegExp(`(${query})`, "gi");
-    return text.split(regex).map((part, i) =>
-      regex.test(part) ? <span key={i} className="bg-yellow-200 font-bold">{part}</span> : part
-    );
+    return text
+      .split(regex)
+      .map((part, i) =>
+        regex.test(part) ? (
+          <span key={i} className="rounded bg-indigo-100 font-bold text-indigo-700">
+            {part}
+          </span>
+        ) : (
+          part
+        )
+      );
   };
 
   return (
-    /*
-     * KEY FIX: navbar is now `sticky top-0` inside the right column flex container,
-     * NOT `fixed left-0 right-0`. This means it scrolls with its column but sticks
-     * to the top of the scrollable area — no overlap with the sidebar at all.
-     * The translate-y animation still works for hide-on-scroll.
-     */
     <header
       className={`
         sticky top-0 z-40 shrink-0
-        bg-white/80 backdrop-blur-xl
-        border-b border-slate-100
+        border-b border-slate-100 bg-white/85 backdrop-blur-xl
         transition-transform duration-300 ease-in-out
         ${isVisible ? "translate-y-0" : "-translate-y-full"}
       `}
     >
-      <div className="h-16 px-4 sm:px-6 flex items-center justify-between gap-4">
-
-        {/* Left — toggles + search + time filters */}
-        <div className="flex items-center gap-3 sm:gap-5 flex-1 min-w-0">
-
-          {/* Mobile hamburger */}
+      <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6">
+        {/* Left — mobile menu trigger + search */}
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          {/* Mobile hamburger — the only way to reach the sidebar on small screens */}
           <button
             onClick={onMobileMenuClick}
-            className="lg:hidden p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors shrink-0"
-            aria-label="Open mobile menu"
+            className="shrink-0 rounded-full p-2 text-slate-500 transition-colors hover:bg-indigo-50 hover:text-[#4f46e5] lg:hidden"
+            aria-label="Open menu"
           >
-            <Menu className="w-5 h-5" />
-          </button>
-
-          {/* Desktop sidebar toggle */}
-          <button
-            onClick={onMenuClick}
-            className="hidden lg:flex p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors shrink-0"
-            aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-          >
-            <Menu className="w-5 h-5" />
+            <Menu className="h-5 w-5" />
           </button>
 
           {/* Search */}
-          <div className="relative w-full max-w-xs sm:max-w-sm md:max-w-md" ref={searchRef}>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          <div className="relative w-full max-w-md" ref={searchRef}>
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
               placeholder="Search orders, products..."
-              className="w-full pl-10 pr-8 py-2 bg-slate-50 border-none rounded-full text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600/20 transition-all"
+              className="w-full rounded-full border border-transparent bg-slate-50 py-2.5 pl-10 pr-9 text-sm text-slate-700 placeholder-slate-400 transition-all focus:border-indigo-200 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               onFocus={() => setShowSearchResults(searchQuery.length > 0)}
             />
             {searchQuery && (
               <button
-                onClick={() => { setSearchQuery(""); setShowSearchResults(false); }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-lg leading-none"
+                onClick={() => {
+                  setSearchQuery("");
+                  setShowSearchResults(false);
+                }}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-lg leading-none text-slate-400 hover:text-slate-600"
                 aria-label="Clear search"
               >
                 ×
@@ -199,11 +186,11 @@ export function VendorNavbar({
             {showSearchResults && (
               <div
                 ref={resultsRef}
-                className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-xl shadow-xl z-50 max-h-80 overflow-y-auto"
+                className="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-y-auto rounded-2xl border border-slate-100 bg-white shadow-[0_16px_40px_-12px_rgba(30,27,75,0.18)]"
               >
                 {filteredItems.length > 0 ? (
                   <>
-                    <div className="px-4 py-2 border-b border-slate-100 bg-slate-50 rounded-t-xl">
+                    <div className="rounded-t-2xl border-b border-slate-100 bg-slate-50 px-4 py-2">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                         {filteredItems.length} result{filteredItems.length !== 1 ? "s" : ""}
                       </p>
@@ -214,120 +201,94 @@ export function VendorNavbar({
                         onClick={() => handleNavigate(item.href)}
                         onMouseEnter={() => setSelectedIndex(index)}
                         className={`
-                          w-full flex items-center justify-between px-4 py-3
-                          border-b border-slate-50 last:border-b-0 transition-colors duration-150
-                          ${selectedIndex === index ? "bg-blue-50" : "hover:bg-slate-50"}
+                          flex w-full items-center justify-between border-b border-slate-50 px-4 py-3
+                          transition-colors duration-150 last:border-b-0
+                          ${selectedIndex === index ? "bg-indigo-50" : "hover:bg-slate-50"}
                         `}
                       >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className={`p-1.5 rounded-lg ${selectedIndex === index ? "bg-blue-100" : "bg-slate-100"}`}>
-                            <item.icon className={`w-4 h-4 ${selectedIndex === index ? "text-blue-600" : "text-slate-500"}`} />
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <div className={`rounded-lg p-1.5 ${selectedIndex === index ? "bg-indigo-100" : "bg-slate-100"}`}>
+                            <item.icon className={`h-4 w-4 ${selectedIndex === index ? "text-[#4f46e5]" : "text-slate-500"}`} />
                           </div>
-                          <div className="flex-1 min-w-0 text-left">
-                            <p className={`text-sm font-semibold truncate ${selectedIndex === index ? "text-blue-700" : "text-slate-900"}`}>
+                          <div className="min-w-0 flex-1 text-left">
+                            <p className={`truncate text-sm font-semibold ${selectedIndex === index ? "text-[#4f46e5]" : "text-slate-900"}`}>
                               {highlightText(item.title, searchQuery)}
                             </p>
-                            <p className="text-[11px] text-slate-400 truncate">{item.href}</p>
+                            <p className="truncate text-[11px] text-slate-400">{item.href}</p>
                           </div>
                         </div>
-                        <ChevronRight className={`w-4 h-4 shrink-0 ${selectedIndex === index ? "text-blue-400" : "text-slate-300"}`} />
+                        <ChevronRight className={`h-4 w-4 shrink-0 ${selectedIndex === index ? "text-indigo-400" : "text-slate-300"}`} />
                       </button>
                     ))}
-                    <div className="px-4 py-2 border-t border-slate-100 bg-slate-50 rounded-b-xl">
+                    <div className="rounded-b-2xl border-t border-slate-100 bg-slate-50 px-4 py-2">
                       <p className="text-[10px] text-slate-400">↑↓ navigate · Enter select · Esc close</p>
                     </div>
                   </>
                 ) : (
                   <div className="px-4 py-8 text-center">
-                    <Search className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                    <Search className="mx-auto mb-2 h-8 w-8 text-slate-200" />
                     <p className="text-sm text-slate-500">No results for &quot;{searchQuery}&quot;</p>
                   </div>
                 )}
               </div>
             )}
           </div>
-
-          {/* Time filter tabs — hidden on small screens */}
-          <nav className="hidden xl:flex items-center gap-1 shrink-0">
-            {TIME_FILTERS.map((filter) => (
-              <button
-                key={filter}
-                onClick={() => setActiveFilter(filter)}
-                className={`
-                  px-3 py-1 text-sm transition-all duration-150 whitespace-nowrap
-                  ${
-                    activeFilter === filter
-                      ? "text-blue-600 font-bold border-b-2 border-blue-600 rounded-none"
-                      : "text-slate-500 hover:text-slate-900 font-medium rounded-md"
-                  }
-                `}
-              >
-                {filter}
-              </button>
-            ))}
-          </nav>
         </div>
 
-        {/* Right — user */}
-        <div className="flex items-center gap-3 pl-3 border-l border-slate-200 shrink-0">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-slate-900 leading-tight">
-              {user?.name || "Vendor"}
-            </p>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-              {user?.vendor?.storeName || user?.role || "Premium Partner"}
-            </p>
-          </div>
+        {/* Right — vendor dropdown */}
+        <div className="relative shrink-0 group">
+          <button className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-slate-50 sm:pr-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#4f46e5] to-[#7c3aed] text-sm font-bold text-white shadow-[0_4px_12px_-3px_rgba(79,70,229,0.5)]">
+              {getUserInitials(user?.name)}
+            </div>
+            <div className="hidden text-left sm:block">
+              <p className="text-sm font-bold leading-tight text-slate-900">{user?.name || "Vendor"}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">
+                {user?.vendor?.storeName || user?.role || "Premium Partner"}
+              </p>
+            </div>
+          </button>
 
-          {/* Avatar + hover dropdown */}
-          <div className="relative group">
-            <button className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center border-2 border-blue-100 shadow-sm hover:shadow-md transition-shadow">
-              <span className="text-sm font-bold text-white">
-                {getUserInitials(user?.name)}
-              </span>
-            </button>
-
-            {/* Dropdown */}
-            <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-100 rounded-xl shadow-xl z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 bg-slate-50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shrink-0">
-                    <span className="text-sm font-bold text-white">{getUserInitials(user?.name)}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate">{user?.name || "Vendor"}</p>
-                    <p className="text-[11px] text-slate-500 truncate">{user?.email || user?.phone}</p>
-                    <span className="inline-block mt-1 text-[9px] font-black uppercase tracking-wider bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                      {user?.role || "Vendor"}
-                    </span>
-                  </div>
+          {/* Dropdown */}
+          <div className="invisible absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-100 bg-white opacity-0 shadow-[0_16px_40px_-12px_rgba(30,27,75,0.2)] transition-all duration-200 group-hover:visible group-hover:opacity-100">
+            <div className="border-b border-slate-100 bg-slate-50 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#4f46e5] to-[#7c3aed]">
+                  <span className="text-sm font-bold text-white">{getUserInitials(user?.name)}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-slate-900">{user?.name || "Vendor"}</p>
+                  <p className="truncate text-[11px] text-slate-500">{user?.email || user?.phone}</p>
+                  <span className="mt-1 inline-block rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-[#4f46e5]">
+                    {user?.role || "Vendor"}
+                  </span>
                 </div>
               </div>
+            </div>
 
-              <div className="p-1">
-                <button
-                  onClick={() => router.push("/vendor-dashboard/settings/profile")}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600 rounded-lg transition-colors"
-                >
-                  <Settings className="w-4 h-4" />
-                  Settings
-                </button>
-              </div>
+            <div className="p-1">
+              <button
+                onClick={() => router.push("/vendor-dashboard/settings/profile")}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 hover:text-[#4f46e5]"
+              >
+                <Settings className="h-4 w-4" />
+                Settings
+              </button>
+            </div>
 
-              <div className="p-1 border-t border-slate-100">
-                <button
-                  onClick={handleLogout}
-                  disabled={isLoggingOut}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {isLoggingOut ? (
-                    <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <LogOut className="w-4 h-4" />
-                  )}
-                  {isLoggingOut ? "Logging out..." : "Logout"}
-                </button>
-              </div>
+            <div className="border-t border-slate-100 p-1">
+              <button
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+              >
+                {isLoggingOut ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-rose-500 border-t-transparent" />
+                ) : (
+                  <LogOut className="h-4 w-4" />
+                )}
+                {isLoggingOut ? "Logging out..." : "Logout"}
+              </button>
             </div>
           </div>
         </div>

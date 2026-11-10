@@ -14,6 +14,7 @@ interface Props {
   }>;
   onSuggestionSelect?: (id: string, fullPath: string) => void;
   initialCategoryId?: string | null;
+  onRequestMissing?: (categoryId?: string, categoryPath?: string) => void;
 }
 
 const CategoryTreeSelector: React.FC<Props> = ({
@@ -22,17 +23,23 @@ const CategoryTreeSelector: React.FC<Props> = ({
   suggestedCategories = [],
   onSuggestionSelect,
   initialCategoryId = "",
+  onRequestMissing,
 }) => {
   const { data: categories, isLoading } = useGetCategoriesQuery();
   const [selectedPath, setSelectedPath] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
-  const [clickedRoot, setClickedRoot] = useState<Category | null>(null);
-  const [clickedL2, setClickedL2] = useState<Category | null>(null);
+
+  // ── Dynamic browse state ──
+  // drillPath holds the chain of categories the vendor has clicked into,
+  // in order from the root. Column 0 always shows root categories; column
+  // i (i >= 1) shows drillPath[i-1].children. This supports ANY nesting
+  // depth (previously this was hardcoded to 3 fixed columns, so leaves
+  // deeper than root > L2 > L3 could never be reached by clicking).
+  const [drillPath, setDrillPath] = useState<Category[]>([]);
+  const [columnFilters, setColumnFilters] = useState<string[]>([]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [rootFilter, setRootFilter] = useState("");
-  const [l2Filter, setL2Filter] = useState("");
-  const [l3Filter, setL3Filter] = useState("");
   const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -103,47 +110,63 @@ const CategoryTreeSelector: React.FC<Props> = ({
     setSelectedId("");
     setSearchQuery("");
     setIsDropdownOpen(false);
-    setClickedRoot(null);
-    setClickedL2(null);
-    setRootFilter("");
-    setL2Filter("");
-    setL3Filter("");
+    setDrillPath([]);
+    setColumnFilters([]);
     setShowSmartSuggestions(false);
     onSelect("", "", false, []);
   };
 
-  const handleRootClick = (cat: Category) => {
-    if (clickedRoot?.id === cat.id) {
-      setClickedRoot(null);
-      setClickedL2(null);
-      setL2Filter("");
-      setL3Filter("");
+  /**
+   * Click handler for a category button inside browse column `columnIndex`.
+   * - Column 0 shows root categories.
+   * - Column i (i >= 1) shows children of drillPath[i - 1].
+   *
+   * If the clicked category has children, we drill into it: truncate
+   * drillPath to `columnIndex` items (dropping anything deeper than the
+   * column clicked) and push this category on — this works for any depth,
+   * not just 3 levels. If it's already the active node in that column,
+   * clicking again collapses back to that column (removes it and deeper).
+   * If it has no children, it's a genuine leaf — finalize the selection.
+   */
+  const handleColumnCategoryClick = (category: Category, columnIndex: number) => {
+    const hasChildren = !!(category.children && category.children.length > 0);
+
+    if (!hasChildren) {
+      const parentNames = drillPath.slice(0, columnIndex).map((c) => c.name);
+      handleSelectCategory(category, parentNames);
+      return;
+    }
+
+    const isActive = drillPath[columnIndex]?.id === category.id;
+    if (isActive) {
+      setDrillPath(drillPath.slice(0, columnIndex));
+      setColumnFilters((prev) => prev.slice(0, columnIndex + 1));
     } else {
-      setClickedRoot(cat);
-      setClickedL2(null);
-      setL2Filter("");
-      setL3Filter("");
+      setDrillPath([...drillPath.slice(0, columnIndex), category]);
+      setColumnFilters((prev) => prev.slice(0, columnIndex + 1));
     }
   };
 
-  const handleL2Click = (cat: Category) => {
-    const hasChildren = cat.children && cat.children.length > 0;
-    if (hasChildren) {
-      if (clickedL2?.id === cat.id) {
-        setClickedL2(null);
-        setL3Filter("");
-      } else {
-        setClickedL2(cat);
-        setL3Filter("");
-      }
-    } else {
-      if (clickedRoot) handleSelectCategory(cat, [clickedRoot.name]);
+  /* ── Resolve the vendor's "currently active" category for a missing-
+     category request: finalized pick first, else the deepest node
+     currently drilled into while browsing, else nothing. ── */
+  const getActiveCategory = (): { id?: string; path?: string } => {
+    if (selectedId) {
+      return { id: selectedId, path: buildPathString(selectedPath) };
     }
+    if (drillPath.length > 0) {
+      return {
+        id: drillPath[drillPath.length - 1].id,
+        path: buildPathString(drillPath.map((c) => c.name)),
+      };
+    }
+    return {};
   };
 
-  const handleL3Click = (cat: Category) => {
-    if (clickedRoot && clickedL2)
-      handleSelectCategory(cat, [clickedRoot.name, clickedL2.name]);
+  const triggerRequestMissing = () => {
+    if (!onRequestMissing) return;
+    const active = getActiveCategory();
+    onRequestMissing(active.id, active.path);
   };
 
   const allLeafCategories = useMemo(() => {
@@ -173,37 +196,49 @@ const CategoryTreeSelector: React.FC<Props> = ({
     );
   }, [searchQuery, allLeafCategories]);
 
-  const filteredRootCategories = useMemo(() => {
+  const filterByName = (cats: Category[] | undefined, filter: string): Category[] => {
+    if (!cats) return [];
+    if (!filter.trim()) return cats;
+    const query = filter.toLowerCase();
+    return cats.filter((cat) => cat.name.toLowerCase().includes(query));
+  };
+
+  /**
+   * Builds however many browse columns are currently needed:
+   *   column 0            → root categories
+   *   column 1..drillPath.length → children of each drilled-into category
+   * This replaces the old hardcoded 3-column (root/L2/L3) layout, so any
+   * nesting depth (4, 5, 6+ levels) can be browsed and selected.
+   */
+  const browseColumns = useMemo(() => {
     if (!categories) return [];
-    if (!rootFilter.trim()) return categories;
-    const query = rootFilter.toLowerCase();
-    return categories.filter((cat) => cat.name.toLowerCase().includes(query));
-  }, [categories, rootFilter]);
+    const cols: { items: Category[]; activeId?: string; filter: string; columnIndex: number }[] = [];
 
-  const filteredL2Categories = useMemo(() => {
-    if (!clickedRoot?.children) return [];
-    if (!l2Filter.trim()) return clickedRoot.children;
-    const query = l2Filter.toLowerCase();
-    return clickedRoot.children.filter((cat) =>
-      cat.name.toLowerCase().includes(query)
-    );
-  }, [clickedRoot, l2Filter]);
+    cols.push({
+      items: filterByName(categories, columnFilters[0] || ""),
+      activeId: drillPath[0]?.id,
+      filter: columnFilters[0] || "",
+      columnIndex: 0,
+    });
 
-  const filteredL3Categories = useMemo(() => {
-    if (!clickedL2?.children) return [];
-    if (!l3Filter.trim()) return clickedL2.children;
-    const query = l3Filter.toLowerCase();
-    return clickedL2.children.filter((cat) =>
-      cat.name.toLowerCase().includes(query)
-    );
-  }, [clickedL2, l3Filter]);
+    drillPath.forEach((node, idx) => {
+      cols.push({
+        items: filterByName(node.children, columnFilters[idx + 1] || ""),
+        activeId: drillPath[idx + 1]?.id,
+        filter: columnFilters[idx + 1] || "",
+        columnIndex: idx + 1,
+      });
+    });
+
+    return cols;
+  }, [categories, columnFilters, drillPath]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsDropdownOpen(false);
-        setClickedRoot(null);
-        setClickedL2(null);
+        setDrillPath([]);
+        setColumnFilters([]);
         setShowSmartSuggestions(false);
       }
     };
@@ -356,7 +391,6 @@ const CategoryTreeSelector: React.FC<Props> = ({
             left: dropdownRef.current?.getBoundingClientRect().left ?? 0,
           }}
         >
-          {/* Suggestion header */}
           <div
             style={{
               padding: "10px 14px",
@@ -386,7 +420,6 @@ const CategoryTreeSelector: React.FC<Props> = ({
             </span>
           </div>
 
-          {/* Suggestion list */}
           <div style={{ maxHeight: 240, overflowY: "auto" }}>
             {suggestedCategories.map((cat, i) => (
               <button
@@ -446,7 +479,6 @@ const CategoryTreeSelector: React.FC<Props> = ({
             ))}
           </div>
 
-          {/* Footer */}
           <div style={{ padding: "8px 14px", background: "#F8FAFC", borderTop: "0.5px solid #E2E8F0" }}>
             <button
               onClick={() => { setShowSmartSuggestions(false); setIsDropdownOpen(true); }}
@@ -532,96 +564,65 @@ const CategoryTreeSelector: React.FC<Props> = ({
             </>
           )}
 
-          {/* No results */}
           {searchQuery.trim() && filteredLeaves.length === 0 && (
             <div style={{ padding: "24px 0", textAlign: "center", fontSize: 13, color: "#64748B" }}>
               No categories found for "{searchQuery}"
+              {onRequestMissing && (
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    onClick={() => { setIsDropdownOpen(false); triggerRequestMissing(); }}
+                    style={{
+                      background: "none",
+                      border: "1px solid #DDD6FE",
+                      borderRadius: 8,
+                      padding: "6px 14px",
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      color: "#7C3AED",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Request this category
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
-          {/* ── 3-column mega browse ── */}
+          {/* ── Dynamic N-column mega browse (supports any nesting depth) ── */}
           {!searchQuery.trim() && categories && categories.length > 0 && (
-            <div style={{ display: "flex", minHeight: 300, maxHeight: 380 }}>
-
-              {/* Column 1 — Root */}
-              <div
-                style={{
-                  width: "34%",
-                  borderRight: "0.5px solid #E2E8F0",
-                  overflowY: "auto",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <FilterInput value={rootFilter} onChange={setRootFilter} placeholder="Search root…" />
-                {filteredRootCategories.map((cat) => {
-                  const active = clickedRoot?.id === cat.id;
-                  return (
-                    <button
-                      key={cat.id}
-                      onClick={() => handleRootClick(cat)}
-                      style={{
-                        width: "100%",
-                        padding: "9px 12px",
-                        textAlign: "left",
-                        background: active ? "#EFF6FF" : "none",
-                        border: "none",
-                        borderBottom: "0.5px solid #F0F4FA",
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 6,
-                        transition: "background 0.12s",
-                      }}
-                      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#F8FAFC"; }}
-                      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "none"; }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 12.5,
-                          fontWeight: active ? 600 : 400,
-                          color: active ? "#1D4ED8" : "#0F172A",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          flex: 1,
-                        }}
-                      >
-                        {cat.name}
-                      </span>
-                      {cat.children && cat.children.length > 0 && (
-                        <ChevronRight
-                          size={13}
-                          color={active ? "#1D4ED8" : "#94A3B8"}
-                          style={{ flexShrink: 0, transform: active ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}
-                        />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Column 2 — L2 */}
-              {clickedRoot && clickedRoot.children && clickedRoot.children.length > 0 && (
+            <div style={{ display: "flex", minHeight: 300, maxHeight: 380, overflowX: "auto" }}>
+              {browseColumns.map((col) => (
                 <div
+                  key={col.columnIndex}
                   style={{
-                    width: "33%",
+                    width: 200,
+                    flexShrink: 0,
                     borderRight: "0.5px solid #E2E8F0",
                     overflowY: "auto",
                     display: "flex",
                     flexDirection: "column",
                   }}
                 >
-                  <FilterInput value={l2Filter} onChange={setL2Filter} placeholder="Search…" />
-                  {filteredL2Categories.map((cat) => {
+                  <FilterInput
+                    value={col.filter}
+                    onChange={(v) =>
+                      setColumnFilters((prev) => {
+                        const next = [...prev];
+                        next[col.columnIndex] = v;
+                        return next;
+                      })
+                    }
+                    placeholder={col.columnIndex === 0 ? "Search root…" : "Search…"}
+                  />
+                  {col.items.map((cat) => {
                     const hasChildren = !!(cat.children && cat.children.length > 0);
-                    const active = clickedL2?.id === cat.id;
+                    const active = col.activeId === cat.id;
                     return (
                       <button
                         key={cat.id}
-                        onClick={() => handleL2Click(cat)}
+                        onClick={() => handleColumnCategoryClick(cat, col.columnIndex)}
                         style={{
                           width: "100%",
                           padding: "9px 12px",
@@ -653,68 +654,27 @@ const CategoryTreeSelector: React.FC<Props> = ({
                         >
                           {cat.name}
                         </span>
-                        {hasChildren && (
+                        {hasChildren ? (
                           <ChevronRight
                             size={13}
                             color={active ? "#1D4ED8" : "#94A3B8"}
                             style={{ flexShrink: 0, transform: active ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}
                           />
+                        ) : (
+                          <Check size={11} color="#93C5FD" style={{ flexShrink: 0, opacity: 0.6 }} />
                         )}
                       </button>
                     );
                   })}
                 </div>
-              )}
+              ))}
 
-              {/* Column 3 — L3 leaf */}
-              {clickedL2 && clickedL2.children && clickedL2.children.length > 0 && (
+              {/* Placeholder when nothing drilled into yet */}
+              {drillPath.length === 0 && (
                 <div
                   style={{
                     flex: 1,
-                    overflowY: "auto",
-                    display: "flex",
-                    flexDirection: "column",
-                  }}
-                >
-                  <FilterInput value={l3Filter} onChange={setL3Filter} placeholder="Search…" />
-                  {filteredL3Categories.map((cat) => (
-                    <button
-                      key={cat.id}
-                      onClick={() => handleL3Click(cat)}
-                      style={{
-                        width: "100%",
-                        padding: "9px 12px",
-                        textAlign: "left",
-                        background: "none",
-                        border: "none",
-                        borderBottom: "0.5px solid #F0F4FA",
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                        fontSize: 12.5,
-                        color: "#0F172A",
-                        transition: "background 0.12s",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 6,
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "#EFF6FF")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
-                    >
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                        {cat.name}
-                      </span>
-                      <Check size={11} color="#93C5FD" style={{ flexShrink: 0, opacity: 0.6 }} />
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Placeholder when nothing is selected yet */}
-              {!clickedRoot && (
-                <div
-                  style={{
-                    flex: 1,
+                    minWidth: 160,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -725,7 +685,7 @@ const CategoryTreeSelector: React.FC<Props> = ({
                   }}
                 >
                   <ChevronRight size={20} color="#BFDBFE" />
-                  Select a root category
+                  Select a category to browse deeper
                 </div>
               )}
             </div>
@@ -794,6 +754,31 @@ const CategoryTreeSelector: React.FC<Props> = ({
         >
           <Sparkles size={12} color="#1D4ED8" />
           See smart category suggestions for your product
+          <ChevronRight size={12} />
+        </button>
+      )}
+
+      {/* ── Can't find the right category? Request one ── */}
+      {onRequestMissing && (
+        <button
+          onClick={triggerRequestMissing}
+          style={{
+            marginTop: 6,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: 11.5,
+            color: "#7C3AED",
+            fontWeight: 600,
+            fontFamily: "inherit",
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+            padding: 0,
+          }}
+        >
+          <Sparkles size={12} color="#7C3AED" />
+          Can't find the right category? Request one
           <ChevronRight size={12} />
         </button>
       )}

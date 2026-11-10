@@ -5,12 +5,14 @@ export interface User {
   // ✅ FIX: id must be string — your DB uses cuid/uuid (e.g. "cmj72c9po0000o0ucd3proe4e")
   // Declaring it as number causes silent === failures when comparing with
   // message.senderId, participant.userId, etc. which are all strings from Prisma.
-  id: string;
+  id: string;// ← Role-specific ID (vendorId for vendors)
+  rawId?: string;// ← Original user table ID
   avatar?: string;
   name?: string;
   email?: string;
   phone?: string;
   vendorId?: string;
+  employeeId: string | null;
   vendor?: { storeName: string; vendorType: string };
   role: string;
 }

@@ -4,9 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Plus, X, Trash2, Copy, ChevronDown, Check, Package,
-  AlertCircle, Image as ImageIcon,
+  AlertCircle, Image as ImageIcon, Info, RefreshCw, FolderOpen, Upload,
 } from "lucide-react";
 import ImageUploader from "@/components/imageuploader/ImageUploader";
+import MediaCenter, { MediaCenterItem } from "@/components/mediauploader/MediaCenter";
 import { ProductVariantInput, ProductImageInput } from "@/types/product";
 import { VariantNamePart } from "@/types/product";
 import { Attribute, AttributeValue } from "@/types/type";
@@ -19,6 +20,283 @@ interface Props {
   categoryAttributes?: Attribute[];
 }
 
+/* ─── Module-scope helpers ───────────────────────────────────────────────
+   Th / Td used to be declared INSIDE VariantManager's render body. That
+   meant a brand-new component type was created on every render —
+   including every keystroke in the SKU input — so React unmounted and
+   remounted the whole <Td> (and the <Input> inside it) each time,
+   killing focus after one character. Declaring them once here, at
+   module scope, fixes it.
+────────────────────────────────────────────────────────────────────── */
+
+function Th({ children, minW = 120 }: { children: React.ReactNode; minW?: number }) {
+  return (
+    <th
+      style={{
+        padding: "10px 12px",
+        textAlign: "left",
+        fontSize: 11.5,
+        fontWeight: 700,
+        color: "#3D5068",
+        background: "#EFF6FF",
+        borderBottom: "0.5px solid #BFDBFE",
+        borderRight: "0.5px solid #E2E8F0",
+        minWidth: minW,
+        whiteSpace: "nowrap",
+        letterSpacing: "0.01em",
+      }}
+    >
+      {children}
+    </th>
+  );
+}
+
+function Td({
+  children,
+  center = false,
+  span = 1,
+}: {
+  children: React.ReactNode;
+  center?: boolean;
+  span?: number;
+}) {
+  return (
+    <td
+      rowSpan={span}
+      style={{
+        padding: "8px 10px",
+        fontSize: 13,
+        color: "#0F172A",
+        borderBottom: "0.5px solid #E2E8F0",
+        borderRight: "0.5px solid #E2E8F0",
+        textAlign: center ? "center" : "left",
+        verticalAlign: "middle",
+      }}
+    >
+      {children}
+    </td>
+  );
+}
+
+function ApplyInput({ onApply, placeholder }: { onApply: (n: number) => void; placeholder: string }) {
+  return (
+    <Input
+      type="number"
+      step="0.01"
+      min="0"
+      placeholder={placeholder}
+      style={{ fontSize: 11, height: 28, marginTop: 4, borderColor: "#BFDBFE", background: "#F8FAFC" }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          const val = Number((e.target as HTMLInputElement).value);
+          if (val >= 0) {
+            onApply(val);
+            (e.target as HTMLInputElement).value = "";
+          }
+        }
+      }}
+    />
+  );
+}
+
+/**
+ * Small hover-tooltip icon. Replaced the old native `title` attribute
+ * (plain OS tooltip, left-aligned to the cursor, no styling control)
+ * with a custom floating panel that:
+ *  - is horizontally centered on the icon itself (left: 50% + translateX(-50%))
+ *  - opens upward with a colorful gradient card + arrow pointer
+ *  - stays open on hover of either the icon or the panel
+ */
+function FieldHint({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+
+  return (
+    <span
+      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      <span
+        onClick={() => setShow((s) => !s)}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          cursor: "help",
+          color: "#1D4ED8",
+          background: "#DBEAFE",
+          transition: "all 0.15s",
+        }}
+      >
+        <Info size={11} />
+      </span>
+
+      {show && (
+        <div
+          role="tooltip"
+          style={{
+            position: "absolute",
+            bottom: "calc(100% + 12px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 260,
+            maxWidth: "70vw",
+            padding: "12px 14px",
+            borderRadius: 12,
+            background: "linear-gradient(135deg,#1D4ED8 0%,#0891B2 55%,#059669 100%)",
+            color: "#FFFFFF",
+            fontSize: 11.5,
+            fontWeight: 500,
+            lineHeight: 1.55,
+            letterSpacing: "0.01em",
+            textAlign: "left",
+            boxShadow: "0 12px 28px rgba(29,78,216,0.35), 0 2px 8px rgba(0,0,0,0.08)",
+            zIndex: 300,
+            whiteSpace: "normal",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+            <div
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: "50%",
+                background: "rgba(255,255,255,0.22)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Info size={11} color="#fff" />
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", opacity: 0.9 }}>
+              SKU tip
+            </span>
+          </div>
+          {text}
+
+          {/* centered arrow pointer, anchored to the icon below */}
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: 0,
+              height: 0,
+              borderLeft: "7px solid transparent",
+              borderRight: "7px solid transparent",
+              borderTop: "7px solid #0891B2",
+            }}
+          />
+        </div>
+      )}
+    </span>
+  );
+}
+
+/** Generates a SKU that's extremely unlikely to collide with existing ones. */
+function generateUniqueSKU(variant: ProductVariantInput): string {
+  const namePart =
+    (variant.name || "SKU").replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase() || "SKU";
+  const timePart = Date.now().toString(36).toUpperCase();
+  const randPart = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `${namePart}-${timePart}-${randPart}`;
+}
+
+/**
+ * Formats manually-typed SKU input: forces uppercase and converts any
+ * run of whitespace into a single hyphen, so vendor-typed SKUs stay
+ * consistent with the auto-generated ones (e.g. "red shirt m" -> "RED-SHIRT-M").
+ */
+function formatSkuInput(value: string): string {
+  return value.toUpperCase().replace(/\s+/g, "-");
+}
+
+const SKU_HINT =
+  "Unique code identifying this exact variant (e.g. size/color combo). It must be unique across your entire store — a duplicate SKU will be rejected when you save. Use the Generate button for a safe, collision-free code, or write your own using a consistent pattern like CATEGORY-COLOR-SIZE.";
+
+/**
+ * Generates a scannable EAN-13 barcode number (13 digits, valid check
+ * digit) using the 200xxxxxxxxxx internal-use GS1 prefix range — safe to
+ * use without a registered GS1 company prefix since it's for in-store /
+ * POS scanning only, not retail resale.
+ */
+function generateUniqueBarcode(): string {
+  const timePart = Date.now().toString().slice(-6);
+  const randPart = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
+  const digits12 = `200${timePart}${randPart}`;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const d = Number(digits12[i]);
+    sum += i % 2 === 0 ? d : d * 3;
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return `${digits12}${check}`;
+}
+
+const BARCODE_HINT =
+  "Scannable code for this variant, used at POS to add it to a sale instantly. Leave empty and the system auto-generates a unique EAN-13 code when you save — or click Generate to preview/print one now, or type your own if you already have physical barcode labels.";
+
+/** Small pill-style toggle used to switch between "Upload" and "Media Center" inside the image panel. */
+function SourceToggle({
+  active,
+  onChange,
+}: {
+  active: "upload" | "media";
+  onChange: (v: "upload" | "media") => void;
+}) {
+  const tabs: { id: "upload" | "media"; label: string; icon: React.ReactNode }[] = [
+    { id: "upload", label: "Upload new", icon: <Upload size={12} /> },
+    { id: "media", label: "Media Center", icon: <FolderOpen size={12} /> },
+  ];
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        padding: 3,
+        borderRadius: 9,
+        background: "#E2E8F0",
+        gap: 2,
+      }}
+    >
+      {tabs.map((tab) => {
+        const isActive = active === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onChange(tab.id)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "5px 11px",
+              borderRadius: 7,
+              border: "none",
+              background: isActive ? "#FFFFFF" : "transparent",
+              color: isActive ? "#1D4ED8" : "#64748B",
+              fontSize: 11.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              boxShadow: isActive ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+              transition: "all 0.15s",
+            }}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function VariantManager({
   variants,
   setVariants,
@@ -27,6 +305,8 @@ export default function VariantManager({
   categoryAttributes = [],
 }: Props) {
   const [showImageUploaders, setShowImageUploaders] = useState<Record<string, boolean>>({});
+  const [imageSourceTab, setImageSourceTab] = useState<Record<string, "upload" | "media">>({});
+  const [mediaCenterVariantId, setMediaCenterVariantId] = useState<string | null>(null);
   const [showAttributeDropdown, setShowAttributeDropdown] = useState(false);
   const [selectedAttributeId, setSelectedAttributeId] = useState<string | null>(null);
   const [showValueDropdown, setShowValueDropdown] = useState(false);
@@ -105,14 +385,39 @@ export default function VariantManager({
     setVariants(variants.map((v) => (v.id === id ? { ...v, [field]: value } : v)));
   };
 
+  const handleSkuChange = (id: string | undefined, rawValue: string) => {
+    if (!id) return;
+    handleChange(id, "sku", formatSkuInput(rawValue));
+  };
+
   const handleImagesChange = (id: string | undefined, images: (string | ProductImageInput)[]) => {
     if (!id) return;
     setVariants(variants.map((v) => (v.id === id ? { ...v, images: images.slice(0, 8) } : v)));
   };
 
+  /** Called when the vendor confirms a selection inside MediaCenter for a specific variant. */
+  const handleMediaCenterSelect = (variantId: string, items: MediaCenterItem[]) => {
+    const variant = variants.find((v) => v.id === variantId);
+    if (!variant) return;
+
+    const existingUrls = new Set(
+      (variant.images || []).map((img) => (typeof img === "string" ? img : img.url))
+    );
+    const newUrls = items.map((it) => it.url).filter((url) => !existingUrls.has(url));
+
+    const merged: (string | ProductImageInput)[] = [
+      ...(variant.images || []),
+      ...newUrls,
+    ].slice(0, 8);
+
+    handleImagesChange(variantId, merged);
+    setMediaCenterVariantId(null);
+  };
+
   const toggleImageUploader = (id: string | undefined) => {
     if (!id) return;
     setShowImageUploaders((prev) => ({ ...prev, [id]: !prev[id] }));
+    setImageSourceTab((prev) => (prev[id] ? prev : { ...prev, [id]: "upload" }));
   };
 
   const handleSpecialPriceChange = (id: string | undefined, specialPrice: number | null) => {
@@ -160,62 +465,6 @@ export default function VariantManager({
   }, [variants.length]);
 
   const displayVariants = variants.filter((v) => !isDefaultEmptyVariant(v) || variants.length === 1);
-
-  /* ── shared thin header input (apply-to-all) ── */
-  const ApplyInput = ({ onApply, placeholder }: { onApply: (n: number) => void; placeholder: string }) => (
-    <Input
-      type="number"
-      step="0.01"
-      min="0"
-      placeholder={placeholder}
-      style={{ fontSize: 11, height: 28, marginTop: 4, borderColor: "#BFDBFE", background: "#F8FAFC" }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          const val = Number((e.target as HTMLInputElement).value);
-          if (val >= 0) { onApply(val); (e.target as HTMLInputElement).value = ""; }
-        }
-      }}
-    />
-  );
-
-  /* ── Th helper ── */
-  const Th = ({ children, minW = 120 }: { children: React.ReactNode; minW?: number }) => (
-    <th
-      style={{
-        padding: "10px 12px",
-        textAlign: "left",
-        fontSize: 11.5,
-        fontWeight: 700,
-        color: "#3D5068",
-        background: "#EFF6FF",
-        borderBottom: "0.5px solid #BFDBFE",
-        borderRight: "0.5px solid #E2E8F0",
-        minWidth: minW,
-        whiteSpace: "nowrap",
-        letterSpacing: "0.01em",
-      }}
-    >
-      {children}
-    </th>
-  );
-
-  /* ── Td helper ── */
-  const Td = ({ children, center = false, span = 1 }: { children: React.ReactNode; center?: boolean; span?: number }) => (
-    <td
-      rowSpan={span}
-      style={{
-        padding: "8px 10px",
-        fontSize: 13,
-        color: "#0F172A",
-        borderBottom: "0.5px solid #E2E8F0",
-        borderRight: "0.5px solid #E2E8F0",
-        textAlign: center ? "center" : "left",
-        verticalAlign: "middle",
-      }}
-    >
-      {children}
-    </td>
-  );
 
   const renderValueDropdown = () => {
     if (!selectedAttributeId) return null;
@@ -466,21 +715,20 @@ export default function VariantManager({
               <tr>
                 <Th minW={160}>Attribute</Th>
                 <Th minW={140}>Value</Th>
-                <Th minW={150}>
-                  <div>SKU <span style={{ color: "#DC2626" }}>*</span></div>
+                <Th minW={190}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    SKU <span style={{ color: "#DC2626" }}>*</span>
+                    <FieldHint text={SKU_HINT} />
+                  </div>
                 </Th>
-                <Th minW={150}>
-                  <div>Price <span style={{ color: "#DC2626" }}>*</span></div>
-                  <ApplyInput onApply={applyPriceToAll} placeholder="Apply to all…" />
+
+                <Th minW={200}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    Barcode
+                    <FieldHint text={BARCODE_HINT} />
+                  </div>
                 </Th>
-                <Th minW={150}>
-                  <div>Special price</div>
-                  <ApplyInput onApply={applySpecialPriceToAll} placeholder="Apply to all…" />
-                </Th>
-                <Th minW={120}>
-                  <div>Stock</div>
-                  <ApplyInput onApply={applyStockToAll} placeholder="Apply to all…" />
-                </Th>
+
                 <Th minW={110}>Availability</Th>
                 <Th minW={120}>Actions</Th>
               </tr>
@@ -489,7 +737,7 @@ export default function VariantManager({
               {displayVariants.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     style={{ padding: "40px 0", textAlign: "center", borderBottom: "0.5px solid #E2E8F0" }}
                   >
                     <Package size={28} color="#BFDBFE" style={{ margin: "0 auto 10px" }} />
@@ -516,6 +764,7 @@ export default function VariantManager({
                     groupVariants.forEach((variant, variantIndex) => {
                       const isFirstInGroup = variantIndex === 0;
                       const firstAttr = variant.attributes?.[0];
+                      const activeTab = imageSourceTab[variant.id!] || "upload";
 
                       rows.push(
                         <React.Fragment key={`${variant.id}-${variantIndex}`}>
@@ -571,80 +820,90 @@ export default function VariantManager({
 
                             {/* SKU */}
                             <Td>
-                              <Input
-                                value={variant.sku}
-                                onChange={(e) => handleChange(variant.id, "sku", e.target.value)}
-                                placeholder="Enter SKU"
-                                required
-                                style={{
-                                  fontSize: 13,
-                                  borderColor: variant.sku ? "#6EE7B7" : "#BFDBFE",
-                                  background: variant.sku ? "#F0FDF4" : "#FFFFFF",
-                                }}
-                              />
-                            </Td>
-
-                            {/* Price */}
-                            <Td>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={variant.price || ""}
-                                onChange={(e) => handleChange(variant.id, "price", Number(e.target.value))}
-                                placeholder="0.00"
-                                required
-                                style={{
-                                  fontSize: 13,
-                                  borderColor: variant.price > 0 ? "#6EE7B7" : "#BFDBFE",
-                                  background: variant.price > 0 ? "#F0FDF4" : "#FFFFFF",
-                                }}
-                              />
-                            </Td>
-
-                            {/* Special price */}
-                            <Td>
-                              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={variant.specialPrice || ""}
-                                  onChange={(e) => handleSpecialPriceChange(variant.id, e.target.value ? Number(e.target.value) : null)}
-                                  placeholder="0.00"
-                                  style={{ fontSize: 13, flex: 1, borderColor: "#BFDBFE" }}
-                                />
-                                {variant.specialPrice && (
-                                  <button
-                                    onClick={() => handleSpecialPriceChange(variant.id, null)}
-                                    style={{ background: "none", border: "none", cursor: "pointer", padding: 3, color: "#94A3B8", display: "flex", flexShrink: 0 }}
-                                  >
-                                    <X size={12} />
-                                  </button>
-                                )}
+                              <div style={{ display: "flex", gap: 5 }}>
+                                <div style={{ position: "relative", flex: 1 }}>
+                                  <Input
+                                    value={variant.sku}
+                                    onChange={(e) => handleSkuChange(variant.id, e.target.value)}
+                                    placeholder="Enter SKU"
+                                    required
+                                    style={{
+                                      fontSize: 13,
+                                      textTransform: "uppercase",
+                                      borderColor: variant.sku ? "#6EE7B7" : "#BFDBFE",
+                                      background: variant.sku ? "#F0FDF4" : "#FFFFFF",
+                                    }}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  title="Generate a unique SKU so it won't clash with existing SKUs"
+                                  onClick={() =>
+                                    handleChange(variant.id, "sku", generateUniqueSKU(variant))
+                                  }
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    width: 30,
+                                    height: 30,
+                                    flexShrink: 0,
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    color: "#1D4ED8",
+                                    background: "#DBEAFE",
+                                    border: "0.5px solid #93C5FD",
+                                    borderRadius: 6,
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                  }}
+                                >
+                                  <RefreshCw size={12} />
+                                </button>
                               </div>
-                              {variant.specialPrice && variant.specialPrice >= variant.price && (
-                                <p style={{ fontSize: 10.5, color: "#DC2626", marginTop: 3, display: "flex", alignItems: "center", gap: 3 }}>
-                                  <AlertCircle size={10} /> Must be less than price
-                                </p>
-                              )}
-                              {variant.specialPrice && variant.specialPrice < variant.price && (
-                                <p style={{ fontSize: 10.5, color: "#059669", marginTop: 3, display: "flex", alignItems: "center", gap: 3 }}>
-                                  <Check size={10} /> Save {variant.discount}%
-                                </p>
-                              )}
                             </Td>
 
-                            {/* Stock */}
+                            {/* Barcode */}
                             <Td>
-                              <Input
-                                type="number"
-                                min="0"
-                                value={variant.stock || 0}
-                                onChange={(e) => handleChange(variant.id, "stock", Number(e.target.value))}
-                                placeholder="0"
-                                style={{ fontSize: 13, borderColor: "#BFDBFE" }}
-                              />
+                              <div style={{ display: "flex", gap: 5 }}>
+                                <div style={{ position: "relative", flex: 1 }}>
+                                  <Input
+                                    value={variant.barcode ?? ""}
+                                    onChange={(e) => handleChange(variant.id, "barcode", e.target.value)}
+                                    placeholder="Auto on save"
+                                    style={{
+                                      fontSize: 13,
+                                      borderColor: variant.barcode ? "#6EE7B7" : "#BFDBFE",
+                                      background: variant.barcode ? "#F0FDF4" : "#FFFFFF",
+                                    }}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  title="Generate a scannable barcode now (or leave empty — one is auto-created on save)"
+                                  onClick={() =>
+                                    handleChange(variant.id, "barcode", generateUniqueBarcode())
+                                  }
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    width: 30,
+                                    height: 30,
+                                    flexShrink: 0,
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    color: "#1D4ED8",
+                                    background: "#DBEAFE",
+                                    border: "0.5px solid #93C5FD",
+                                    borderRadius: 6,
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                  }}
+                                >
+                                  <RefreshCw size={12} />
+                                </button>
+                              </div>
                             </Td>
 
                             {/* Availability toggle */}
@@ -749,7 +1008,7 @@ export default function VariantManager({
                             </Td>
                           </tr>
 
-                          {/* Image uploader row */}
+                          {/* Image uploader row — vendor picks Upload vs Media Center */}
                           {showImageUploaders[variant.id!] && (
                             <tr>
                               <td
@@ -760,15 +1019,23 @@ export default function VariantManager({
                                   borderBottom: "0.5px solid #BFDBFE",
                                 }}
                               >
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                                  <span style={{ fontSize: 12, fontWeight: 600, color: "#1D4ED8" }}>
-                                    Variant images
-                                    {variant.images && variant.images.length > 0 && (
-                                      <span style={{ fontSize: 10.5, color: "#64748B", marginLeft: 6 }}>
-                                        ({variant.images.length}/8)
-                                      </span>
-                                    )}
-                                  </span>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: "#1D4ED8" }}>
+                                      Variant images
+                                      {variant.images && variant.images.length > 0 && (
+                                        <span style={{ fontSize: 10.5, color: "#64748B", marginLeft: 6 }}>
+                                          ({variant.images.length}/8)
+                                        </span>
+                                      )}
+                                    </span>
+                                    <SourceToggle
+                                      active={activeTab}
+                                      onChange={(tab) =>
+                                        setImageSourceTab((prev) => ({ ...prev, [variant.id!]: tab }))
+                                      }
+                                    />
+                                  </div>
                                   <button
                                     onClick={() => toggleImageUploader(variant.id)}
                                     style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11.5, color: "#64748B", fontFamily: "inherit" }}
@@ -776,11 +1043,72 @@ export default function VariantManager({
                                     Close
                                   </button>
                                 </div>
-                                <ImageUploader
-                                  images={(variant.images || []).map((img) => (typeof img === "string" ? img : img.url))}
-                                  setImages={(images) => handleImagesChange(variant.id, images)}
-                                  maxImages={8}
-                                />
+
+                                {activeTab === "upload" ? (
+                                  <ImageUploader
+                                    images={(variant.images || []).map((img) => (typeof img === "string" ? img : img.url))}
+                                    setImages={(images) => handleImagesChange(variant.id, images)}
+                                    maxImages={8}
+                                  />
+                                ) : (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: 10,
+                                      padding: "26px 16px",
+                                      border: "1.5px dashed #93C5FD",
+                                      borderRadius: 10,
+                                      background: "#FFFFFF",
+                                      textAlign: "center",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: 10,
+                                        background: "#EFF6FF",
+                                        border: "0.5px solid #BFDBFE",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                      }}
+                                    >
+                                      <FolderOpen size={18} color="#1D4ED8" />
+                                    </div>
+                                    <p style={{ fontSize: 12.5, fontWeight: 600, color: "#0F172A", margin: 0 }}>
+                                      Reuse images already in your Media Center
+                                    </p>
+                                    <p style={{ fontSize: 11, color: "#64748B", margin: 0, maxWidth: 320 }}>
+                                      Pick from previously uploaded files or existing product images — no need to upload again.
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={() => setMediaCenterVariantId(variant.id!)}
+                                      style={{
+                                        marginTop: 4,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 6,
+                                        padding: "7px 16px",
+                                        borderRadius: 8,
+                                        border: "none",
+                                        background: "linear-gradient(135deg,#1D4ED8,#0891B2)",
+                                        color: "#FFFFFF",
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        cursor: "pointer",
+                                        fontFamily: "inherit",
+                                      }}
+                                    >
+                                      <FolderOpen size={13} />
+                                      Open Media Center
+                                    </button>
+                                  </div>
+                                )}
                               </td>
                             </tr>
                           )}
@@ -853,29 +1181,23 @@ export default function VariantManager({
         </div>
       </div>
 
-      {/* ── Summary bar ── */}
-      {displayVariants.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 8,
-            padding: "8px 14px",
-            background: "#EFF6FF",
-            border: "0.5px solid #BFDBFE",
-            borderRadius: 9,
-            fontSize: 11.5,
-            color: "#1D4ED8",
-            fontWeight: 500,
+      {/* Media Center dialog — opened per-variant via "Open Media Center" */}
+      {mediaCenterVariantId && (
+        <MediaCenter
+          open={!!mediaCenterVariantId}
+          onOpenChange={(open: boolean) => {
+            if (!open) setMediaCenterVariantId(null);
           }}
-        >
-          <span>{displayVariants.length} variant{displayVariants.length !== 1 ? "s" : ""} created</span>
-          <span style={{ color: "#64748B" }}>
-            {displayVariants.filter((v) => v.sku && v.price > 0).length}/{displayVariants.length} fully configured
-          </span>
-        </div>
+          fileType="IMAGE"
+          multiple
+          maxSelect={Math.max(
+            1,
+            8 - ((variants.find((v) => v.id === mediaCenterVariantId)?.images || []).length)
+          )}
+          title="Choose variant images"
+          description="Select one or more images from your uploaded files or existing product images."
+          onSelect={(items: MediaCenterItem[]) => handleMediaCenterSelect(mediaCenterVariantId, items)}
+        />
       )}
 
       <style>{`

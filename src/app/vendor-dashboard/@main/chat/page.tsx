@@ -1,22 +1,29 @@
+"use client";
 
-"use client"
-import { RootState } from "@/store/store";
-import { redirect } from "next/navigation";
+// Route: /vendor-dashboard/chat
+// Vendor সব customer-এর সাথে product নিয়ে যে চ্যাট করে, সেগুলোর তালিকা +
+// থ্রেড এখানে দেখাবে। কোনো otherParticipant/productId পাস করা হচ্ছে না —
+// তাই component সরাসরি "list" ভিউতে খুলবে, ChatList থেকে বেছে নিলে থ্রেড খুলবে।
+
 import { useSelector } from "react-redux";
-import MessagingPage from "@/components/chatbox/MessagingPage";
+import { redirect } from "next/navigation";
+import { RootState } from "@/store/store";
+import UnifiedChat from "@/components/chatbox/UnifiedChat";
 
-// app/(vendor-dashboard)/messages/page.tsx
-export default function VendorMessagingPage() {
-  const user = useSelector((state: RootState) => state.auth.user);
+export default function VendorLiveChatPage() {
+   const user = useSelector((state: RootState) => state.auth.user);
   const accessToken = useSelector((state: RootState) => state.auth.accessToken);
+  const vendorId = user?.vendorId;
 
-  if (!user || !user.vendorId || !accessToken) redirect("/vendor/login");
+  if (!user || !vendorId || !accessToken) redirect("/vendor/login");
+
 
   return (
-    <MessagingPage
+    <UnifiedChat
+      layout="fullscreen"
       role="VENDOR"
-      currentVendorId={user.vendorId}
-      accessToken={accessToken}  
+      currentVendorId={vendorId}
+      accessToken={accessToken}
     />
   );
 }

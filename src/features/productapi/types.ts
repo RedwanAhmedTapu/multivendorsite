@@ -1,0 +1,327 @@
+// productapi/types.ts
+import type {
+  Product,
+  CreateProductData,
+  UpdateProductData,
+  ProductVariant,
+} from "../../types/product";
+
+// =====================================================
+// Generic envelope — matches utils/response.ts on the backend
+// =====================================================
+export interface ApiResponse<T> {
+  success: boolean;
+  message?: string;
+  data: T;
+  pagination?: CursorPagination | OffsetPagination;
+  meta?: Record<string, any>;
+}
+
+// =====================================================
+// Pagination Types
+// =====================================================
+
+// Cursor pagination (Public APIs)
+export interface CursorPagination {
+  hasNext: boolean;
+  nextCursor: string | null;
+  limit: number;
+  total?: number;
+}
+
+// Offset pagination (Vendor/Admin dashboards)
+export interface OffsetPagination {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+  limit: number;
+}
+
+export function isOffsetPagination(p?: CursorPagination | OffsetPagination): p is OffsetPagination {
+  return !!p && "currentPage" in p;
+}
+
+// Cursor-paginated page structure (for public APIs)
+export interface CursorPage<T> {
+  items: T[];
+  pagination: {
+    cursor?: string;
+    nextCursor?: string | null;
+    hasMore: boolean;
+    hasNext: boolean;
+    limit: number;
+    total?: number;
+  };
+}
+
+// Offset-paginated page structure (for vendor/admin APIs)
+export interface OffsetPage<T> {
+  items: T[];
+  pagination: OffsetPagination;
+}
+
+// =====================================================
+// Shared query param shapes
+// =====================================================
+
+export type SortBy =
+  | "newest"
+  | "oldest"
+  | "price_asc"
+  | "price_desc"
+  | "rating_asc"
+  | "rating_desc"
+  | "popularity"
+  | "trending"
+  | "best_selling"
+  | "most_viewed"
+  | "top_rated"
+  | "highest_discount"
+  | "recently_updated";
+
+export interface BaseProductFilter {
+  categoryId?: string;
+  categorySlug?: string; // Added for slug-based filtering
+  categoryIds?: string[];
+  subCategoryId?: string;
+  brandId?: string;
+  brandIds?: string[];
+  brandNames?: string[]; // Added for name-based filtering
+  search?: string;
+  keyword?: string;
+  tags?: string[];
+
+  minPrice?: number;
+  maxPrice?: number;
+  minRating?: number;
+
+  inStock?: boolean;
+  outOfStock?: boolean;
+
+  onSale?: boolean;
+  newArrival?: boolean;
+  newArrivals?: boolean; // Alternative naming
+  featured?: boolean;
+  freeShipping?: boolean;
+  hasDiscount?: boolean;
+
+  warehouseId?: string;
+  attributes?: Record<string, string | string[] | number | number[] | boolean>; // Updated to match API
+  color?: string[];
+  size?: string[];
+  sku?: string;
+  ratings?: number[]; // Added for rating filter
+
+  vendorIds?: string[];
+  vendorNames?: string[]; // Added for name-based filtering
+
+  sortBy?: SortBy;
+}
+
+// Public: cursor-paginated
+export interface PublicProductFilter extends BaseProductFilter {
+  cursor?: string;
+  limit?: number;
+}
+
+// FIX: rackId/rowNumber/shelfNumber weren't part of VendorProductFilter —
+// added so the Product Management page can filter by exact stock location,
+// mirroring warehouseId (already inherited from BaseProductFilter).
+// NOTE: this only works if the backend's /products/vendor/my-products
+// controller actually reads these query params and joins against
+// WarehouseStock — confirm that server-side before relying on it.
+export interface VendorProductFilter extends BaseProductFilter {
+  approvalStatus?: "PENDING" | "ACTIVE" | "REJECTED" | "DRAFT";
+  lowStock?: boolean;
+  rackId?: string;
+  rowNumber?: number;
+  shelfNumber?: number;
+  page?: number;
+  limit?: number;
+}
+
+// Admin: offset-paginated, sees everything
+export interface AdminProductFilter extends BaseProductFilter {
+  approvalStatus?: "PENDING" | "ACTIVE" | "REJECTED" | "DRAFT" | "INACTIVE";
+  vendorId?: string;
+  vendorName?: string;
+  includeDeleted?: boolean;
+  taxRateMin?: number;
+  taxRateMax?: number;
+  createdFrom?: string;
+  createdTo?: string;
+  updatedFrom?: string;
+  updatedTo?: string;
+  page?: number;
+  limit?: number;
+}
+
+// =====================================================
+// SEO block returned on the product detail page
+// =====================================================
+export interface ProductSeo {
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  canonicalUrl?: string | null;
+  robots?: string;
+  ogTitle?: string | null;
+  ogDescription?: string | null;
+  ogImage?: string | null;
+  ogType?: string;
+  twitterTitle?: string | null;
+  twitterDescription?: string | null;
+  twitterImage?: string | null;
+  twitterCard?: string;
+  schemaOverride?: {
+    jsonLd?: Record<string, any>;
+    breadcrumb?: Record<string, any>;
+  } | null;
+  sitemapPriority?: number | null;
+  sitemapChangefreq?: string;
+  isAutoGenerated?: boolean;
+  isPublished?: boolean;
+}
+
+export interface BreadcrumbItem {
+  name: string;
+  url: string;
+}
+
+export interface ReviewSummary {
+  averageRating: number;
+  totalReviews: number;
+  ratingDistribution: { star: number; count: number; percentage: number }[];
+}
+
+// Full SEO product detail response — GET /products/:slug
+export interface ProductDetailResponse extends Product {
+  reviewSummary: ReviewSummary;
+  breadcrumb: BreadcrumbItem[];
+  seo: ProductSeo;
+  redirectedFrom: string | null;
+}
+
+// =====================================================
+// Statistics
+// =====================================================
+export interface VendorStatistics {
+  total: number;
+  pending: number;
+  active: number;
+  rejected: number;
+  draft: number;
+  archived: number;
+  featured: number;
+  newArrival: number;
+  outOfStock: number;
+  lowStock: number;
+  inStock: number;
+  onSale: number;
+  freeShippingProducts: number;
+  totalInventoryUnits: number | null;
+  inventoryValue: number;
+  averageProductRating: number;
+  totalReviews: number;
+  recentlyAddedProducts: { id: string; name: string; createdAt: string }[];
+  recentlyUpdatedProducts: { id: string; name: string; updatedAt: string }[];
+  categoryDistribution: { categoryId: string; categoryName: string; count: number }[];
+  brandDistribution: { brandId: string | null; brandName: string; count: number }[];
+  topProducts: { id: string; name: string; salesCount: number; viewCount: number }[];
+}
+
+export interface MonthlyTrendPoint {
+  month: string;
+  productsCreated: number;
+}
+
+export interface AdminStatistics {
+  global: {
+    totalProducts: number;
+    totalVendors: number;
+    pendingApprovals: number;
+    approvedProducts: number;
+    rejectedProducts: number;
+    deletedProducts: number;
+  };
+  productsByCategory: { categoryId: string | null; count: number }[];
+  productsByBrand: { brandId: string | null; count: number }[];
+  productsByWarehouse: { warehouseId: string; count: number }[];
+  topVendors: { vendorId: string; vendorName: string; productCount: number }[];
+  inventorySummary: { totalVariants: number; totalInventoryValue: number };
+  monthlyProductGrowth: MonthlyTrendPoint[];
+  approvalTrends: {
+    recentlyApproved: { id: string; name: string; updatedAt: string; vendor: { storeName: string } }[];
+    recentlyRejected: { id: string; name: string; updatedAt: string; vendor: { storeName: string } }[];
+  };
+  productHealthReport: {
+    mostViewed: { id: string; name: string; viewCount: number }[];
+    mostSold: { id: string; name: string; salesCount: number }[];
+  };
+}
+
+export interface ProductContentScoreSummary {
+  totalProducts: number;
+  needsImprovement: number;
+  improvementRate: number;
+  products: Array<{
+    productId: string;
+    productName: string;
+    status: "PENDING" | "ACTIVE" | "REJECTED" | "DRAFT";
+    imageCount: number;
+    hasDescriptionImages: boolean;
+    isDescriptionTooShort: boolean;
+    issues: string[];
+    needsImprovement: boolean;
+  }>;
+}
+
+// =====================================================
+// Soft-delete / trash
+// =====================================================
+export interface VendorTrashItem {
+  id: string;
+  name: string;
+  slug: string;
+  deletedAt: string;
+  scheduledPurgeAt: string;
+  daysUntilPurge: number | null;
+  images: { url: string }[];
+}
+
+export interface SoftDeleteResult {
+  id: string;
+  scheduledPurgeAt: string;
+}
+
+// =====================================================
+// Upload
+// =====================================================
+export interface ImageUploadResult {
+  urls: string[];
+  count: number;
+}
+
+export interface VideoUploadResult {
+  url: string;
+}
+export interface BulkImportGroupResult {
+  groupKey: string;
+  rowNumbers: number[];
+  productName: string;
+  success: boolean;
+  productId?: string;
+  slug?: string;
+  error?: string;
+}
+
+export interface BulkImportSummary {
+  totalRows: number;
+  totalGroups: number;
+  created: number;
+  failed: number;
+  results: BulkImportGroupResult[];
+}
+// Re-export the shared domain types
+export type { Product, CreateProductData, UpdateProductData, ProductVariant };

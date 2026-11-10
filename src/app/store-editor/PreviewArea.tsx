@@ -57,25 +57,108 @@ const COMPONENT_MAP = {
 
 type ModuleType = keyof typeof COMPONENT_MAP;
 
-// Extract StoreHeaderStyles from raw formData
-function extractHeaderStyles(formData: any): StoreHeaderStyles {
+// Hard-coded fallback values so the Store Header always renders fully
+// styled — even on the very first paint of a brand-new store, before any
+// backend config or formDataMap entry exists for it yet.
+//
+// IMPORTANT: these must match StoreHeader's own internal default values
+// (see componentspreview/StoreHeader.tsx) exactly. StoreHeader applies its
+// defaults via destructuring (`headerBgColor = "#0f172a"`, etc.), which only
+// kicks in when a field is `undefined`. If this layer supplies a *different*
+// default for the same field, it overrides StoreHeader's intended default
+// and the two layers fall out of sync (e.g. a white header instead of the
+// intended dark navy one).
+const DEFAULT_HEADER_STYLES: Required<
+  Pick<
+    StoreHeaderStyles,
+    | "headerBgColor"
+    | "headerOverlayOpacity"
+    | "storeNameColor"
+    | "followersColor"
+    | "iconsColor"
+    | "logoRingColor"
+    | "chatButtonColor"
+    | "chatButtonTextColor"
+    | "showLogo"
+    | "showStoreName"
+    | "showFollowers"
+    | "showRating"
+    | "showVerifiedBadge"
+    | "showChatButton"
+  >
+> = {
+  headerBgColor: "#0f172a",
+  headerOverlayOpacity: 0,
+  storeNameColor: "#ffffff",
+  followersColor: "#cbd5e1",
+  iconsColor: "#f59e0b",
+  logoRingColor: "#ffffff",
+  chatButtonColor: "#f97316",
+  chatButtonTextColor: "#ffffff",
+  showLogo: true,
+  showStoreName: true,
+  showFollowers: true,
+  showRating: true,
+  showVerifiedBadge: true,
+  showChatButton: true,
+};
+
+// Extract StoreHeaderStyles from raw formData, always falling back to safe
+// defaults for every field so StoreHeader never receives `undefined` for a
+// value it needs to render (e.g. on first paint, before any config exists).
+export function extractHeaderStyles(formData: any): StoreHeaderStyles {
+  const f = formData ?? {};
   return {
-    headerBgColor: formData?.headerBgColor,
-    headerBgImageMobile: formData?.headerBgImageMobile,
-    headerBgImageDesktop: formData?.headerBgImageDesktop,
-    headerOverlayOpacity: formData?.headerOverlayOpacity,
-    storeNameColor: formData?.storeNameColor,
-    followersColor: formData?.followersColor,
-    iconsColor: formData?.iconsColor,
-    logoRingColor: formData?.logoRingColor,
-    chatButtonColor: formData?.chatButtonColor,
-    chatButtonTextColor: formData?.chatButtonTextColor,
-    showLogo: formData?.showLogo,
-    showStoreName: formData?.showStoreName,
-    showFollowers: formData?.showFollowers,
-    showRating: formData?.showRating,
-    showVerifiedBadge: formData?.showVerifiedBadge,
-    showChatButton: formData?.showChatButton,
+    headerBgColor: f.headerBgColor ?? DEFAULT_HEADER_STYLES.headerBgColor,
+    headerBgImageMobile: f.headerBgImageMobile,
+    headerBgImageDesktop: f.headerBgImageDesktop,
+    headerOverlayOpacity: f.headerOverlayOpacity ?? DEFAULT_HEADER_STYLES.headerOverlayOpacity,
+    storeNameColor: f.storeNameColor ?? DEFAULT_HEADER_STYLES.storeNameColor,
+    followersColor: f.followersColor ?? DEFAULT_HEADER_STYLES.followersColor,
+    iconsColor: f.iconsColor ?? DEFAULT_HEADER_STYLES.iconsColor,
+    logoRingColor: f.logoRingColor ?? DEFAULT_HEADER_STYLES.logoRingColor,
+    chatButtonColor: f.chatButtonColor ?? DEFAULT_HEADER_STYLES.chatButtonColor,
+    chatButtonTextColor: f.chatButtonTextColor ?? DEFAULT_HEADER_STYLES.chatButtonTextColor,
+    showLogo: f.showLogo ?? DEFAULT_HEADER_STYLES.showLogo,
+    showStoreName: f.showStoreName ?? DEFAULT_HEADER_STYLES.showStoreName,
+    showFollowers: f.showFollowers ?? DEFAULT_HEADER_STYLES.showFollowers,
+    showRating: f.showRating ?? DEFAULT_HEADER_STYLES.showRating,
+    showVerifiedBadge: f.showVerifiedBadge ?? DEFAULT_HEADER_STYLES.showVerifiedBadge,
+    showChatButton: f.showChatButton ?? DEFAULT_HEADER_STYLES.showChatButton,
+  };
+}
+
+// Voucher.tsx renders an array of `VoucherItem` cards, but the backend only
+// stores ONE voucher's worth of fields per component (voucherTitle,
+// voucherCode, discountPercentage, etc. — see ComponentConfigInput.settings
+// in storeEditorApi.ts). This adapter wraps that single saved voucher into
+// the 1-item array shape Voucher.tsx expects, so the preview component
+// itself didn't need to change.
+export function extractVoucherFormData(formData: any) {
+  const f = formData ?? {};
+  const hasSavedVoucher = !!(f.voucherTitle || f.voucherCode || f.discountPercentage || f.discountAmount);
+  if (!hasSavedVoucher) return f; // let Voucher.tsx fall back to its own DEFAULT_VOUCHERS
+
+  const discount = f.discountPercentage
+    ? `${f.discountPercentage}%`
+    : f.discountAmount
+      ? `৳${f.discountAmount}`
+      : undefined;
+
+  return {
+    ...f,
+    vouchers: [
+      {
+        id: 1,
+        discount,
+        upTo: f.voucherTitle ?? 'Special offer',
+        date: f.voucherValidTo ? new Date(f.voucherValidTo).toLocaleDateString(undefined, { weekday: 'long' }) : undefined,
+        fullDate: f.voucherValidTo ? new Date(f.voucherValidTo).toLocaleDateString() : undefined,
+        event: f.voucherDescription,
+        code: f.voucherCode,
+        serialNumber: f.voucherCode ? `Code: ${f.voucherCode}` : undefined,
+      },
+    ],
   };
 }
 
@@ -135,14 +218,17 @@ export const PreviewArea = ({
     const Component = COMPONENT_MAP[module.type as ModuleType];
     const formData = formDataMap[module.id] ?? {};
 
-    // Extra props only for StoreHeader
-
+    // Every component now receives `formData` (previously only StoreHeader
+    // and CountdownProducts did — every other module silently rendered its
+    // hardcoded placeholder data forever, no matter what was saved in
+    // ConfigurationForm). StoreHeader keeps its own `styles` shape; Voucher
+    // gets its data pre-shaped into the `vouchers` array it expects.
     const extraProps =
       module.type === "categoryBar"
         ? { styles: extractHeaderStyles(formData), viewMode: currentView }
-        : module.type === "countdownProduct"
-          ? { formData, viewMode: currentView }
-          : { viewMode: currentView };
+        : module.type === "voucher"
+          ? { formData: extractVoucherFormData(formData), viewMode: currentView }
+          : { formData, viewMode: currentView };
 
     const cardContent = Component ? (
       <Component

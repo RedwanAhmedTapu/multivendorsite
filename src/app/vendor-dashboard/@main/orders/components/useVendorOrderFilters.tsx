@@ -1,7 +1,24 @@
-import { useState, useCallback, useMemo } from "react";
-import type { VendorOrderFilters } from "@/types/vendorOrderTypes";
+"use client";
 
-const DEFAULT_FILTERS: VendorOrderFilters = {
+import { useState, useCallback, useMemo } from "react";
+import type {
+  OrderStatus,
+  FulfillmentStatus,
+  VendorOrderFilters,
+} from "@/features/vendorOrderApi";
+
+// UI-facing filter shape (all strings so <Select>/<Input> bind cleanly).
+export interface VendorOrderUiFilters {
+  page: number;
+  limit: number;
+  search: string;
+  status: OrderStatus | "";
+  fulfillmentStatus: FulfillmentStatus | "";
+  dateFrom: string;
+  dateTo: string;
+}
+
+const DEFAULT_FILTERS: VendorOrderUiFilters = {
   page: 1,
   limit: 20,
   search: "",
@@ -9,27 +26,24 @@ const DEFAULT_FILTERS: VendorOrderFilters = {
   fulfillmentStatus: "",
   dateFrom: "",
   dateTo: "",
-  sortBy: "createdAt",
-  sortOrder: "desc",
 };
 
 export function useVendorOrderFilters() {
-  const [filters, setFilters] = useState<VendorOrderFilters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<VendorOrderUiFilters>(DEFAULT_FILTERS);
 
   const setFilter = useCallback(
-    <K extends keyof VendorOrderFilters>(key: K, value: VendorOrderFilters[K]) => {
+    <K extends keyof VendorOrderUiFilters>(key: K, value: VendorOrderUiFilters[K]) => {
       setFilters((prev) => ({
         ...prev,
         [key]: value,
+        // any filter change resets pagination back to page 1
         page: key === "page" ? (value as number) : 1,
       }));
     },
     []
   );
 
-  const resetFilters = useCallback(() => {
-    setFilters(DEFAULT_FILTERS);
-  }, []);
+  const resetFilters = useCallback(() => setFilters(DEFAULT_FILTERS), []);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -40,45 +54,18 @@ export function useVendorOrderFilters() {
     return count;
   }, [filters]);
 
-  // Stable string arg for RTK Query — avoids setState-during-render error
-  const queryString = useMemo(() => {
-    const params = new URLSearchParams();
-    params.set("page", String(filters.page));
-    params.set("limit", String(filters.limit));
-    if (filters.search) params.set("search", filters.search);
-    if (filters.status) params.set("status", filters.status);
-    if (filters.fulfillmentStatus) params.set("fulfillmentStatus", filters.fulfillmentStatus);
-    if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
-    if (filters.dateTo) params.set("dateTo", filters.dateTo);
-    params.set("sortBy", filters.sortBy);
-    params.set("sortOrder", filters.sortOrder);
-    return params.toString();
-  }, [
-    filters.page,
-    filters.limit,
-    filters.search,
-    filters.status,
-    filters.fulfillmentStatus,
-    filters.dateFrom,
-    filters.dateTo,
-    filters.sortBy,
-    filters.sortOrder,
-  ]);
+  // What actually gets passed to useGetVendorOrdersQuery — matches the
+  // VendorOrderFilters interface field-for-field (fromDate/toDate, not
+  // dateFrom/dateTo), and strips empty values so we don't send "".
+  const apiFilters: VendorOrderFilters = useMemo(() => {
+    const f: VendorOrderFilters = { page: filters.page, limit: filters.limit };
+    if (filters.search) f.search = filters.search;
+    if (filters.status) f.status = filters.status;
+    if (filters.fulfillmentStatus) f.fulfillmentStatus = filters.fulfillmentStatus;
+    if (filters.dateFrom) f.fromDate = filters.dateFrom;
+    if (filters.dateTo) f.toDate = filters.dateTo;
+    return f;
+  }, [filters]);
 
-  // Stats query string (date range only)
-  const statsQueryString = useMemo(() => {
-    const params = new URLSearchParams();
-    if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
-    if (filters.dateTo) params.set("dateTo", filters.dateTo);
-    return params.toString();
-  }, [filters.dateFrom, filters.dateTo]);
-
-  return {
-    filters,
-    setFilter,
-    resetFilters,
-    activeFilterCount,
-    queryString,
-    statsQueryString,
-  };
+  return { filters, setFilter, resetFilters, activeFilterCount, apiFilters };
 }

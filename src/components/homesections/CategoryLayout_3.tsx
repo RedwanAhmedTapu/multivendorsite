@@ -156,10 +156,10 @@ export default function CategoryLayout3({
 
   return (
     <div className=" w-full " >
-        <Container className="hidden md:flex bg-white shadow-lg overflow-hidden">
+        <Container className="hidden md:flex bg-card shadow-lg overflow-hidden">
 
       {/* Left Sidebar - Always Open */}
-      <div className="w-1/4 border-r border-gray-200 overflow-y-auto">
+      <div className="w-1/4 border-r border-border overflow-y-auto">
         {categories.map((cat) => {
           const Icon = getCategoryIcon(cat.name);
           return (
@@ -169,22 +169,22 @@ export default function CategoryLayout3({
               onMouseLeave={() => setActiveCategory(null)}
               className={cn(
                 "flex items-center justify-between px-4 py-3 cursor-pointer transition-all duration-200",
-                "hover:bg-teal-50 border-b border-gray-100",
+                "hover:bg-primary-tint border-b border-border",
                 activeCategory?.id === cat.id
-                  ? "bg-teal-50 border-l-4 border-teal-600"
+                  ? "bg-primary-tint border-l-4 border-primary"
                   : ""
               )}
             >
               <div className="flex items-center gap-3">
                 <div className={cn(
                   "transition-colors duration-200",
-                  activeCategory?.id === cat.id ? "text-teal-600" : "text-gray-600"
+                  activeCategory?.id === cat.id ? "text-primary" : "text-muted-foreground"
                 )}>
                   {Icon}
                 </div>
                 <span className={cn(
                   "text-sm font-medium transition-colors duration-200",
-                  activeCategory?.id === cat.id ? "text-teal-700" : "text-gray-700"
+                  activeCategory?.id === cat.id ? "text-primary" : "text-foreground"
                 )}>
                   {cat.name}
                 </span>
@@ -192,7 +192,7 @@ export default function CategoryLayout3({
               {cat.children && cat.children.length > 0 && (
                 <ChevronRight className={cn(
                   "w-4 h-4 transition-all duration-200",
-                  activeCategory?.id === cat.id ? "text-teal-600 translate-x-1" : "text-gray-400"
+                  activeCategory?.id === cat.id ? "text-primary translate-x-1" : "text-muted-foreground"
                 )} />
               )}
             </div>
@@ -224,21 +224,21 @@ export default function CategoryLayout3({
             
             {/* Content */}
             <div className="relative z-10 p-6 h-full overflow-y-auto">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6 pb-3 border-b-2 border-teal-600">
+              <h3 className="text-2xl font-bold text-foreground mb-6 pb-3 border-b-2 border-primary">
                 {activeCategory.name}
               </h3>
               
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                 {activeCategory.children?.map((sub) => (
                   <div key={sub.id} className="group">
-                    <h4 className="font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-300 group-hover:border-teal-500 transition-colors duration-200">
+                    <h4 className="font-semibold text-foreground mb-3 pb-2 border-b border-border group-hover:border-primary transition-colors duration-200">
                       {sub.name}
                     </h4>
                     <ul className="space-y-2">
                       {sub.children?.map((child) => (
                         <li
                           key={child.id}
-                          className="text-sm text-gray-700 hover:text-teal-600 cursor-pointer transition-all duration-200 hover:translate-x-1"
+                          className="text-sm text-foreground hover:text-primary cursor-pointer transition-all duration-200 hover:translate-x-1"
                           onClick={() => {
                             onSelectCategory?.(child.id);
                           }}

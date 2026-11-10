@@ -255,7 +255,8 @@ function OrderCard({ order, onCancelClick }: OrderCardProps) {
           <tbody className="divide-y divide-slate-100">
             {allItems.map((item) => {
               const img = item.variant.images?.[0]?.url;
-              const price = item.variant.specialPrice ?? item.variant.price;
+              // Phase 4 (H-4): the price actually paid (persisted on the order line), never today's catalog price.
+              const price = Number(item.price);
 
               return (
                 <tr key={item.id} className="hover:bg-[#f5f7f8]/60 transition-colors">

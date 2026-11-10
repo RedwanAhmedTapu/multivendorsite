@@ -13,7 +13,7 @@ export const ModuleItemCard = ({
   onClick,
   isSelected = false
 }: {
-  item: ModuleItem;
+item: ModuleItem;
   onClick: () => void;
   isSelected?: boolean;
 }) => {

@@ -19,7 +19,17 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { OFFER_WIZARD_STEPS, formatTaka, validateWizardStep, type OfferWizardStep } from "@/lib/offers/offer-view";
+import {
+  OfferWizardFooter,
+  OfferWizardHeader,
+  OfferWizardStepper,
+  WIZARD_STEP_META,
+  useOfferWizard,
+  wizardCard,
+  wizardCardTitle,
+} from "@/components/offers/shared/offer-wizard";
 import { 
   CalendarIcon, 
   Plus, 
@@ -217,7 +227,6 @@ interface EditOfferPageProps {
 export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps) {
   const [updateOffer, { isLoading }] = useUpdateOfferMutation();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("basic");
   const [targetProductIds, setTargetProductIds] = useState<string[]>([]);
   const [targetCategoryIds, setTargetCategoryIds] = useState<string[]>([]);
   const [productSelectorOpen, setProductSelectorOpen] = useState(false);
@@ -401,23 +410,45 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
     toast.info("Category selection cleared");
   };
 
+  const OFFERS_LIST = "/admin-dashboard/offer-manage";
+
+  const validateStep = (step: OfferWizardStep) => {
+    const issues = validateWizardStep(step, formData, { targetProductCount: targetProductIds.length });
+    if (step === "basic" && !selectedCategoryPath) issues.push("Choose a category for this offer.");
+    return issues;
+  };
+  const wizard = useOfferWizard(validateStep);
+  const activeTab = wizard.active;
+  const setActiveTab = (tab: string) => wizard.setActive(tab as OfferWizardStep);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!offer) return;
+    // Enter inside a field on an earlier step moves forward instead of submitting.
+    if (!wizard.isLast) {
+      wizard.next();
+      return;
+    }
+    if (wizard.submitLock.current || isLoading) return;
+    if (!wizard.validateAll()) return;
+    wizard.submitLock.current = true;
 
     // Validate required fields
     if (!formData.title.trim()) {
       toast.error("Offer title is required");
+      wizard.submitLock.current = false;
       return;
     }
 
     if (!formData.type) {
       toast.error("Offer type is required");
+      wizard.submitLock.current = false;
       return;
     }
 
     if (formData.discountValue <= 0) {
       toast.error("Discount value must be greater than 0");
+      wizard.submitLock.current = false;
       return;
     }
 
@@ -440,11 +471,13 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
       if (onSuccess) {
         onSuccess();
       } else {
-        // router.push('/admin/offers');
+        router.push(OFFERS_LIST);
       }
     } catch (error) {
-      console.error("Update offer error:", error);
-      toast.error("Failed to update offer");
+      const message = (error as { data?: { message?: string } })?.data?.message;
+      toast.error(message ? `Couldn't update offer: ${message}` : "Couldn't update the offer");
+    } finally {
+      wizard.submitLock.current = false;
     }
   };
 
@@ -487,7 +520,7 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
     if (formData.discountType === "PERCENTAGE") {
       return `${formData.discountValue}% off`;
     } else if (formData.discountType === "FIXED_AMOUNT") {
-      return `₹${formData.discountValue} off`;
+      return `${formatTaka(formData.discountValue)} off`;
     } else if (formData.discountType === "FREE_SHIPPING") {
       return "Free Shipping";
     }
@@ -518,107 +551,31 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCancel}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit Offer</h1>
-            <p className="text-muted-foreground">
-              Update the offer details and settings. All changes will be applied immediately.
-            </p>
-          </div>
-        </div>
-        
-        {/* Offer Type Badge */}
-        <Badge 
-          variant="outline" 
-          className={cn("text-lg px-4 py-2", currentConfig.color)}
-        >
-          <span className="flex items-center gap-2">
+    <div className="mx-auto max-w-6xl space-y-4 pb-2">
+      <OfferWizardHeader
+        title="Edit offer"
+        subtitle="Changes apply to the live offer as soon as you save"
+        onBack={handleCancel}
+        badge={
+          <Badge variant="outline" className={cn("gap-1.5 rounded-full px-3 py-1 text-xs", currentConfig.color)}>
             {currentConfig.icon}
-            {formData.type.replace(/_/g, ' ')}
-          </span>
-        </Badge>
-      </div>
+            {formData.type.replace(/_/g, " ")}
+          </Badge>
+        }
+      />
 
-      {/* Progress Steps */}
-      <div className="flex items-center justify-between max-w-2xl mx-auto">
-        {["Basic Info", "Discount", "Rules", "Advanced"].map((step, index) => (
-          <div key={step} className="flex items-center">
-            <div className={cn(
-              "flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-medium",
-              activeTab === step.toLowerCase().replace(' ', '') 
-                ? "bg-primary text-primary-foreground border-primary" 
-                : index < ["basic", "discount", "rules", "advanced"].indexOf(activeTab)
-                ? "bg-green-500 text-white border-green-500"
-                : "border-muted-foreground text-muted-foreground"
-            )}>
-              {index < ["basic", "discount", "rules", "advanced"].indexOf(activeTab) ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                index + 1
-              )}
-            </div>
-            <span className={cn(
-              "ml-2 text-sm font-medium",
-              activeTab === step.toLowerCase().replace(' ', '') || 
-              index < ["basic", "discount", "rules", "advanced"].indexOf(activeTab)
-                ? "text-foreground"
-                : "text-muted-foreground"
-            )}>
-              {step}
-            </span>
-            {index < 3 && (
-              <div className={cn(
-                "w-16 h-0.5 mx-4",
-                index < ["basic", "discount", "rules", "advanced"].indexOf(activeTab)
-                  ? "bg-green-500"
-                  : "bg-muted"
-              )} />
-            )}
-          </div>
-        ))}
-      </div>
+      <OfferWizardStepper active={wizard.active} onSelect={wizard.setActive} complete={wizard.complete} />
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-4 h-auto mb-8 w-full max-w-2xl mx-auto">
-            <TabsTrigger value="basic" className="flex items-center gap-2 py-3">
-              <Info className="h-4 w-4" />
-              Basic Info
-            </TabsTrigger>
-            <TabsTrigger value="discount" className="flex items-center gap-2 py-3">
-              <Percent className="h-4 w-4" />
-              Discount
-            </TabsTrigger>
-            <TabsTrigger value="rules" className="flex items-center gap-2 py-3">
-              <Shield className="h-4 w-4" />
-              Rules & Limits
-            </TabsTrigger>
-            <TabsTrigger value="advanced" className="flex items-center gap-2 py-3">
-              <Users className="h-4 w-4" />
-              Advanced
-            </TabsTrigger>
-          </TabsList>
-
           {/* Basic Info Tab */}
-          <TabsContent value="basic" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TabsContent value="basic" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Main Content */}
               <div className="lg:col-span-2 space-y-6">
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Offer Details</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Offer Details</CardTitle>
                     <CardDescription>
                       Basic information about your offer
                     </CardDescription>
@@ -772,9 +729,9 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
 
                 {/* Voucher Configuration */}
                 {currentConfig.showVoucherConfig && (
-                  <Card>
+                  <Card className={wizardCard}>
                     <CardHeader>
-                      <CardTitle>Voucher Configuration</CardTitle>
+                      <CardTitle className={wizardCardTitle}>Voucher Configuration</CardTitle>
                       <CardDescription>
                         Settings for voucher code generation and usage
                       </CardDescription>
@@ -847,9 +804,9 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
 
                 {/* Countdown Configuration */}
                 {currentConfig.showCountdownConfig && (
-                  <Card>
+                  <Card className={wizardCard}>
                     <CardHeader>
-                      <CardTitle>Countdown Configuration</CardTitle>
+                      <CardTitle className={wizardCardTitle}>Countdown Configuration</CardTitle>
                       <CardDescription>
                         Timer and urgency settings for time-sensitive offers
                       </CardDescription>
@@ -959,11 +916,11 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
               </div>
 
               {/* Sidebar */}
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Banner Image Upload */}
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Banner Image</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Banner Image</CardTitle>
                     <CardDescription>
                       Update the offer banner image
                     </CardDescription>
@@ -1014,57 +971,22 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
                   </CardContent>
                 </Card>
 
-                {/* Quick Actions */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={() => setActiveTab("discount")}
-                    >
-                      <Percent className="h-4 w-4 mr-2" />
-                      Set Discount
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={() => setActiveTab("rules")}
-                    >
-                      <Clock className="h-4 w-4 mr-2" />
-                      Set Validity
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={() => setActiveTab("advanced")}
-                    >
-                      <Users className="h-4 w-4 mr-2" />
-                      Target Products
-                    </Button>
-                  </CardContent>
-                </Card>
               </div>
             </div>
           </TabsContent>
 
           {/* Discount Tab */}
-          <TabsContent value="discount" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TabsContent value="discount" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2 space-y-6">
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Discount Configuration</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Discount Configuration</CardTitle>
                     <CardDescription>
                       Set up the discount value and type
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-6">
+                  <CardContent className="space-y-4">
                     {/* Discount Preview */}
                     {formData.discountValue > 0 && (
                       <div className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border">
@@ -1074,14 +996,14 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
                           </div>
                           {(formData.minOrderAmount ?? 0) > 0 && (
                             <div className="text-sm text-muted-foreground mt-2">
-                              on orders above ₹{formData.minOrderAmount ?? 0}
+                              on orders above ৳{formData.minOrderAmount ?? 0}
                             </div>
                           )}
                         </div>
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="edit-discountType">Discount Type *</Label>
                         <Select
@@ -1197,9 +1119,9 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
 
                 {/* Buy X Get Y Configuration */}
                 {currentConfig.showBuyXGetYConfig && (
-                  <Card>
+                  <Card className={wizardCard}>
                     <CardHeader>
-                      <CardTitle>Buy X Get Y Configuration</CardTitle>
+                      <CardTitle className={wizardCardTitle}>Buy X Get Y Configuration</CardTitle>
                       <CardDescription>
                         Set up the buy X get Y free offer details
                       </CardDescription>
@@ -1295,10 +1217,10 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
               </div>
 
               {/* Sidebar */}
-              <div className="space-y-6">
-                <Card>
+              <div className="space-y-4">
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Discount Tips</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Discount Tips</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
                     <div className="flex items-start gap-2">
@@ -1329,12 +1251,12 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
           </TabsContent>
 
           {/* Rules & Limits Tab */}
-          <TabsContent value="rules" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TabsContent value="rules" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2 space-y-6">
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Validity Period</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Validity Period</CardTitle>
                     <CardDescription>
                       Set when the offer starts and ends
                     </CardDescription>
@@ -1415,9 +1337,9 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
                 </Card>
 
                 {currentConfig.showUsageLimits && (
-                  <Card>
+                  <Card className={wizardCard}>
                     <CardHeader>
-                      <CardTitle>Usage Limits</CardTitle>
+                      <CardTitle className={wizardCardTitle}>Usage Limits</CardTitle>
                       <CardDescription>
                         Control how many times this offer can be used
                       </CardDescription>
@@ -1466,9 +1388,9 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
 
                 {/* Stack Rules */}
                 {currentConfig.showStackRules && (
-                  <Card>
+                  <Card className={wizardCard}>
                     <CardHeader>
-                      <CardTitle>Stacking Rules</CardTitle>
+                      <CardTitle className={wizardCardTitle}>Stacking Rules</CardTitle>
                       <CardDescription>
                         Control how this offer interacts with other offers
                       </CardDescription>
@@ -1527,10 +1449,10 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
               </div>
 
               {/* Sidebar */}
-              <div className="space-y-6">
-                <Card>
+              <div className="space-y-4">
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Best Practices</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Best Practices</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
                     <div className="flex items-start gap-2">
@@ -1561,12 +1483,12 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
           </TabsContent>
 
           {/* Advanced Tab */}
-          <TabsContent value="advanced" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TabsContent value="advanced" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2 space-y-6">
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Product Targeting</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Product Targeting</CardTitle>
                     <CardDescription>
                       Choose which products this offer applies to
                     </CardDescription>
@@ -1661,9 +1583,9 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Visibility & Status</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Visibility & Status</CardTitle>
                     <CardDescription>
                       Control who can see and use this offer
                     </CardDescription>
@@ -1724,9 +1646,9 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Terms & Conditions</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Terms & Conditions</CardTitle>
                     <CardDescription>
                       Additional terms and conditions for this offer
                     </CardDescription>
@@ -1752,10 +1674,10 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
               </div>
 
               {/* Sidebar */}
-              <div className="space-y-6">
-                <Card>
+              <div className="space-y-4">
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Offer Summary</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Offer Summary</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-3">
@@ -1770,7 +1692,7 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
                       {((formData.minOrderAmount ?? 0) > 0) && (
                         <div className="flex justify-between">
                           <span className="text-sm text-muted-foreground">Min. Order</span>
-                          <span className="text-sm font-medium">₹{formData.minOrderAmount !== undefined ? formData.minOrderAmount : 0}</span>
+                          <span className="text-sm font-medium">৳{formData.minOrderAmount !== undefined ? formData.minOrderAmount : 0}</span>
                         </div>
                       )}
                       <div className="flex justify-between">
@@ -1803,72 +1725,47 @@ export function EditOfferPage({ offer, onSuccess, onCancel }: EditOfferPageProps
                 </Card>
 
                 {/* Quick Actions */}
-                <Card>
+                <Card className={wizardCard}>
                   <CardHeader>
-                    <CardTitle>Ready to Update</CardTitle>
+                    <CardTitle className={wizardCardTitle}>Ready to submit</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      {!formData.title && (
-                        <div className="flex items-center gap-2 text-sm text-destructive">
-                          <X className="h-4 w-4" />
-                          <span>Offer title is required</span>
-                        </div>
-                      )}
-                      {!formData.discountValue && (
-                        <div className="flex items-center gap-2 text-sm text-destructive">
-                          <X className="h-4 w-4" />
-                          <span>Discount value is required</span>
-                        </div>
-                      )}
-                      {!selectedCategoryPath && (
-                        <div className="flex items-center gap-2 text-sm text-destructive">
-                          <X className="h-4 w-4" />
-                          <span>Category is required</span>
-                        </div>
-                      )}
-                      {formData.title && formData.discountValue && selectedCategoryPath && (
-                        <div className="flex items-center gap-2 text-sm text-green-600">
-                          <Check className="h-4 w-4" />
-                          <span>All requirements met</span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <Button 
-                      type="submit" 
-                      disabled={isLoading || !formData.title || !formData.discountValue || !selectedCategoryPath}
-                      className="w-full"
-                      size="lg"
-                    >
-                      {isLoading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                          Updating Offer...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4 mr-2" />
-                          Update Offer
-                        </>
-                      )}
-                    </Button>
-                    
-                    <Button 
-                      type="button"
-                      variant="outline" 
-                      onClick={handleCancel}
-                      disabled={isLoading}
-                      className="w-full"
-                    >
-                      Cancel
-                    </Button>
+                    <ul className="space-y-1.5" aria-label="Step checklist">
+                      {OFFER_WIZARD_STEPS.map((step) => (
+                        <li key={step} className="flex items-center gap-2 text-sm">
+                          {wizard.complete[step] ? (
+                            <Check className="h-4 w-4 text-emerald-600" />
+                          ) : (
+                            <X className="h-4 w-4 text-rose-500" />
+                          )}
+                          <button
+                            type="button"
+                            className={cn("text-left underline-offset-2 hover:underline", wizard.complete[step] ? "text-[#3D5068]" : "font-medium text-rose-600")}
+                            onClick={() => wizard.setActive(step)}
+                          >
+                            {WIZARD_STEP_META[step].label}
+                            {!wizard.complete[step] && ` — ${validateStep(step)[0]}`}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   </CardContent>
                 </Card>
               </div>
             </div>
           </TabsContent>
         </Tabs>
+
+        <OfferWizardFooter
+          active={wizard.active}
+          onBack={wizard.back}
+          onNext={wizard.next}
+          onCancel={handleCancel}
+          submitting={isLoading || wizard.submitLock.current}
+          submitLabel="Save changes"
+          submittingLabel="Saving…"
+          issues={wizard.issues}
+        />
       </form>
 
       {/* Product Selector Modal */}

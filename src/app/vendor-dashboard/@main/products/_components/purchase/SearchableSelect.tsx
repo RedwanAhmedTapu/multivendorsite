@@ -82,7 +82,6 @@ export default function SearchableSelect({
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
-  // Group logic
   const groups: string[] = [];
   filtered.forEach((o) => {
     if (o.group && !groups.includes(o.group)) groups.push(o.group);
@@ -91,7 +90,6 @@ export default function SearchableSelect({
 
   return (
     <div ref={containerRef} className={`relative w-full ${className}`}>
-      {/* Trigger */}
       <div
         role="combobox"
         aria-expanded={open}
@@ -122,10 +120,8 @@ export default function SearchableSelect({
         />
       </div>
 
-      {/* Dropdown */}
       {open && (
         <div className="absolute top-[calc(100%+3px)] left-0 right-0 bg-white border border-[#D0CEC6] rounded-[8px] shadow-[0_4px_12px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.04)] z-[400] max-h-[220px] overflow-hidden flex flex-col">
-          {/* Search */}
           <div className="sticky top-0 bg-white px-[10px] py-[7px] border-b border-[#E4E2DB]">
             <input
               ref={searchRef}
@@ -137,8 +133,6 @@ export default function SearchableSelect({
               className="w-full border border-[#D0CEC6] rounded-[6px] px-2 py-[5px] text-[12.5px] text-[#1A1916] outline-none focus:border-[#1D6B45] bg-white"
             />
           </div>
-
-          {/* Options */}
           <div className="overflow-y-auto flex-1">
             {filtered.length === 0 ? (
               <div className="px-3 py-[10px] text-[12.5px] text-[#9B9890] italic">

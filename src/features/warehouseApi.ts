@@ -81,6 +81,8 @@ export interface WarehouseFilters {
   type?: WarehouseType;
   isDefault?: boolean;
   locationId?: string;
+  /** true = only active warehouses (use for selectors that create new usage). */
+  isActive?: boolean;
 }
 
 export interface HolidayFilters {
@@ -95,22 +97,21 @@ export interface CreateRackRequest {
   warehouseId: string;
   code: string;
   label?: string;
-  row?: string;
-  shelf?: string;
+  totalRows?: number;
+  totalShelves?: number;
   isActive?: boolean;
 }
 
 export interface UpdateRackRequest {
   code?: string;
   label?: string;
-  row?: string;
-  shelf?: string;
+  totalRows?: number;
+  totalShelves?: number;
   isActive?: boolean;
 }
 
 export interface RackFilters {
   isActive?: boolean;
-  row?: string;
 }
 
 /* ---------- STOCK REQUEST TYPES ---------- */
@@ -123,6 +124,8 @@ export interface ReceivePurchaseOrderItem {
   newAvgCost: number;
   sellPrice?: number;
   rackId?: string;
+  rowNumber?: number;
+  shelfNumber?: number;
 }
 
 export interface ReceivePurchaseOrderRequest {
@@ -142,6 +145,8 @@ export interface StockAdjustmentRequest {
     | StockMovementType.DAMAGE
     | StockMovementType.RETURN;
   rackId?: string;
+  rowNumber?: number;
+  shelfNumber?: number;
   reason?: string;
   notes?: string;
 }
@@ -152,7 +157,12 @@ export interface StockTransferRequest {
   toWarehouseId: string;
   vendorId: string;
   quantity: number;
+  fromRackId?: string;
+  fromRowNumber?: number;
+  fromShelfNumber?: number;
   toRackId?: string;
+  toRowNumber?: number;
+  toShelfNumber?: number;
   reason?: string;
   notes?: string;
 }
@@ -163,6 +173,9 @@ export interface SellDamagedStockRequest {
   vendorId: string;
   quantity: number;
   saleAmount: number;
+  fromRackId?: string;
+  fromRowNumber?: number;
+  fromShelfNumber?: number;
   coaAccountId?: string;
   reason?: string;
   notes?: string;
@@ -172,6 +185,8 @@ export interface WarehouseStockFilters {
   warehouseId?: string;
   variantId?: string;
   rackId?: string;
+  rowNumber?: number;
+  shelfNumber?: number;
   lowStockOnly?: boolean;
   outOfStockOnly?: boolean;
   page?: number;
@@ -243,8 +258,8 @@ export interface WarehouseRack {
   warehouseId: string;
   code: string;
   label: string | null;
-  row: string | null;
-  shelf: string | null;
+  totalRows: number;
+  totalShelves: number;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -260,6 +275,9 @@ export interface WarehouseStockSummary {
   id: string;
   variantId: string;
   warehouseId: string;
+  rackId: string | null;
+  rowNumber: number | null;
+  shelfNumber: number | null;
   quantity: number;
   reservedQty: number;
   damagedQty: number;
@@ -278,6 +296,9 @@ export interface Warehouse {
   phone: string | null;
   isDefault: boolean;
   type: WarehouseType;
+  /** false = deactivated: no new operational use; history intact. */
+  isActive: boolean;
+  deactivatedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   vendor: Vendor;
@@ -285,6 +306,22 @@ export interface Warehouse {
   holidays?: WarehouseHoliday[];
   racks?: WarehouseRack[];
   warehouseStock?: WarehouseStockSummary[];
+}
+
+/** Derived lifecycle state from GET /warehouse/warehouses/:id/usage. */
+export interface WarehouseUsage {
+  warehouseId: string;
+  isActive: boolean;
+  deactivatedAt: string | null;
+  /** Derived from real stock/order activity — never stored. */
+  operational: boolean;
+  counts: Record<string, number>;
+  /** Reason text when a field is locked, otherwise null. */
+  locks: { locationId: string | null; type: string | null; address: string | null };
+  canDeactivate: boolean;
+  deactivationBlockers: string[];
+  canHardDelete: boolean;
+  hardDeleteBlockers: string[];
 }
 
 export interface BulkWarehouseResponse {
@@ -320,8 +357,8 @@ export interface RackSummary {
   id: string;
   code: string;
   label: string | null;
-  row: string | null;
-  shelf: string | null;
+  totalRows: number;
+  totalShelves: number;
 }
 
 export interface WarehouseStock {
@@ -329,6 +366,8 @@ export interface WarehouseStock {
   variantId: string;
   warehouseId: string;
   rackId: string | null;
+  rowNumber: number | null;
+  shelfNumber: number | null;
   quantity: number;
   reservedQty: number;
   damagedQty: number;
@@ -384,25 +423,27 @@ export const warehouseApi = createApi({
     "WarehouseRackList",
     "WarehouseStock",
     "StockMovement",
+    "WarehouseUsage",
   ],
 
   endpoints: (builder) => ({
     /* ==================== WAREHOUSE ENDPOINTS ==================== */
 
-    // POST /vendors/:vendorId/warehouses
-    createWarehouse: builder.mutation<ApiResponse<Warehouse>, CreateWarehouseRequest>({
+    createWarehouse: builder.mutation<
+      ApiResponse<Warehouse>,
+      CreateWarehouseRequest
+    >({
       query: (data) => ({
         url: `/warehouse/vendors/${data.vendorId}/warehouses`,
         method: "POST",
         body: data,
       }),
-      invalidatesTags: (result, error, { vendorId }) => [
+      invalidatesTags: (_result, _error, { vendorId }) => [
         { type: "WarehouseList", id: vendorId },
         "Warehouse",
       ],
     }),
 
-    // POST /vendors/:vendorId/warehouses/bulk
     createOrUpdateBulkWarehouses: builder.mutation<
       ApiResponse<BulkWarehouseResponse>,
       BulkWarehouseRequest
@@ -415,41 +456,43 @@ export const warehouseApi = createApi({
           returnWarehouse: data.returnWarehouse,
         },
       }),
-      invalidatesTags: (result, error, { vendorId }) => [
+      invalidatesTags: (_result, _error, { vendorId }) => [
         { type: "WarehouseList", id: vendorId },
         "Warehouse",
       ],
     }),
 
-    // GET /vendors/:vendorId/warehouses
     getWarehousesByVendor: builder.query<
       ApiResponse<Warehouse[]>,
       { vendorId: string; filters?: WarehouseFilters }
     >({
-      query: ({ vendorId, filters = {} }) => {
+      query: ({ vendorId, filters }) => {
+        const safeFilters = filters ?? {};
         const params = new URLSearchParams();
-        if (filters.type) params.append("type", filters.type);
-        if (filters.isDefault !== undefined)
-          params.append("isDefault", filters.isDefault.toString());
-        if (filters.locationId) params.append("locationId", filters.locationId);
+        if (safeFilters.type) params.append("type", safeFilters.type);
+        if (safeFilters.isDefault !== undefined)
+          params.append("isDefault", String(safeFilters.isDefault));
+        if (safeFilters.locationId)
+          params.append("locationId", safeFilters.locationId);
+        if (safeFilters.isActive !== undefined)
+          params.append("isActive", String(safeFilters.isActive));
         const queryString = params.toString();
         return `/warehouse/vendors/${vendorId}/warehouses${queryString ? `?${queryString}` : ""}`;
       },
-      providesTags: (result, error, { vendorId }) => [
+      providesTags: (_result, _error, { vendorId }) => [
         { type: "WarehouseList", id: vendorId },
-        ...(result?.data?.map((w) => ({
+        ...(_result?.data?.map((w) => ({
           type: "Warehouse" as const,
           id: w.id,
-        })) || []),
+        })) ?? []),
       ],
     }),
 
-    // GET /warehouses/:id
     getWarehouseById: builder.query<
       ApiResponse<Warehouse>,
       { id: string; includeHolidays?: boolean }
     >({
-      query: ({ id, includeHolidays = false }) => {
+      query: ({ id, includeHolidays }) => {
         const params = new URLSearchParams();
         if (includeHolidays) params.append("includeHolidays", "true");
         const queryString = params.toString();
@@ -458,7 +501,6 @@ export const warehouseApi = createApi({
       providesTags: (result) => [{ type: "Warehouse", id: result?.data.id }],
     }),
 
-    // PATCH /warehouses/:id
     updateWarehouse: builder.mutation<
       ApiResponse<Warehouse>,
       { id: string; data: UpdateWarehouseRequest }
@@ -468,19 +510,49 @@ export const warehouseApi = createApi({
         method: "PATCH",
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: "Warehouse", id },
         "WarehouseList",
+        { type: "WarehouseUsage", id },
       ],
     }),
 
-    // DELETE /warehouses/:id
+    /** Lifecycle state: operational?, locked fields, deactivate/delete eligibility. */
+    getWarehouseUsage: builder.query<ApiResponse<WarehouseUsage>, { id: string }>({
+      query: ({ id }) => `/warehouse/warehouses/${id}/usage`,
+      providesTags: (_result, _error, { id }) => [{ type: "WarehouseUsage", id }],
+    }),
+
+    deactivateWarehouse: builder.mutation<ApiResponse<Warehouse>, { id: string }>({
+      query: ({ id }) => ({
+        url: `/warehouse/warehouses/${id}/deactivate`,
+        method: "PATCH",
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: "Warehouse", id },
+        "WarehouseList",
+        { type: "WarehouseUsage", id },
+      ],
+    }),
+
+    reactivateWarehouse: builder.mutation<ApiResponse<Warehouse>, { id: string }>({
+      query: ({ id }) => ({
+        url: `/warehouse/warehouses/${id}/reactivate`,
+        method: "PATCH",
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: "Warehouse", id },
+        "WarehouseList",
+        { type: "WarehouseUsage", id },
+      ],
+    }),
+
     deleteWarehouse: builder.mutation<ApiResponse<null>, { id: string }>({
       query: ({ id }) => ({
         url: `/warehouse/warehouses/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: "Warehouse", id },
         "WarehouseList",
         "WarehouseStock",
@@ -488,13 +560,12 @@ export const warehouseApi = createApi({
       ],
     }),
 
-    // PATCH /warehouses/:id/set-default
     setDefaultWarehouse: builder.mutation<ApiResponse<Warehouse>, { id: string }>({
       query: ({ id }) => ({
         url: `/warehouse/warehouses/${id}/set-default`,
         method: "PATCH",
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: "Warehouse", id },
         "WarehouseList",
       ],
@@ -502,49 +573,45 @@ export const warehouseApi = createApi({
 
     /* ==================== RACK ENDPOINTS ==================== */
 
-    // POST /warehouses/:warehouseId/racks
     createRack: builder.mutation<ApiResponse<WarehouseRack>, CreateRackRequest>({
       query: ({ warehouseId, ...body }) => ({
         url: `/warehouse/warehouses/${warehouseId}/racks`,
         method: "POST",
         body,
       }),
-      invalidatesTags: (result, error, { warehouseId }) => [
+      invalidatesTags: (_result, _error, { warehouseId }) => [
         { type: "WarehouseRackList", id: warehouseId },
         { type: "Warehouse", id: warehouseId },
         "WarehouseRack",
       ],
     }),
 
-    // GET /warehouses/:warehouseId/racks
     getRacksByWarehouse: builder.query<
       ApiResponse<WarehouseRack[]>,
       { warehouseId: string; filters?: RackFilters }
     >({
-      query: ({ warehouseId, filters = {} }) => {
+      query: ({ warehouseId, filters }) => {
+        const safeFilters = filters ?? {};
         const params = new URLSearchParams();
-        if (filters.isActive !== undefined)
-          params.append("isActive", filters.isActive.toString());
-        if (filters.row) params.append("row", filters.row);
+        if (safeFilters.isActive !== undefined)
+          params.append("isActive", String(safeFilters.isActive));
         const queryString = params.toString();
         return `/warehouse/warehouses/${warehouseId}/racks${queryString ? `?${queryString}` : ""}`;
       },
-      providesTags: (result, error, { warehouseId }) => [
+      providesTags: (_result, _error, { warehouseId }) => [
         { type: "WarehouseRackList", id: warehouseId },
-        ...(result?.data?.map((r) => ({
+        ...(_result?.data?.map((r) => ({
           type: "WarehouseRack" as const,
           id: r.id,
-        })) || []),
+        })) ?? []),
       ],
     }),
 
-    // GET /racks/:id
     getRackById: builder.query<ApiResponse<WarehouseRack>, { id: string }>({
       query: ({ id }) => `/warehouse/racks/${id}`,
       providesTags: (result) => [{ type: "WarehouseRack", id: result?.data.id }],
     }),
 
-    // PATCH /racks/:id
     updateRack: builder.mutation<
       ApiResponse<WarehouseRack>,
       { id: string; data: UpdateRackRequest }
@@ -554,32 +621,30 @@ export const warehouseApi = createApi({
         method: "PATCH",
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: "WarehouseRack", id },
         "WarehouseRackList",
       ],
     }),
 
-    // DELETE /racks/:id
     deleteRack: builder.mutation<ApiResponse<null>, { id: string }>({
       query: ({ id }) => ({
         url: `/warehouse/racks/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: "WarehouseRack", id },
         "WarehouseRackList",
         "WarehouseStock",
       ],
     }),
 
-    // PATCH /racks/:id/toggle-active
     toggleRackActive: builder.mutation<ApiResponse<WarehouseRack>, { id: string }>({
       query: ({ id }) => ({
         url: `/warehouse/racks/${id}/toggle-active`,
         method: "PATCH",
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: "WarehouseRack", id },
         "WarehouseRackList",
       ],
@@ -587,45 +652,46 @@ export const warehouseApi = createApi({
 
     /* ==================== HOLIDAY ENDPOINTS ==================== */
 
-    // POST /warehouses/:warehouseId/holidays
-    createHoliday: builder.mutation<ApiResponse<WarehouseHoliday>, CreateHolidayRequest>({
+    createHoliday: builder.mutation<
+      ApiResponse<WarehouseHoliday>,
+      CreateHolidayRequest
+    >({
       query: (data) => ({
         url: `/warehouse/warehouses/${data.warehouseId}/holidays`,
         method: "POST",
         body: data,
       }),
-      invalidatesTags: (result, error, { warehouseId }) => [
+      invalidatesTags: (_result, _error, { warehouseId }) => [
         { type: "WarehouseHolidayList", id: warehouseId },
         "WarehouseHoliday",
       ],
     }),
 
-    // GET /warehouses/:warehouseId/holidays
     getHolidaysByWarehouse: builder.query<
       ApiResponse<WarehouseHoliday[]>,
       { warehouseId: string; filters?: HolidayFilters }
     >({
-      query: ({ warehouseId, filters = {} }) => {
+      query: ({ warehouseId, filters }) => {
+        const safeFilters = filters ?? {};
         const params = new URLSearchParams();
-        if (filters.startDate)
-          params.append("startDate", filters.startDate.toString());
-        if (filters.endDate)
-          params.append("endDate", filters.endDate.toString());
-        if (filters.isOpen !== undefined)
-          params.append("isOpen", filters.isOpen.toString());
+        if (safeFilters.startDate)
+          params.append("startDate", String(safeFilters.startDate));
+        if (safeFilters.endDate)
+          params.append("endDate", String(safeFilters.endDate));
+        if (safeFilters.isOpen !== undefined)
+          params.append("isOpen", String(safeFilters.isOpen));
         const queryString = params.toString();
         return `/warehouse/warehouses/${warehouseId}/holidays${queryString ? `?${queryString}` : ""}`;
       },
-      providesTags: (result, error, { warehouseId }) => [
+      providesTags: (_result, _error, { warehouseId }) => [
         { type: "WarehouseHolidayList", id: warehouseId },
-        ...(result?.data?.map((h) => ({
+        ...(_result?.data?.map((h) => ({
           type: "WarehouseHoliday" as const,
           id: h.id,
-        })) || []),
+        })) ?? []),
       ],
     }),
 
-    // PATCH /holidays/:id
     updateHoliday: builder.mutation<
       ApiResponse<WarehouseHoliday>,
       { id: string; data: UpdateHolidayRequest }
@@ -635,19 +701,18 @@ export const warehouseApi = createApi({
         method: "PATCH",
         body: data,
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: "WarehouseHoliday", id },
         "WarehouseHolidayList",
       ],
     }),
 
-    // DELETE /holidays/:id
     deleteHoliday: builder.mutation<ApiResponse<null>, { id: string }>({
       query: ({ id }) => ({
         url: `/warehouse/holidays/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: "WarehouseHoliday", id },
         "WarehouseHolidayList",
       ],
@@ -655,7 +720,6 @@ export const warehouseApi = createApi({
 
     /* ==================== STOCK ENDPOINTS ==================== */
 
-    // POST /warehouses/:warehouseId/stock/receive
     receivePurchaseOrder: builder.mutation<
       ApiResponse<ReceivePurchaseOrderResponse>,
       ReceivePurchaseOrderRequest
@@ -665,94 +729,111 @@ export const warehouseApi = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: (result, error, { warehouseId }) => [
+      invalidatesTags: (_result, _error, { warehouseId }) => [
         { type: "WarehouseStock", id: warehouseId },
         "StockMovement",
       ],
     }),
 
-    // POST /stock/adjust
-    adjustStock: builder.mutation<ApiResponse<StockMovement>, StockAdjustmentRequest>({
+    adjustStock: builder.mutation<
+      ApiResponse<StockMovement>,
+      StockAdjustmentRequest
+    >({
       query: (body) => ({
         url: `/warehouse/stock/adjust`,
         method: "POST",
         body,
       }),
-      invalidatesTags: (result, error, { warehouseId }) => [
-        { type: "WarehouseStock", id: warehouseId },
+      invalidatesTags: (_result, _error, arg) => [
+        { type: "WarehouseStock", id: arg.warehouseId },
         "StockMovement",
       ],
     }),
 
-    // POST /stock/transfer
-    transferStock: builder.mutation<ApiResponse<StockMovement>, StockTransferRequest>({
+    transferStock: builder.mutation<
+      ApiResponse<StockMovement>,
+      StockTransferRequest
+    >({
       query: (body) => ({
         url: `/warehouse/stock/transfer`,
         method: "POST",
         body,
       }),
-      invalidatesTags: (result, error, { fromWarehouseId, toWarehouseId }) => [
-        { type: "WarehouseStock", id: fromWarehouseId },
-        { type: "WarehouseStock", id: toWarehouseId },
+      invalidatesTags: (_result, _error, arg) => [
+        { type: "WarehouseStock", id: arg.fromWarehouseId },
+        { type: "WarehouseStock", id: arg.toWarehouseId },
         "StockMovement",
       ],
     }),
 
-    // POST /stock/sell-damaged
-    sellDamagedStock: builder.mutation<ApiResponse<StockMovement>, SellDamagedStockRequest>({
+    sellDamagedStock: builder.mutation<
+      ApiResponse<StockMovement>,
+      SellDamagedStockRequest
+    >({
       query: (body) => ({
         url: `/warehouse/stock/sell-damaged`,
         method: "POST",
         body,
       }),
-      invalidatesTags: (result, error, { fromWarehouseId }) => [
-        { type: "WarehouseStock", id: fromWarehouseId },
+      invalidatesTags: (_result, _error, arg) => [
+        { type: "WarehouseStock", id: arg.fromWarehouseId },
         "StockMovement",
       ],
     }),
 
-    // GET /stock
     getWarehouseStock: builder.query<
       PaginatedApiResponse<WarehouseStock>,
       WarehouseStockFilters
     >({
-      query: (filters = {}) => {
+      query: (filters) => {
+        const safeFilters = filters ?? {};
         const params = new URLSearchParams();
-        if (filters.warehouseId) params.append("warehouseId", filters.warehouseId);
-        if (filters.variantId) params.append("variantId", filters.variantId);
-        if (filters.rackId) params.append("rackId", filters.rackId);
-        if (filters.lowStockOnly) params.append("lowStockOnly", "true");
-        if (filters.outOfStockOnly) params.append("outOfStockOnly", "true");
-        if (filters.page) params.append("page", filters.page.toString());
-        if (filters.limit) params.append("limit", filters.limit.toString());
+        if (safeFilters.warehouseId)
+          params.append("warehouseId", safeFilters.warehouseId);
+        if (safeFilters.variantId)
+          params.append("variantId", safeFilters.variantId);
+        if (safeFilters.rackId) params.append("rackId", safeFilters.rackId);
+        if (safeFilters.rowNumber !== undefined)
+          params.append("rowNumber", String(safeFilters.rowNumber));
+        if (safeFilters.shelfNumber !== undefined)
+          params.append("shelfNumber", String(safeFilters.shelfNumber));
+        if (safeFilters.lowStockOnly)
+          params.append("lowStockOnly", "true");
+        if (safeFilters.outOfStockOnly)
+          params.append("outOfStockOnly", "true");
+        if (safeFilters.page) params.append("page", String(safeFilters.page));
+        if (safeFilters.limit) params.append("limit", String(safeFilters.limit));
         const queryString = params.toString();
         return `/warehouse/stock${queryString ? `?${queryString}` : ""}`;
       },
-      providesTags: (result, error, { warehouseId }) => [
-        { type: "WarehouseStock", id: warehouseId ?? "ALL" },
-        ...(result?.data?.map((s) => ({
+      providesTags: (_result, _error, filters) => [
+        { type: "WarehouseStock", id: filters?.warehouseId ?? "ALL" },
+        ...(_result?.data?.map((s) => ({
           type: "WarehouseStock" as const,
           id: s.id,
-        })) || []),
+        })) ?? []),
       ],
     }),
 
-    // GET /stock/movements
     getStockMovements: builder.query<
       PaginatedApiResponse<StockMovement>,
       StockMovementFilters
     >({
-      query: (filters = {}) => {
+      query: (filters) => {
+        const safeFilters = filters ?? {};
         const params = new URLSearchParams();
-        if (filters.variantId) params.append("variantId", filters.variantId);
-        if (filters.warehouseId) params.append("warehouseId", filters.warehouseId);
-        if (filters.movementType) params.append("movementType", filters.movementType);
-        if (filters.startDate)
-          params.append("startDate", filters.startDate.toString());
-        if (filters.endDate)
-          params.append("endDate", filters.endDate.toString());
-        if (filters.page) params.append("page", filters.page.toString());
-        if (filters.limit) params.append("limit", filters.limit.toString());
+        if (safeFilters.variantId)
+          params.append("variantId", safeFilters.variantId);
+        if (safeFilters.warehouseId)
+          params.append("warehouseId", safeFilters.warehouseId);
+        if (safeFilters.movementType)
+          params.append("movementType", safeFilters.movementType);
+        if (safeFilters.startDate)
+          params.append("startDate", String(safeFilters.startDate));
+        if (safeFilters.endDate)
+          params.append("endDate", String(safeFilters.endDate));
+        if (safeFilters.page) params.append("page", String(safeFilters.page));
+        if (safeFilters.limit) params.append("limit", String(safeFilters.limit));
         const queryString = params.toString();
         return `/warehouse/stock/movements${queryString ? `?${queryString}` : ""}`;
       },
@@ -761,7 +842,7 @@ export const warehouseApi = createApi({
         ...(result?.data?.map((m) => ({
           type: "StockMovement" as const,
           id: m.id,
-        })) || []),
+        })) ?? []),
       ],
     }),
   }),
@@ -770,7 +851,6 @@ export const warehouseApi = createApi({
 /* ==================== EXPORT HOOKS ==================== */
 
 export const {
-  // Warehouse hooks
   useCreateWarehouseMutation,
   useCreateOrUpdateBulkWarehousesMutation,
   useGetWarehousesByVendorQuery,
@@ -778,10 +858,11 @@ export const {
   useGetWarehouseByIdQuery,
   useLazyGetWarehouseByIdQuery,
   useUpdateWarehouseMutation,
+  useGetWarehouseUsageQuery,
+  useDeactivateWarehouseMutation,
+  useReactivateWarehouseMutation,
   useDeleteWarehouseMutation,
   useSetDefaultWarehouseMutation,
-
-  // Rack hooks
   useCreateRackMutation,
   useGetRacksByWarehouseQuery,
   useLazyGetRacksByWarehouseQuery,
@@ -790,15 +871,11 @@ export const {
   useUpdateRackMutation,
   useDeleteRackMutation,
   useToggleRackActiveMutation,
-
-  // Holiday hooks
   useCreateHolidayMutation,
   useGetHolidaysByWarehouseQuery,
   useLazyGetHolidaysByWarehouseQuery,
   useUpdateHolidayMutation,
   useDeleteHolidayMutation,
-
-  // Stock hooks
   useReceivePurchaseOrderMutation,
   useAdjustStockMutation,
   useTransferStockMutation,

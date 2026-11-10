@@ -26,6 +26,20 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  /* ── Part 1 theme architecture: semantic extension tokens (additive).
+     These map NEW variables only — no existing utility changes. ── */
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-tint: var(--primary-tint);
+  --color-primary-dark: var(--primary-dark);
+  --color-border-strong: var(--border-strong);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -78,6 +92,21 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* ── Part 1 theme architecture (additive defaults, unreferenced until
+     components opt in during Part 9). These values ARE the Neutral preset
+     (src/lib/palette/presets.ts) — the parity test keeps them in sync. ── */
+  --primary-hover: oklch(0.269 0 0);
+  --primary-active: oklch(0.32 0 0);
+  --primary-tint: oklch(0.97 0 0);
+  --primary-dark: oklch(0.145 0 0);
+  --border-strong: oklch(0.85 0 0);
+  --destructive-foreground: #FFFFFF;
+  --success: #16A34A;
+  --success-foreground: #FFFFFF;
+  --warning: #D97706;
+  --warning-foreground: #1E293B;
+  --info: #2563EB;
+  --info-foreground: #FFFFFF;
 }
 
 .dark {
@@ -112,6 +141,20 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  /* Part 1 extension — Neutral dark variants of the new tokens (dormant,
+     like the rest of .dark, until Part 8 wires the provider). */
+  --primary-hover: oklch(0.85 0 0);
+  --primary-active: oklch(0.8 0 0);
+  --primary-tint: oklch(0.269 0 0);
+  --primary-dark: oklch(1 0 0);
+  --border-strong: oklch(1 0 0 / 25%);
+  --destructive-foreground: #FFFFFF;
+  --success: #16A34A;
+  --success-foreground: #FFFFFF;
+  --warning: #D97706;
+  --warning-foreground: #1E293B;
+  --info: #2563EB;
+  --info-foreground: #FFFFFF;
 }
   html {
     font-family: var(--font-inter), system-ui, sans-serif;
@@ -140,59 +183,63 @@
     display: -webkit-box;
   }
 }
- *::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  *::-webkit-scrollbar-thumb {
-    background-color: #14b8a6; /* teal-500 */
-    border-radius: 9999px; /* fully rounded */
-  }
-
-  *::-webkit-scrollbar-track {
-    background-color: #0f766e; /* teal-900 */
-    border-radius: 9999px;
-  }
-
-  .scrollbar-slim {
-  scrollbar-width: thin;
-  scrollbar-color: #9ca3af #f3f4f6;
+ /* ── Global slim neutral scrollbar (fits any base color) ── */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.5); /* slate-400 @ 50% */
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 116, 139, 0.7); /* slate-500 @ 70% */
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+}
+
+/* ── Even slimmer variant for inner panels/tables ── */
 .scrollbar-slim::-webkit-scrollbar {
   width: 4px;
+  height: 4px;
 }
 
 .scrollbar-slim::-webkit-scrollbar-track {
-  background: #f3f4f6;
-  border-radius: 2px;
+  background: transparent;
 }
 
 .scrollbar-slim::-webkit-scrollbar-thumb {
-  background: #9ca3af;
-  border-radius: 2px;
+  background-color: rgba(148, 163, 184, 0.45);
+  border-radius: 9999px;
 }
 
 .scrollbar-slim::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  background-color: rgba(100, 116, 139, 0.65);
 }
 
-  /* Firefox */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: #14b8a6 #0f766e; /* thumb color / track color */
-  }
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
 
-  /* Hide scrollbar for Chrome, Safari and Opera */
+/* ── Hide scrollbar completely (Chrome, Safari, Opera, Firefox, IE/Edge) ── */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
 
-/* Hide scrollbar for IE, Edge and Firefox */
 .scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 @layer base {
   * {
