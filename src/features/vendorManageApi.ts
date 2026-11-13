@@ -26,6 +26,7 @@ export interface Vendor {
     totalOrders: number;
     fulfillmentRatePct: number;
     avgRating: number;
+    lastCalculatedAt?: string | null;
   };
   _count?: {
     products: number;
