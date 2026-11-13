@@ -92,6 +92,14 @@ const DOC_LABELS: Record<string, string> = {
   OTHER: "Other document",
 };
 
+// Mirrors src/constants/vendor-documents.ts in the backend: these types are
+// time-boxed and cannot be approved without an expiry date.
+const DOC_EXPIRY_REQUIRED_TYPES = new Set([
+  "TRADE_LICENSE",
+  "TIN_CERTIFICATE",
+  "VAT_CERTIFICATE",
+]);
+
 /* ─── Section shell (mirrors AddProductForm's SectionCard) ─────────────── */
 
 function SectionCard({
@@ -310,6 +318,8 @@ export default function VendorDetailPage() {
   const [reasonText, setReasonText] = useState("");
   const [docRejectDialog, setDocRejectDialog] = useState<string | null>(null);
   const [docReasonText, setDocReasonText] = useState("");
+  // Per-document expiry input (YYYY-MM-DD), pre-filled from the stored value.
+  const [docExpiry, setDocExpiry] = useState<Record<string, string>>({});
 
   const handleVerify = async () => {
     try {
@@ -351,9 +361,18 @@ export default function VendorDetailPage() {
     }
   };
 
-  const approveDocument = async (documentId: string) => {
+  const approveDocument = async (documentId: string, type?: string, storedExpiry?: string | null) => {
+    const expiresAt = docExpiry[documentId] ?? storedExpiry?.slice(0, 10) ?? "";
+    if (type && DOC_EXPIRY_REQUIRED_TYPES.has(type) && !expiresAt) {
+      // The backend refuses this too — fail fast instead of a 422 round-trip.
+      return;
+    }
     try {
-      await updateDocumentStatus({ documentId, status: "APPROVED" }).unwrap();
+      await updateDocumentStatus({
+        documentId,
+        status: "APPROVED",
+        expiresAt: expiresAt || undefined,
+      }).unwrap();
       refetch();
     } catch (e) {
       console.error(e);
@@ -747,6 +766,11 @@ export default function VendorDetailPage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {vendor.documents.map((doc: any) => {
                 const ds = DOC_STATUS_STYLE[doc.verificationStatus as DocStatus] ?? DOC_STATUS_STYLE.PENDING;
+                const expiryValue =
+                  docExpiry[doc.id] ??
+                  (doc.expiresAt ? String(doc.expiresAt).slice(0, 10) : "");
+                const expiryRequired = DOC_EXPIRY_REQUIRED_TYPES.has(doc.type);
+                const expiryMissing = expiryRequired && !expiryValue;
                 return (
                   <div
                     key={doc.id}
@@ -783,6 +807,35 @@ export default function VendorDetailPage() {
                         Reason: {doc.rejectionReason}
                       </p>
                     )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                      <label
+                        htmlFor={`doc-expiry-${doc.id}`}
+                        style={{ fontSize: 11, color: SUBTLE }}
+                      >
+                        Expires{expiryRequired ? " *" : ""}
+                      </label>
+                      <input
+                        id={`doc-expiry-${doc.id}`}
+                        type="date"
+                        value={expiryValue}
+                        onChange={(e) =>
+                          setDocExpiry((prev) => ({ ...prev, [doc.id]: e.target.value }))
+                        }
+                        style={{
+                          fontSize: 11.5,
+                          padding: "3px 6px",
+                          border: `1px solid ${CARD_BORDER}`,
+                          borderRadius: 6,
+                          background: "#fff",
+                          color: TITLE,
+                        }}
+                      />
+                    </div>
+                    {expiryMissing && (
+                      <p style={{ fontSize: 10.5, color: "#B45309", marginTop: 4 }}>
+                        Set an expiry date to approve this document.
+                      </p>
+                    )}
                     <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                       <a
                         href={doc.filePath}
@@ -802,7 +855,13 @@ export default function VendorDetailPage() {
                       </a>
                       {doc.verificationStatus !== "APPROVED" && (
                         <button
-                          onClick={() => approveDocument(doc.id)}
+                          onClick={() => approveDocument(doc.id, doc.type, doc.expiresAt)}
+                          disabled={expiryMissing}
+                          title={
+                            expiryMissing
+                              ? "Set an expiry date to approve this document"
+                              : undefined
+                          }
                           style={{
                             marginLeft: "auto",
                             fontSize: 11,
@@ -812,7 +871,8 @@ export default function VendorDetailPage() {
                             border: "1px solid #BBF7D0",
                             borderRadius: 7,
                             padding: "4px 10px",
-                            cursor: "pointer",
+                            cursor: expiryMissing ? "not-allowed" : "pointer",
+                            opacity: expiryMissing ? 0.5 : 1,
                           }}
                         >
                           Approve

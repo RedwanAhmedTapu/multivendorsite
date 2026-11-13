@@ -367,6 +367,8 @@ export interface VendorDocument {
   mimeType?: string | null;
   verificationStatus: string;
   rejectionReason?: string | null; // Added and made nullable
+  issuedAt?: string | null;
+  expiresAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1209,12 +1211,15 @@ export const vendorManageApi = createApi({
           | "REJECTED"
           | "EXPIRED";
         rejectionReason?: string;
+        /** Validity window (ISO dates, YYYY-MM-DD accepted). */
+        issuedAt?: string | null;
+        expiresAt?: string | null;
       }
     >({
-      query: ({ documentId, status, rejectionReason }) => ({
+      query: ({ documentId, status, rejectionReason, issuedAt, expiresAt }) => ({
         url: `/vendormanagement/documents/${documentId}/status`,
         method: "PATCH",
-        body: { status, rejectionReason },
+        body: { status, rejectionReason, issuedAt, expiresAt },
       }),
       invalidatesTags: (result, error, { documentId }) => [
         { type: "VendorDocument", id: documentId },
