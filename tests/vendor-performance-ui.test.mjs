@@ -539,6 +539,32 @@ test("drawer explains the grade, keeps the checklist English, and runs a dry run
   });
 });
 
+test("score config publish dialog keeps a scrollable, colour-coded JSON editor", { skip }, async () => {
+  await withDom(backend(), async (ui, React) => {
+    const { default: Page } = await import("../src/components/vendor-performance/VendorPerformancePage.tsx");
+    await renderPage(ui, React, Page);
+
+    await ui.click(ui.buttonExact("Score config"));
+    assert.match(ui.text(), /Active version/);
+
+    await ui.click(ui.button("Publish new version"));
+    assert.match(ui.text(), /Publish a new score config/);
+    assert.match(ui.text(), /Config JSON/);
+
+    const editor = ui.doc.getElementById("config-json");
+    assert.ok(editor, "json textarea is present");
+    assert.match(editor.value, /"version"/);
+
+    const layer = editor.parentElement.querySelector("pre");
+    assert.ok(layer, "highlight layer present");
+    assert.ok(layer.querySelector(".text-sky-600"), "keys are highlighted");
+    assert.ok(layer.querySelector(".text-emerald-600"), "string values are highlighted");
+    assert.ok(layer.querySelector(".text-amber-600"), "numbers are highlighted");
+
+    assert.deepEqual(ui.errors, [], `console errors: ${ui.errors.join("\n")}`);
+  });
+});
+
 test("expiry queue saves the same date twice without error or duplicate write", { skip }, async () => {
   await withDom(backend(), async (ui, React) => {
     const { default: Page } = await import("../src/components/vendor-performance/VendorPerformancePage.tsx");
