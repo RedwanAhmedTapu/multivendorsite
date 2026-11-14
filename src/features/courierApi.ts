@@ -359,6 +359,11 @@ export interface RedXArea {
 
 export interface RedXAreasResponse {
   areas: RedXArea[];
+  /** Present when the backend filtered the full area list down to a sample. */
+  filtered?: boolean;
+  totalAvailable?: number;
+  availableSample?: RedXArea[];
+  message?: string;
 }
 
 export interface RedXStore {
