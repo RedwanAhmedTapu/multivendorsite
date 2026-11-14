@@ -92,11 +92,12 @@ const DOC_LABELS: Record<string, string> = {
   OTHER: "Other document",
 };
 
-// Mirrors src/constants/vendor-documents.ts in the backend: these types are
-// time-boxed and cannot be approved without an expiry date.
+// Mirrors VENDOR_DOCUMENT_TYPES in the backend's constants/vendor-documents.ts:
+// only these types carry a validity window, so only they need a date to be
+// approved. (TIN is not time-boxed; VAT is required for VAT-registered vendors
+// but still needs an expiry date whenever it is approved.)
 const DOC_EXPIRY_REQUIRED_TYPES = new Set([
   "TRADE_LICENSE",
-  "TIN_CERTIFICATE",
   "VAT_CERTIFICATE",
 ]);
 
