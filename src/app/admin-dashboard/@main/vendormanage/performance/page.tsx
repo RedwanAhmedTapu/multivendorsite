@@ -1,8 +1,8 @@
-// app/vendors/performance/page.tsx
+// app/admin-dashboard/@main/vendormanage/performance/page.tsx
 'use client';
 
-import VendorPerformance from '@/components/vendor-management/VendorPerformance';
+import VendorPerformancePage from '@/components/vendor-performance/VendorPerformancePage';
 
 export default function PerformancePage() {
-  return <VendorPerformance />;
+  return <VendorPerformancePage />;
 }
