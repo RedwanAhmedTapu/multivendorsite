@@ -102,20 +102,50 @@ export function Meter({
   );
 }
 
-const DOT_CLASS: Record<Tone, string> = {
-  emerald: "bg-emerald-500",
-  indigo: "bg-indigo-500",
-  sky: "bg-sky-500",
-  amber: "bg-amber-500",
-  rose: "bg-rose-500",
-  slate: "bg-slate-400",
+const KPI_SKIN: Record<Tone, { card: string; tile: string; label: string; hint: string }> = {
+  indigo: {
+    card: "border-indigo-200/80 bg-gradient-to-br from-indigo-50 via-white to-violet-50 dark:border-indigo-900/60 dark:from-indigo-950/50 dark:via-slate-900 dark:to-violet-950/40",
+    tile: "from-indigo-500 to-violet-600 shadow-indigo-500/30",
+    label: "text-indigo-700/80 dark:text-indigo-300",
+    hint: "text-indigo-950/60 dark:text-indigo-200/60",
+  },
+  emerald: {
+    card: "border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50 dark:border-emerald-900/60 dark:from-emerald-950/50 dark:via-slate-900 dark:to-teal-950/40",
+    tile: "from-emerald-500 to-teal-600 shadow-emerald-500/30",
+    label: "text-emerald-700/80 dark:text-emerald-300",
+    hint: "text-emerald-950/60 dark:text-emerald-200/60",
+  },
+  sky: {
+    card: "border-sky-200/80 bg-gradient-to-br from-sky-50 via-white to-cyan-50 dark:border-sky-900/60 dark:from-sky-950/50 dark:via-slate-900 dark:to-cyan-950/40",
+    tile: "from-sky-500 to-cyan-600 shadow-sky-500/30",
+    label: "text-sky-700/80 dark:text-sky-300",
+    hint: "text-sky-950/60 dark:text-sky-200/60",
+  },
+  amber: {
+    card: "border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50 dark:border-amber-900/60 dark:from-amber-950/50 dark:via-slate-900 dark:to-orange-950/40",
+    tile: "from-amber-500 to-orange-600 shadow-amber-500/30",
+    label: "text-amber-700/80 dark:text-amber-300",
+    hint: "text-amber-950/60 dark:text-amber-200/60",
+  },
+  rose: {
+    card: "border-rose-200/80 bg-gradient-to-br from-rose-50 via-white to-pink-50 dark:border-rose-900/60 dark:from-rose-950/50 dark:via-slate-900 dark:to-pink-950/40",
+    tile: "from-rose-500 to-pink-600 shadow-rose-500/30",
+    label: "text-rose-700/80 dark:text-rose-300",
+    hint: "text-rose-950/60 dark:text-rose-200/60",
+  },
+  slate: {
+    card: "border-slate-200/80 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:border-slate-700/60 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800",
+    tile: "from-slate-500 to-slate-700 shadow-slate-500/30",
+    label: "text-slate-600 dark:text-slate-300",
+    hint: "text-slate-600 dark:text-slate-400",
+  },
 };
 
 export function Kpi({
   label,
   value,
   hint,
-  tone = "slate",
+  tone = "indigo",
   icon,
 }: {
   label: string;
@@ -124,20 +154,110 @@ export function Kpi({
   tone?: Tone;
   icon?: React.ReactNode;
 }) {
+  const skin = KPI_SKIN[tone];
   return (
-    <div className="rounded-xl border bg-card p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          {label}
-        </p>
-        {icon ? <span className="text-muted-foreground">{icon}</span> : null}
+    <div className={cn("relative overflow-hidden rounded-2xl border p-3.5 shadow-sm", skin.card)}>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-white/50 blur-2xl dark:bg-white/5"
+      />
+      <div className="relative flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className={cn("text-[10px] font-bold uppercase tracking-[0.09em]", skin.label)}>
+            {label}
+          </p>
+          <div className="mt-1.5 flex items-baseline gap-1.5 text-[24px] font-extrabold leading-none tracking-tight tabular-nums text-slate-900 dark:text-white sm:text-[26px]">
+            {value}
+          </div>
+          {hint ? (
+            <p className={cn("mt-1.5 line-clamp-2 text-[11px] leading-4", skin.hint)}>{hint}</p>
+          ) : null}
+        </div>
+        {icon ? (
+          <span
+            className={cn(
+              "grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-white shadow-md [&>svg]:h-4 [&>svg]:w-4",
+              skin.tile,
+            )}
+          >
+            {icon}
+          </span>
+        ) : null}
       </div>
-      <div className="mt-1 flex items-end gap-2">
-        <span className="text-2xl font-semibold leading-none tabular-nums">{value}</span>
-        {tone !== "slate" ? <span className={cn("mb-0.5 h-2 w-2 rounded-full", DOT_CLASS[tone])} /> : null}
-      </div>
-      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
     </div>
+  );
+}
+
+const PANEL_HEAD: Record<Tone, string> = {
+  indigo: "from-indigo-50/90 via-white to-violet-50/70 dark:from-indigo-950/50 dark:via-slate-900 dark:to-violet-950/30",
+  emerald: "from-emerald-50/90 via-white to-teal-50/70 dark:from-emerald-950/50 dark:via-slate-900 dark:to-teal-950/30",
+  sky: "from-sky-50/90 via-white to-cyan-50/70 dark:from-sky-950/50 dark:via-slate-900 dark:to-cyan-950/30",
+  amber: "from-amber-50/90 via-white to-orange-50/70 dark:from-amber-950/50 dark:via-slate-900 dark:to-orange-950/30",
+  rose: "from-rose-50/90 via-white to-pink-50/70 dark:from-rose-950/50 dark:via-slate-900 dark:to-pink-950/30",
+  slate: "from-slate-50/90 via-white to-slate-100/70 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/60",
+};
+
+const PANEL_TILE: Record<Tone, string> = {
+  indigo: "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300",
+  emerald: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
+  sky: "bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300",
+  amber: "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
+  rose: "bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
+  slate: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300",
+};
+
+/** Tinted panel header + rounded-2xl body used across the performance tabs. */
+export function Panel({
+  title,
+  subtitle,
+  icon,
+  tone = "indigo",
+  action,
+  children,
+  className,
+  bodyClassName,
+}: {
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
+  icon?: React.ReactNode;
+  tone?: Tone;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+  bodyClassName?: string;
+}) {
+  return (
+    <section className={cn("overflow-hidden rounded-2xl border bg-card shadow-sm", className)}>
+      {title ? (
+        <header
+          className={cn(
+            "flex flex-wrap items-center justify-between gap-2 border-b bg-gradient-to-r px-3 py-2.5",
+            PANEL_HEAD[tone],
+          )}
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            {icon ? (
+              <span
+                className={cn(
+                  "grid h-6 w-6 shrink-0 place-items-center rounded-lg [&>svg]:h-3.5 [&>svg]:w-3.5",
+                  PANEL_TILE[tone],
+                )}
+              >
+                {icon}
+              </span>
+            ) : null}
+            <div className="min-w-0">
+              <h3 className="text-[13px] font-semibold leading-tight">{title}</h3>
+              {subtitle ? (
+                <p className="text-[11px] leading-4 text-muted-foreground">{subtitle}</p>
+              ) : null}
+            </div>
+          </div>
+          {action}
+        </header>
+      ) : null}
+      <div className={bodyClassName ?? "p-3"}>{children}</div>
+    </section>
   );
 }
 

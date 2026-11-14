@@ -4,9 +4,9 @@
 //   • scoreboard KPIs + table render from the snapshot API
 //   • a grade card filters server-side (grade=NOT_ENOUGH_DATA) and search is
 //     debounced into the request
-//   • the drawer shows why the grade was given, localised checklist text,
-//     per-metric "Collecting data"/"Not tracked" states, and a dry run posts
-//     dryRun=true
+//   • the drawer shows why the grade was given, the English checklist (the UI
+//     is English-only), per-metric "Collecting data"/"Not tracked" states, and
+//     a dry run posts dryRun=true
 //   • the expiry dialog PATCHes the same date twice without error (idempotent)
 //   node --test tests/vendor-performance-ui.test.mjs
 
@@ -474,7 +474,7 @@ test("scoreboard renders KPIs, honest null score, and filters server-side", { sk
   });
 });
 
-test("drawer explains the grade, localises the checklist, and runs a dry run", { skip }, async () => {
+test("drawer explains the grade, keeps the checklist English, and runs a dry run", { skip }, async () => {
   await withDom(backend(), async (ui, React) => {
     const { default: Page } = await import("../src/components/vendor-performance/VendorPerformancePage.tsx");
     await renderPage(ui, React, Page);
@@ -509,9 +509,11 @@ test("drawer explains the grade, localises the checklist, and runs a dry run", {
 
     await ui.click(ui.buttonExact("Overview"));
 
-    // locale switch → Bangla checklist message from the API's {en, bn}
-    await ui.click(ui.buttonExact("বাংলা"));
-    assert.match(ui.text(), /শুধু ৮০% অর্ডার সময়মতো dispatch হয়েছে/);
+    // English-only surface: no language toggle, checklist stays English
+    assert.equal(ui.buttonExact("বাংলা"), undefined, "no Bangla language toggle");
+    assert.equal(ui.buttonExact("EN"), undefined, "no EN language toggle");
+    assert.doesNotMatch(ui.text(), /শুধু ৮০% অর্ডার সময়মতো dispatch হয়েছে/);
+    assert.match(ui.text(), /Ranked by score at stake/);
 
     // dry run POST + rendered result lines
     await ui.click(ui.button("Dry run"));

@@ -42,7 +42,6 @@ import {
   useGetVendorPerformanceHistoryQuery,
   useRunVendorPerformanceSnapshotMutation,
 } from "@/features/vendorPerformanceApi";
-import { useAppLocale } from "@/i18n/MarketingIntlProvider";
 import type {
   HistoryDay,
   PerformanceListItem,
@@ -80,7 +79,6 @@ export function VendorPerformanceDrawer({
   onClose: () => void;
 }) {
   const [tab, setTab] = React.useState<DrawerTab>("overview");
-  const { locale } = useAppLocale();
   const snapshot = item;
   const grade = gradeMeta(snapshot.score.grade);
   const trend = scoreTrend(snapshot.score.overallScore, item.previous?.overallScore);
@@ -92,7 +90,7 @@ export function VendorPerformanceDrawer({
         side="right"
         className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
       >
-        <SheetHeader className="space-y-1 border-b px-5 py-4 pr-12">
+        <SheetHeader className="space-y-1 border-b bg-gradient-to-r from-indigo-50 via-white to-violet-50 px-5 py-4 pr-12 dark:from-indigo-950/40 dark:via-slate-900 dark:to-violet-950/30">
           <div className="flex flex-wrap items-center gap-2">
             <SheetTitle className="text-lg leading-tight">{item.vendor.storeName}</SheetTitle>
             <Chip tone={item.vendor.status === "ACTIVE" ? "emerald" : "slate"}>
@@ -126,50 +124,64 @@ export function VendorPerformanceDrawer({
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             <TabsContent value="overview" className="mt-0 space-y-4">
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-                <div className="rounded-xl border p-4">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Overall score
-                  </p>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-4xl font-semibold tabular-nums">
-                      {scoreText(snapshot.score.overallScore)}
-                    </span>
-                    <span className="text-sm text-muted-foreground">/ 100</span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <GradeBadge grade={snapshot.score.grade} />
-                    {trend.direction === "none" ? (
-                      <span className="text-[11px] text-muted-foreground">No previous snapshot</span>
-                    ) : (
-                      <span
-                        className={cn(
-                          "text-[11px] font-medium",
-                          trend.direction === "up"
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : trend.direction === "down"
-                              ? "text-rose-600 dark:text-rose-400"
-                              : "text-muted-foreground",
-                        )}
-                      >
-                        {trend.label}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-700 p-4 text-white shadow-lg shadow-indigo-500/25">
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-white/15 blur-2xl"
+                  />
+                  <div className="relative">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-indigo-100">
+                      Overall score
+                    </p>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className="text-4xl font-extrabold tabular-nums">
+                        {scoreText(snapshot.score.overallScore)}
                       </span>
-                    )}
-                  </div>
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span>Metric coverage</span>
-                      <span className="tabular-nums">{percentText(snapshot.score.coveragePct)}</span>
+                      <span className="text-sm text-indigo-200">/ 100</span>
                     </div>
-                    <Meter
-                      className="mt-1"
-                      value={snapshot.score.coveragePct}
-                      tone={coverageTone(snapshot.score.coveragePct)}
-                      label="Coverage"
-                    />
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <GradeBadge grade={snapshot.score.grade} />
+                      {trend.direction === "none" ? (
+                        <span className="text-[11px] text-indigo-200">No previous snapshot</span>
+                      ) : (
+                        <span
+                          className={cn(
+                            "rounded-md bg-white/15 px-1.5 py-0.5 text-[11px] font-semibold",
+                            trend.direction === "up"
+                              ? "text-emerald-100"
+                              : trend.direction === "down"
+                                ? "text-rose-100"
+                                : "text-indigo-100",
+                          )}
+                        >
+                          {trend.label}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-[11px] text-indigo-100">
+                        <span>Metric coverage</span>
+                        <span className="tabular-nums">
+                          {percentText(snapshot.score.coveragePct)}
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/25">
+                        <div
+                          className="h-full rounded-full bg-white transition-all"
+                          style={{
+                            width: `${
+                              typeof snapshot.score.coveragePct === "number"
+                                ? Math.min(100, Math.max(0, snapshot.score.coveragePct))
+                                : 0
+                            }%`,
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="rounded-xl border p-4">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-4 dark:border-amber-900/60 dark:from-amber-950/40 dark:via-slate-900 dark:to-orange-950/30">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-300">
                     Why this grade
                   </p>
                   <p className="mt-1 text-sm leading-relaxed">{explainGrade(snapshot, config)}</p>
@@ -204,8 +216,8 @@ export function VendorPerformanceDrawer({
                 </div>
               </div>
 
-              <section className="rounded-xl border">
-                <header className="flex items-center justify-between border-b px-3 py-2">
+              <section className="overflow-hidden rounded-2xl border">
+                <header className="flex items-center justify-between border-b border-sky-100 bg-gradient-to-r from-sky-50 via-white to-cyan-50 px-3 py-2 dark:border-sky-900/50 dark:from-sky-950/40 dark:via-slate-900 dark:to-cyan-950/30">
                   <h4 className="text-sm font-semibold">Group scores</h4>
                   <span className="text-[11px] text-muted-foreground">0–100, latest snapshot</span>
                 </header>
@@ -239,21 +251,19 @@ export function VendorPerformanceDrawer({
                 </div>
               </section>
 
-              <section className="rounded-xl border">
-                <header className="flex items-center justify-between border-b px-3 py-2">
+              <section className="overflow-hidden rounded-2xl border">
+                <header className="flex items-center justify-between border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-teal-50 px-3 py-2 dark:border-emerald-900/50 dark:from-emerald-950/40 dark:via-slate-900 dark:to-teal-950/30">
                   <h4 className="text-sm font-semibold">What to improve</h4>
-                  <span className="text-[11px] text-muted-foreground">
-                    Ranked by score at stake · {locale === "bn" ? "বাংলা" : "English"}
-                  </span>
+                  <span className="text-[11px] text-muted-foreground">Ranked by score at stake</span>
                 </header>
                 {snapshot.checklist && snapshot.checklist.length > 0 ? (
                   <ol className="divide-y">
                     {snapshot.checklist.map((action, index) => (
                       <li key={action.code} className="flex items-start gap-3 px-3 py-2">
-                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold">
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-[11px] font-bold text-white shadow-sm">
                           {index + 1}
                         </span>
-                        <p className="flex-1 text-sm leading-snug">{checklistText(action, locale)}</p>
+                        <p className="flex-1 text-sm leading-snug">{checklistText(action, "en")}</p>
                         <Chip tone="amber" title="Weighted score at stake">
                           {formatNumber(action.impact, 1)} pts
                         </Chip>
@@ -319,8 +329,8 @@ function ManualRunCard({ vendorId }: { vendorId: string }) {
   }
 
   return (
-    <section className="rounded-xl border">
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
+    <section className="overflow-hidden rounded-2xl border">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-100 bg-gradient-to-r from-amber-50 via-white to-orange-50 px-3 py-2 dark:border-amber-900/50 dark:from-amber-950/40 dark:via-slate-900 dark:to-orange-950/30">
         <div>
           <h4 className="text-sm font-semibold">Manual snapshot run</h4>
           <p className="text-[11px] text-muted-foreground">
@@ -436,17 +446,21 @@ function HistorySection({ vendorId, config }: { vendorId: string; config: ScoreC
 
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border p-3">
-        <div className="flex items-center justify-between">
+      <div className="overflow-hidden rounded-2xl border">
+        <div className="flex items-center justify-between border-b border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-violet-50 px-3 py-2 dark:border-indigo-900/50 dark:from-indigo-950/40 dark:via-slate-900 dark:to-violet-950/30">
           <h4 className="flex items-center gap-1.5 text-sm font-semibold">
-            <HistoryIcon className="h-4 w-4" /> Score &amp; coverage trend
+            <span className="grid h-6 w-6 place-items-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+              <HistoryIcon className="h-3.5 w-3.5" />
+            </span>
+            Score &amp; coverage trend
           </h4>
           <span className="text-[11px] text-muted-foreground">
             Last {data.days.length} snapshot day(s)
           </span>
         </div>
+        <div className="p-3">
         {hasScore ? (
-          <div className="mt-2 h-[220px] w-full">
+          <div className="h-[220px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
                 <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />
@@ -504,12 +518,13 @@ function HistorySection({ vendorId, config }: { vendorId: string; config: ScoreC
             Dashed reference lines: grade bands {bands.map((band) => `${band.grade} ≥ ${band.min}`).join(" · ")}
           </p>
         ) : null}
+        </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border">
+      <div className="overflow-x-auto rounded-2xl border">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
-            <tr className="border-b text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+            <tr className="border-b bg-gradient-to-r from-indigo-50/80 via-white to-violet-50/60 text-left text-[11px] uppercase tracking-wide text-slate-600 dark:from-indigo-950/40 dark:via-slate-900 dark:to-violet-950/30 dark:text-slate-300">
               <th className="px-3 py-2 font-medium">Day</th>
               <th className="px-3 py-2 font-medium">Score</th>
               <th className="px-3 py-2 font-medium">Grade</th>

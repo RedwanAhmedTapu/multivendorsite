@@ -7,11 +7,19 @@
 
 import * as React from "react";
 import {
+  Activity,
+  AlertTriangle,
   ArrowDown,
   ArrowRight,
   ArrowUp,
+  BarChart3,
+  CalendarDays,
+  CircleHelp,
+  Gauge,
+  Layers,
   Minus,
   Search,
+  Table2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -53,7 +61,7 @@ import {
   percentText,
   scoreText,
   scoreTrend,
-  TONE_CLASS,
+  type Tone,
 } from "./format";
 import {
   Chip,
@@ -62,6 +70,7 @@ import {
   GradeBadge,
   Kpi,
   Meter,
+  Panel,
 } from "./shared";
 
 const SORT_OPTIONS = [
@@ -78,6 +87,41 @@ const KYC_OPTIONS = [
   { value: "EXPIRY_UNKNOWN", label: "Expiry not recorded" },
   { value: "MISSING", label: "Missing" },
   { value: "EXPIRED", label: "Expired" },
+];
+
+const GRADE_CARD: Record<Tone, { idle: string; active: string }> = {
+  emerald: {
+    idle: "border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-teal-50 dark:border-emerald-900/60 dark:from-emerald-950/40 dark:via-slate-900 dark:to-teal-950/30",
+    active: "border-emerald-300 ring-2 ring-emerald-500/60 shadow-md shadow-emerald-500/20 dark:border-emerald-700",
+  },
+  indigo: {
+    idle: "border-indigo-200/80 bg-gradient-to-br from-indigo-50 via-white to-violet-50 dark:border-indigo-900/60 dark:from-indigo-950/40 dark:via-slate-900 dark:to-violet-950/30",
+    active: "border-indigo-300 ring-2 ring-indigo-500/60 shadow-md shadow-indigo-500/20 dark:border-indigo-700",
+  },
+  sky: {
+    idle: "border-sky-200/80 bg-gradient-to-br from-sky-50 via-white to-cyan-50 dark:border-sky-900/60 dark:from-sky-950/40 dark:via-slate-900 dark:to-cyan-950/30",
+    active: "border-sky-300 ring-2 ring-sky-500/60 shadow-md shadow-sky-500/20 dark:border-sky-700",
+  },
+  amber: {
+    idle: "border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-orange-50 dark:border-amber-900/60 dark:from-amber-950/40 dark:via-slate-900 dark:to-orange-950/30",
+    active: "border-amber-300 ring-2 ring-amber-500/60 shadow-md shadow-amber-500/20 dark:border-amber-700",
+  },
+  rose: {
+    idle: "border-rose-200/80 bg-gradient-to-br from-rose-50 via-white to-pink-50 dark:border-rose-900/60 dark:from-rose-950/40 dark:via-slate-900 dark:to-pink-950/30",
+    active: "border-rose-300 ring-2 ring-rose-500/60 shadow-md shadow-rose-500/20 dark:border-rose-700",
+  },
+  slate: {
+    idle: "border-slate-200/80 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:border-slate-700/60 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800",
+    active: "border-slate-400 ring-2 ring-slate-400/60 shadow-md shadow-slate-500/20 dark:border-slate-500",
+  },
+};
+
+const BUCKET_BARS = [
+  "from-rose-400 to-rose-500",
+  "from-amber-400 to-orange-500",
+  "from-sky-400 to-cyan-500",
+  "from-indigo-400 to-violet-500",
+  "from-emerald-400 to-teal-500",
 ];
 
 export function Scoreboard({
@@ -141,7 +185,7 @@ export function Scoreboard({
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {distribution.isLoading ? (
           Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-[86px] animate-pulse rounded-xl border bg-muted" />
+            <div key={index} className="h-[104px] animate-pulse rounded-2xl border bg-muted" />
           ))
         ) : (
           <>
@@ -152,22 +196,29 @@ export function Scoreboard({
                 distribution.data?.total ?? 0,
                 0,
               )} vendors scored`}
+              tone="indigo"
+              icon={<Gauge />}
             />
             <Kpi
               label="Needs attention"
               value={formatNumber(distribution.data?.needsAttention ?? 0, 0)}
               hint="At risk or still collecting data"
-              tone={distribution.data?.needsAttention ? "amber" : "slate"}
+              tone={distribution.data?.needsAttention ? "amber" : "emerald"}
+              icon={<AlertTriangle />}
             />
             <Kpi
               label="Snapshot day"
-              value={<span className="text-lg">{formatDay(distribution.data?.day)}</span>}
+              value={<span className="text-lg font-extrabold">{formatDay(distribution.data?.day)}</span>}
               hint="Nightly job output — never a live aggregate"
+              tone="sky"
+              icon={<CalendarDays />}
             />
             <Kpi
               label="No coverage value"
               value={formatNumber(distribution.data?.coverage.unknown ?? 0, 0)}
               hint="Rows written before coverage was tracked"
+              tone="slate"
+              icon={<CircleHelp />}
             />
           </>
         )}
@@ -175,15 +226,16 @@ export function Scoreboard({
 
       {/* Distribution */}
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="rounded-xl border bg-card p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Grade distribution
-            </h3>
-            {grade ? (
+        <Panel
+          tone="indigo"
+          icon={<BarChart3 />}
+          title="Grade distribution"
+          subtitle="Click a grade to filter the vendor table"
+          action={
+            grade ? (
               <button
                 type="button"
-                className="text-[11px] font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                className="rounded-md bg-white/70 px-2 py-1 text-[11px] font-semibold text-indigo-700 shadow-sm hover:bg-white dark:bg-indigo-500/20 dark:text-indigo-200"
                 onClick={() => {
                   setGrade(null);
                   setPage(1);
@@ -191,19 +243,19 @@ export function Scoreboard({
               >
                 Clear filter
               </button>
-            ) : (
-              <span className="text-[11px] text-muted-foreground">Click a grade to filter</span>
-            )}
-          </div>
+            ) : null
+          }
+        >
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             {distribution.isLoading
               ? Array.from({ length: 6 }).map((_, index) => (
-                  <div key={index} className="h-16 animate-pulse rounded-lg bg-muted" />
+                  <div key={index} className="h-16 animate-pulse rounded-xl bg-muted" />
                 ))
               : GRADE_ORDER.map((value) => {
                   const meta = gradeMeta(value);
                   const count = gradeCount(value);
                   const active = grade === value;
+                  const skin = GRADE_CARD[meta.tone];
                   return (
                     <button
                       key={value}
@@ -215,13 +267,13 @@ export function Scoreboard({
                       aria-pressed={active}
                       aria-label={`Filter by grade ${meta.label} (${count})`}
                       className={cn(
-                        "rounded-lg border p-2 text-left transition-colors",
-                        active ? TONE_CLASS[meta.tone] : "bg-background hover:bg-muted/60",
+                        "rounded-xl border p-2 text-left transition-all",
+                        active ? skin.active : `${skin.idle} hover:-translate-y-0.5 hover:shadow-sm`,
                         count === 0 && !active ? "opacity-60" : "",
                       )}
                     >
-                      <div className="text-base font-semibold leading-none tabular-nums">{count}</div>
-                      <div className="mt-1 text-[11px] font-medium leading-tight">{meta.label}</div>
+                      <div className="text-lg font-extrabold leading-none tabular-nums">{count}</div>
+                      <div className="mt-1 text-[11px] font-semibold leading-tight">{meta.label}</div>
                     </button>
                   );
                 })}
@@ -231,7 +283,7 @@ export function Scoreboard({
               {unknownGrades} snapshot row(s) have no grade value.
             </p>
           ) : null}
-        </div>
+        </Panel>
 
         <CoverageHistogram
           loading={distribution.isLoading}
@@ -247,8 +299,14 @@ export function Scoreboard({
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border bg-card">
-        <div className="flex flex-col gap-2 border-b p-3 sm:flex-row sm:items-center">
+      <Panel
+        tone="indigo"
+        icon={<Table2 />}
+        title="Vendor scoreboard"
+        subtitle="One row per vendor on the latest snapshot day"
+        bodyClassName="p-0"
+      >
+        <div className="flex flex-col gap-2 border-b bg-muted/30 p-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -256,7 +314,7 @@ export function Scoreboard({
               aria-label="Search vendors by store name"
               type="search"
               placeholder="Search store name…"
-              className="pl-8"
+              className="bg-background pl-8"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
             />
@@ -337,7 +395,7 @@ export function Scoreboard({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] text-sm">
               <thead>
-                <tr className="border-b text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                <tr className="border-b bg-gradient-to-r from-indigo-50/80 via-white to-violet-50/60 text-left text-[11px] uppercase tracking-wide text-slate-600 dark:from-indigo-950/40 dark:via-slate-900 dark:to-violet-950/30 dark:text-slate-300">
                   <th className="px-3 py-2 font-medium">Store</th>
                   <th className="px-3 py-2 font-medium">Score</th>
                   <th className="px-3 py-2 font-medium">Coverage</th>
@@ -377,7 +435,7 @@ export function Scoreboard({
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/20 p-3">
           <p className="text-xs text-muted-foreground">
             {list.data
               ? `${formatNumber(list.data.total, 0)} vendor(s) on ${formatDay(list.data.day)}`
@@ -432,7 +490,7 @@ export function Scoreboard({
             ) : null}
           </div>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }
@@ -455,7 +513,7 @@ function ScoreRow({
 
   return (
     <tr
-      className="cursor-pointer border-b last:border-0 hover:bg-muted/50"
+      className="cursor-pointer border-b transition-colors last:border-0 hover:bg-indigo-50/60 dark:hover:bg-indigo-500/10"
       onClick={onOpen}
       tabIndex={0}
       onKeyDown={(event) => {
@@ -472,7 +530,7 @@ function ScoreRow({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={item.vendor.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
           ) : (
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-[11px] font-bold text-white shadow-sm">
               {initials}
             </span>
           )}
@@ -567,28 +625,34 @@ function CoverageHistogram({
 }) {
   const max = Math.max(1, ...buckets.map((bucket) => bucket.count));
   return (
-    <div className="rounded-xl border bg-card p-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Coverage spread
-      </h3>
-      <p className="mt-0.5 text-[11px] text-muted-foreground">
-        Share of score weight backed by real data.
-      </p>
+    <Panel
+      tone="sky"
+      icon={<Activity />}
+      title="Coverage spread"
+      subtitle="Share of score weight backed by real data"
+    >
       {loading ? (
-        <div className="mt-3 h-20 animate-pulse rounded bg-muted" />
+        <div className="h-20 animate-pulse rounded-xl bg-muted" />
       ) : buckets.length === 0 ? (
-        <p className="mt-4 text-xs text-muted-foreground">No snapshots in the latest day.</p>
+        <p className="py-6 text-center text-xs text-muted-foreground">
+          No snapshots in the latest day.
+        </p>
       ) : (
-        <div className="mt-3 flex h-24 items-end gap-1.5">
-          {buckets.map((bucket) => (
+        <div className="flex h-24 items-end gap-1.5">
+          {buckets.map((bucket, index) => (
             <div key={`${bucket.min}-${bucket.max}`} className="flex flex-1 flex-col items-center gap-1">
-              <span className="text-[11px] tabular-nums text-muted-foreground">{bucket.count}</span>
+              <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">
+                {bucket.count}
+              </span>
               <div
-                className="w-full rounded-t bg-indigo-500/80 dark:bg-indigo-400/70"
+                className={cn(
+                  "w-full rounded-t-md bg-gradient-to-t shadow-sm",
+                  BUCKET_BARS[index % BUCKET_BARS.length],
+                )}
                 style={{ height: `${Math.max(4, (bucket.count / max) * 64)}px` }}
                 title={`${bucket.min}–${bucket.max}% coverage: ${bucket.count} vendor(s)`}
               />
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-[10px] text-foreground/70">
                 {bucket.min}–{bucket.max}
               </span>
             </div>
@@ -598,7 +662,7 @@ function CoverageHistogram({
       {unknown > 0 ? (
         <p className="mt-2 text-[11px] text-muted-foreground">{unknown} row(s) without a coverage value.</p>
       ) : null}
-    </div>
+    </Panel>
   );
 }
 
@@ -616,19 +680,20 @@ function GroupAverages({
     : Object.keys(GROUP_LABELS).map((key) => ({ key, label: GROUP_LABELS[key], weight: null }));
 
   return (
-    <div className="rounded-xl border bg-card p-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Group averages
-      </h3>
-      <p className="mt-0.5 text-[11px] text-muted-foreground">Mean 0–100 group score, latest day.</p>
+    <Panel
+      tone="emerald"
+      icon={<Layers />}
+      title="Group averages"
+      subtitle="Mean 0–100 group score, latest day"
+    >
       {loading ? (
-        <div className="mt-3 space-y-2">
+        <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, index) => (
             <div key={index} className="h-6 animate-pulse rounded bg-muted" />
           ))}
         </div>
       ) : (
-        <ul className="mt-3 space-y-2">
+        <ul className="space-y-2">
           {keys.map(({ key, label, weight }) => {
             const entry = averages[key];
             return (
@@ -655,6 +720,6 @@ function GroupAverages({
           })}
         </ul>
       )}
-    </div>
+    </Panel>
   );
 }

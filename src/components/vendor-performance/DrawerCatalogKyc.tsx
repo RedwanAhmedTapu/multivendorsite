@@ -6,7 +6,15 @@
 "use client";
 
 import * as React from "react";
-import { ShieldAlert, ShieldCheck } from "lucide-react";
+import {
+  AlignLeft,
+  Clock,
+  ImageIcon,
+  PackageCheck,
+  Percent,
+  ShieldAlert,
+  ShieldCheck,
+} from "lucide-react";
 import { dateText } from "@/lib/billing/format";
 import { Button } from "@/components/ui/button";
 import {
@@ -84,21 +92,28 @@ export function CatalogSection({
           }
           tone={target !== null && data.summary.qualified >= target ? "emerald" : "amber"}
           hint="Fully complete products"
+          icon={<PackageCheck />}
         />
         <Kpi
           label="Avg completeness"
           value={percentText(data.summary.averageCompletenessPct)}
           hint={`${formatNumber(data.summary.total, 0)} approved product(s)`}
+          tone="sky"
+          icon={<Percent />}
         />
         <Kpi
           label="Images required"
           value={formatNumber(data.summary.minImages, 0)}
           hint="Per product, incl. variant images"
+          tone="indigo"
+          icon={<ImageIcon />}
         />
         <Kpi
           label="Description required"
           value={formatNumber(data.summary.minDescriptionChars, 0)}
           hint="Characters per product"
+          tone="amber"
+          icon={<AlignLeft />}
         />
       </div>
 
@@ -197,16 +212,25 @@ export function KycSection({ vendorId, storeName }: { vendorId: string; storeNam
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Kpi label="KYC headline" value={<span className="text-lg">{headline.label}</span>} tone={headline.tone} />
+        <Kpi
+          label="KYC headline"
+          value={<span className="text-lg">{headline.label}</span>}
+          tone={headline.tone}
+          icon={<ShieldCheck />}
+        />
         <Kpi
           label="Valid weight"
           value={percentText(data.validWeightPct)}
           hint="Missing expiry dates earn half credit"
+          tone="indigo"
+          icon={<Percent />}
         />
         <Kpi
           label="Grace window"
           value={`${formatNumber(data.graceDays, 0)} days`}
           hint="After expiry before restriction"
+          tone="amber"
+          icon={<Clock />}
         />
       </div>
 

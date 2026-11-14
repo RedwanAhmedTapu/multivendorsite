@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { PerformanceSnapshotView, ScoreConfig } from "./types";
+import type { Tone } from "./format";
 import {
   formatNumber,
   groupKeys,
@@ -24,6 +25,16 @@ import {
   sampleNote,
   thresholdText,
 } from "./format";
+import { Panel } from "./shared";
+
+const GROUP_TONE: Record<string, Tone> = {
+  order: "indigo",
+  catalog: "sky",
+  customerExperience: "amber",
+  sales: "emerald",
+  compliance: "rose",
+  activity: "slate",
+};
 
 export function DrawerMetrics({
   snapshot,
@@ -46,17 +57,21 @@ export function DrawerMetrics({
         {groups.map((group) => {
           const score = snapshot.score.groupScores?.[group.key];
           return (
-            <section key={group.key} className="rounded-xl border">
-              <header className="flex flex-wrap items-baseline justify-between gap-2 border-b px-3 py-2">
-                <h4 className="text-sm font-semibold">{group.label}</h4>
-                <p className="text-[11px] text-muted-foreground">
+            <Panel
+              key={group.key}
+              tone={GROUP_TONE[group.key] ?? "slate"}
+              title={group.label}
+              subtitle={
+                <>
                   {group.weight !== null ? `Weight ${formatNumber(group.weight, 0)}% · ` : ""}
                   Group score{" "}
-                  <span className="font-medium text-foreground">
+                  <span className="font-semibold text-foreground">
                     {typeof score === "number" ? formatNumber(score, 1) : MISSING_TEXT}
                   </span>
-                </p>
-              </header>
+                </>
+              }
+              bodyClassName=""
+            >
               <div className="divide-y">
                 {metricRowsForGroup(group.key, config).map((row) => {
                   const value = metricDisplayValue(row.def, snapshot.metrics, snapshot.day);
@@ -121,7 +136,7 @@ export function DrawerMetrics({
                   );
                 })}
               </div>
-            </section>
+            </Panel>
           );
         })}
         <p className="text-[11px] text-muted-foreground">

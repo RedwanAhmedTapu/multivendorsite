@@ -8,7 +8,16 @@
 "use client";
 
 import * as React from "react";
-import { EyeOff, FileCog, Loader2, Rocket } from "lucide-react";
+import {
+  CalendarCheck,
+  EyeOff,
+  FileCog,
+  Gauge,
+  Loader2,
+  Percent,
+  Rocket,
+  ShieldAlert,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +43,7 @@ import {
   shadowModeText,
   thresholdText,
 } from "./format";
-import { Chip, ErrorState, Kpi, LoadingBlock } from "./shared";
+import { Chip, ErrorState, Kpi, LoadingBlock, Panel } from "./shared";
 
 export function ScoreConfigPanel() {
   const { data, isLoading, isError, error, refetch } = useGetVendorPerformanceConfigQuery();
@@ -60,51 +69,58 @@ function ConfigView({ data }: { data: ConfigResponse }) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi label="Active version" value={<span className="text-lg">{data.version}</span>} hint={`Source: ${data.source}`} />
+        <Kpi
+          label="Active version"
+          value={<span className="text-lg font-extrabold">{data.version}</span>}
+          hint={`Source: ${data.source}`}
+          tone="indigo"
+          icon={<FileCog />}
+        />
         <Kpi
           label="Published"
-          value={<span className="text-lg">{data.createdAt ? formatDay(data.createdAt) : "Built-in default"}</span>}
+          value={<span className="text-lg font-extrabold">{data.createdAt ? formatDay(data.createdAt) : "Built-in default"}</span>}
           hint={data.createdAt ? "Audited config row" : "No row in vendor_performance_config"}
+          tone="sky"
+          icon={<CalendarCheck />}
         />
         <Kpi
           label="Minimum coverage"
           value={`${formatNumber(config.notEnoughDataCoveragePct, 0)}%`}
           hint="Below this the grade is “Collecting data”"
+          tone="emerald"
+          icon={<Percent />}
         />
         <Kpi
           label="At-risk cap"
           value={`${formatNumber(config.atRiskScoreCap, 0)}/100`}
           hint="Applied when KYC is past grace"
+          tone="amber"
+          icon={<ShieldAlert />}
         />
       </div>
 
-      <div className="rounded-xl border bg-card p-3">
+      <Panel tone={data.shadowMode.visibleToVendors ? "emerald" : "amber"} icon={data.shadowMode.visibleToVendors ? <Rocket /> : <EyeOff />} title="Vendor visibility" subtitle="Controlled by the server flag — the UI cannot flip it">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 text-sm font-semibold">
-            {data.shadowMode.visibleToVendors ? <Rocket className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-            Vendor visibility
-          </p>
-          <Chip tone={data.shadowMode.visibleToVendors ? "emerald" : "slate"}>
+          <p className="text-xs text-muted-foreground">{shadowModeText(data.shadowMode.visibleToVendors)}</p>
+          <Chip tone={data.shadowMode.visibleToVendors ? "emerald" : "amber"}>
             {data.shadowMode.visibleToVendors ? "Visible to vendors" : "Shadow mode"}
           </Chip>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">{shadowModeText(data.shadowMode.visibleToVendors)}</p>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Controlled by VENDOR_PERFORMANCE_VISIBLE_TO_VENDORS on the server — the UI cannot flip it.
+          Controlled by VENDOR_PERFORMANCE_VISIBLE_TO_VENDORS on the server.
         </p>
         {data.note ? (
-          <p className="mt-2 rounded-md bg-muted px-2 py-1 text-xs">Note: {data.note}</p>
+          <p className="mt-2 rounded-md bg-white/70 px-2 py-1 text-xs dark:bg-slate-900/60">Note: {data.note}</p>
         ) : null}
-      </div>
+      </Panel>
 
-      <div className="rounded-xl border bg-card p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold">Grade bands</p>
-          <span className="text-[11px] text-muted-foreground">
-            Catalog flag below {formatNumber(config.catalogFlagMinProducts, 0)} qualified products
-          </span>
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
+      <Panel
+        tone="rose"
+        icon={<Gauge />}
+        title="Grade bands"
+        subtitle={`Catalog flag below ${formatNumber(config.catalogFlagMinProducts, 0)} qualified products`}
+      >
+        <div className="flex flex-wrap gap-1.5">
           {config.gradeBands.map((band) => (
             <Chip key={band.grade} tone="indigo">
               {band.grade} ≥ {formatNumber(band.min, 0)}
@@ -113,12 +129,12 @@ function ConfigView({ data }: { data: ConfigResponse }) {
           <Chip tone="rose">At risk · capped at {formatNumber(config.atRiskScoreCap, 0)}</Chip>
           <Chip tone="slate">Collecting data · coverage &lt; {formatNumber(config.notEnoughDataCoveragePct, 0)}%</Chip>
         </div>
-      </div>
+      </Panel>
 
       <div className="space-y-3">
         {groups.map((group) => (
-          <section key={group.key} className="rounded-xl border bg-card">
-            <header className="flex items-center justify-between border-b px-3 py-2">
+          <section key={group.key} className="overflow-hidden rounded-2xl border bg-card">
+            <header className="flex items-center justify-between border-b bg-gradient-to-r from-indigo-50 via-white to-violet-50 px-3 py-2 dark:from-indigo-950/40 dark:via-slate-900 dark:to-violet-950/30">
               <h4 className="text-sm font-semibold">{group.label}</h4>
               <span className="text-[11px] text-muted-foreground">
                 Group weight {formatNumber(group.weight, 0)}%
@@ -153,7 +169,7 @@ function ConfigView({ data }: { data: ConfigResponse }) {
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-indigo-200/70 bg-gradient-to-r from-indigo-50 via-white to-violet-50 p-3 dark:border-indigo-900/60 dark:from-indigo-950/40 dark:via-slate-900 dark:to-violet-950/30">
         <p className="text-[11px] text-muted-foreground">
           Group weights sum to {formatNumber(groups.reduce((sum, group) => sum + group.weight, 0), 0)} ·
           metric weights per group sum to 100 · publishing creates a new version and keeps older
