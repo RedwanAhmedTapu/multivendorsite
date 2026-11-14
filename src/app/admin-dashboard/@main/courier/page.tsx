@@ -936,9 +936,10 @@ function ServiceableAreasManagement() {
     useSyncServiceableAreasMutation();
   const [deleteArea, { isLoading: isDeleting }] = useDeleteServiceableAreaMutation();
 
-  const { data: areasData, refetch } = useGetServiceableAreasQuery(
-    selectedCourier ? { courierProviderId: selectedCourier } : undefined
-  );
+  const { data: areasData, isLoading: areasLoading, refetch } =
+    useGetServiceableAreasQuery(
+      selectedCourier ? { courierProviderId: selectedCourier } : undefined
+    );
   const areas = areasData?.data || [];
 
   const filteredAreas = areas.filter(
@@ -1006,21 +1007,21 @@ function ServiceableAreasManagement() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Card className="p-3.5">
           <p className="text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-500">Mapped Areas</p>
-          <p className="mt-1 text-[22px] font-semibold tracking-tight text-slate-900 tabular-nums">{areas.length}</p>
+          <p className="mt-1 text-[22px] font-semibold tracking-tight text-slate-900 tabular-nums">{areasLoading ? "—" : areas.length}</p>
           <p className="mt-1 text-[11px] text-slate-500">{activeAreas} active</p>
         </Card>
         <Card className="p-3.5">
           <p className="text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-500">Home Delivery</p>
-          <p className="mt-1 text-[22px] font-semibold tracking-tight text-slate-900 tabular-nums">{homeDeliveryAreas}</p>
+          <p className="mt-1 text-[22px] font-semibold tracking-tight text-slate-900 tabular-nums">{areasLoading ? "—" : homeDeliveryAreas}</p>
           <p className="mt-1 text-[11px] text-slate-500">
-            {areas.length > 0 ? ((homeDeliveryAreas / areas.length) * 100).toFixed(0) : 0}% coverage
+            {!areasLoading && areas.length > 0 ? ((homeDeliveryAreas / areas.length) * 100).toFixed(0) : 0}% coverage
           </p>
         </Card>
         <Card className="p-3.5">
           <p className="text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-500">Pickup Available</p>
-          <p className="mt-1 text-[22px] font-semibold tracking-tight text-slate-900 tabular-nums">{pickupAreas}</p>
+          <p className="mt-1 text-[22px] font-semibold tracking-tight text-slate-900 tabular-nums">{areasLoading ? "—" : pickupAreas}</p>
           <p className="mt-1 text-[11px] text-slate-500">
-            {areas.length > 0 ? ((pickupAreas / areas.length) * 100).toFixed(0) : 0}% coverage
+            {!areasLoading && areas.length > 0 ? ((pickupAreas / areas.length) * 100).toFixed(0) : 0}% coverage
           </p>
         </Card>
       </div>
@@ -1078,6 +1079,8 @@ function ServiceableAreasManagement() {
               title="No courier selected"
               body="Select a courier provider to view and manage areas."
             />
+          ) : areasLoading ? (
+            <Skeleton rows={6} />
           ) : filteredAreas.length === 0 ? (
             <EmptyState
               icon={<MapPin />}
