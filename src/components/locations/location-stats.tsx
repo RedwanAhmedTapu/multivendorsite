@@ -1,169 +1,130 @@
-// components/locations/location-stats.tsx - With deferred loading
+// components/locations/location-stats.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Building, MapPin, Navigation, CheckCircle, AlertCircle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import React, { useEffect, useState } from "react";
+import { Building, CheckCircle, MapPin, Navigation, Package } from "lucide-react";
+import { StatCard } from "@/components/payouts/ui";
 import { useGetAllLocationsQuery } from "@/features/locationApi";
+
+interface LocationStatsData {
+  divisions: number;
+  districts: number;
+  thanas: number;
+  total: number;
+  codDivisions: number;
+  dgCodDivisions: number;
+  codDistricts: number;
+  dgCodDistricts: number;
+  codThanas: number;
+  dgCodThanas: number;
+}
+
+const EMPTY_STATS: LocationStatsData = {
+  divisions: 0, districts: 0, thanas: 0, total: 0,
+  codDivisions: 0, dgCodDivisions: 0, codDistricts: 0, dgCodDistricts: 0, codThanas: 0, dgCodThanas: 0,
+};
+
+function StatSkeleton() {
+  return (
+    <div aria-busy="true" className="animate-pulse rounded-lg border border-slate-200 bg-white p-3.5">
+      <div className="flex items-start justify-between">
+        <div className="space-y-2">
+          <div className="h-2.5 w-20 rounded bg-slate-200" />
+          <div className="h-6 w-12 rounded bg-slate-200" />
+        </div>
+        <div className="h-8 w-8 rounded-md bg-slate-100" />
+      </div>
+      <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-2">
+        <div className="h-2 w-28 rounded bg-slate-100" />
+      </div>
+    </div>
+  );
+}
 
 export default function LocationStats() {
   const [isClient, setIsClient] = useState(false);
-  
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  useEffect(() => setIsClient(true), []);
 
-  // Only run the query on the client side
-  const { data: locationsData, isLoading } = useGetAllLocationsQuery(undefined, {
-    skip: !isClient, // Skip on server side
-  });
+  const { data: locationsData, isLoading } = useGetAllLocationsQuery(undefined, { skip: !isClient });
 
-  // Calculate stats
-  const stats = React.useMemo(() => {
-    if (!locationsData?.data) {
-      return {
-        divisions: 0,
-        districts: 0,
-        thanas: 0,
-        total: 0,
-        codDivisions: 0,
-        dgCodDivisions: 0,
-        codDistricts: 0,
-        dgCodDistricts: 0,
-        codThanas: 0,
-        dgCodThanas: 0,
-      };
-    }
-
-    let divisions = 0;
-    let districts = 0;
-    let thanas = 0;
-    let codDivisions = 0;
-    let dgCodDivisions = 0;
-    let codDistricts = 0;
-    let dgCodDistricts = 0;
-    let codThanas = 0;
-    let dgCodThanas = 0;
-
-    const processLocationTree = (nodes: any[]) => {
-      nodes.forEach(node => {
-        if (node.level === 'DIVISION') {
-          divisions++;
-          if (node.is_cod_supported) codDivisions++;
-          if (node.is_dg_cod_supported) dgCodDivisions++;
-        } else if (node.level === 'DISTRICT') {
-          districts++;
-          if (node.is_cod_supported) codDistricts++;
-          if (node.is_dg_cod_supported) dgCodDistricts++;
-        } else if (node.level === 'THANA') {
-          thanas++;
-          if (node.is_cod_supported) codThanas++;
-          if (node.is_dg_cod_supported) dgCodThanas++;
+  const stats = React.useMemo<LocationStatsData>(() => {
+    if (!locationsData?.data) return EMPTY_STATS;
+    const acc = { ...EMPTY_STATS };
+    const walk = (nodes: any[]) => {
+      nodes.forEach((node) => {
+        if (node.level === "DIVISION") {
+          acc.divisions++;
+          if (node.is_cod_supported) acc.codDivisions++;
+          if (node.is_dg_cod_supported) acc.dgCodDivisions++;
+        } else if (node.level === "DISTRICT") {
+          acc.districts++;
+          if (node.is_cod_supported) acc.codDistricts++;
+          if (node.is_dg_cod_supported) acc.dgCodDistricts++;
+        } else if (node.level === "THANA") {
+          acc.thanas++;
+          if (node.is_cod_supported) acc.codThanas++;
+          if (node.is_dg_cod_supported) acc.dgCodThanas++;
         }
-        
-        if (node.children && node.children.length > 0) {
-          processLocationTree(node.children);
-        }
+        if (node.children?.length) walk(node.children);
       });
     };
-
-    processLocationTree(locationsData.data);
-
-    return {
-      divisions,
-      districts,
-      thanas,
-      total: divisions + districts + thanas,
-      codDivisions,
-      dgCodDivisions,
-      codDistricts,
-      dgCodDistricts,
-      codThanas,
-      dgCodThanas,
-    };
+    walk(locationsData.data);
+    acc.total = acc.divisions + acc.districts + acc.thanas;
+    return acc;
   }, [locationsData]);
-
-  const statCards = [
-    {
-      title: "Divisions",
-      value: stats.divisions,
-      icon: Building,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
-      codCount: stats.codDivisions,
-      dgCodCount: stats.dgCodDivisions,
-    },
-    {
-      title: "Districts",
-      value: stats.districts,
-      icon: MapPin,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
-      codCount: stats.codDistricts,
-      dgCodCount: stats.dgCodDistricts,
-    },
-    {
-      title: "Thanas",
-      value: stats.thanas,
-      icon: Navigation,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50",
-      codCount: stats.codThanas,
-      dgCodCount: stats.dgCodThanas,
-    },
-    {
-      title: "Total Locations",
-      value: stats.total,
-      icon: CheckCircle,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50",
-      codCount: stats.codDivisions + stats.codDistricts + stats.codThanas,
-      dgCodCount: stats.dgCodDivisions + stats.dgCodDistricts + stats.dgCodThanas,
-    },
-  ];
 
   if (isLoading || !isClient) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="pb-2">
-              <Skeleton className="h-6 w-24" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-16 mb-2" />
-              <Skeleton className="h-4 w-full" />
-            </CardContent>
-          </Card>
-        ))}
+      <div aria-busy="true" aria-label="Loading location statistics" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => <StatSkeleton key={i} />)}
       </div>
     );
   }
 
+  const codFooter = (cod: number, dgCod: number) => (
+    <span className="flex items-center gap-3">
+      <span className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-emerald-500" /> COD {cod}</span>
+      <span className="flex items-center gap-1"><Package className="h-3 w-3 text-sky-500" /> DG COD {dgCod}</span>
+    </span>
+  );
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {statCards.map((stat) => (
-        <Card key={stat.title} className={`${stat.bgColor}`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-            <stat.icon className={`h-5 w-5 ${stat.color}`} />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stat.value}</div>
-            <div className="flex items-center gap-4 mt-2 text-xs">
-              <div className="flex items-center gap-1">
-                <CheckCircle className="h-3 w-3 text-green-600" />
-                <span className="text-gray-600">COD: {stat.codCount}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <AlertCircle className="h-3 w-3 text-blue-600" />
-                <span className="text-gray-600">DG COD: {stat.dgCodCount}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <StatCard
+        label="Divisions"
+        value={stats.divisions}
+        icon={<Building />}
+        accent="sky"
+        hint="Top-level regions"
+        footer={codFooter(stats.codDivisions, stats.dgCodDivisions)}
+      />
+      <StatCard
+        label="Districts"
+        value={stats.districts}
+        icon={<MapPin />}
+        accent="green"
+        hint="Cities under divisions"
+        footer={codFooter(stats.codDistricts, stats.dgCodDistricts)}
+      />
+      <StatCard
+        label="Thanas / Areas"
+        value={stats.thanas}
+        icon={<Navigation />}
+        accent="indigo"
+        hint="Delivery zones under districts"
+        footer={codFooter(stats.codThanas, stats.dgCodThanas)}
+      />
+      <StatCard
+        label="Total Locations"
+        value={stats.total}
+        icon={<Package />}
+        accent="amber"
+        hint="Across all hierarchy levels"
+        footer={codFooter(
+          stats.codDivisions + stats.codDistricts + stats.codThanas,
+          stats.dgCodDivisions + stats.dgCodDistricts + stats.dgCodThanas,
+        )}
+      />
     </div>
   );
 }

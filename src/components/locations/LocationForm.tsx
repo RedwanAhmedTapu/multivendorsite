@@ -1,242 +1,295 @@
-// components/locations/bulk-upload.tsx - Updated for Sonner
+// components/locations/LocationForm.tsx
 "use client";
 
-import React, { useState } from "react";
-import { Upload, Download, X, AlertCircle, CheckCircle, File } from "lucide-react";
-import { useDropzone } from "react-dropzone";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import React, { useEffect, useState } from "react";
+import { MapPin } from "lucide-react";
 import { toast } from "sonner";
-import { useBulkUploadLocationsMutation } from "@/features/locationApi";
+import { Button, Field, Modal, Skeleton, Toggle, inputCls } from "@/components/payouts/ui";
+import {
+  useCreateLocationMutation,
+  useGetDistrictsQuery,
+  useGetDivisionsQuery,
+  useGetLocationByIdQuery,
+  useUpdateLocationMutation,
+  type LocationLevel,
+} from "@/features/locationApi";
 
-interface BulkUploadProps {
+interface LocationFormProps {
   open: boolean;
   onClose: () => void;
+  locationId?: string | null;
 }
 
-export default function BulkUpload({ open, onClose }: BulkUploadProps) {
-  const [file, setFile] = useState<File | null>(null);
-  const [uploadResult, setUploadResult] = useState<any>(null);
-  const [isUploading, setIsUploading] = useState(false);
+interface FormState {
+  name: string;
+  nameLocal: string;
+  level: LocationLevel;
+  divisionId: string;
+  parentId: string;
+  externalCode: string;
+  sortOrder: string;
+  isCodSupported: boolean;
+  isDgCodSupported: boolean;
+}
 
-  const [bulkUpload] = useBulkUploadLocationsMutation();
+const EMPTY_FORM: FormState = {
+  name: "",
+  nameLocal: "",
+  level: "DIVISION",
+  divisionId: "",
+  parentId: "",
+  externalCode: "",
+  sortOrder: "",
+  isCodSupported: false,
+  isDgCodSupported: false,
+};
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    accept: {
-      "text/csv": [".csv"],
-      "application/vnd.ms-excel": [".xls"],
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-    },
-    maxFiles: 1,
-    maxSize: 10 * 1024 * 1024, // 10MB
-    onDrop: (acceptedFiles, rejectedFiles) => {
-      if (rejectedFiles.length > 0) {
-        toast.error("File too large or invalid format");
-        return;
-      }
-      setFile(acceptedFiles[0]);
-      setUploadResult(null);
-    },
+const LEVEL_OPTIONS: { value: LocationLevel; label: string }[] = [
+  { value: "DIVISION", label: "Division" },
+  { value: "DISTRICT", label: "District" },
+  { value: "THANA", label: "Thana / Area" },
+];
+
+export default function LocationForm({ open, onClose, locationId }: LocationFormProps) {
+  const isEditing = Boolean(locationId);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [errors, setErrors] = useState<{ name?: string; parentId?: string }>({});
+  const [prefilledFor, setPrefilledFor] = useState<string | null>(null);
+
+  const { data: locationData, isFetching: isFetchingLocation } = useGetLocationByIdQuery(
+    locationId as string,
+    { skip: !open || !locationId },
+  );
+  const { data: divisionsData, isFetching: isFetchingDivisions } = useGetDivisionsQuery(undefined, {
+    skip: !open,
   });
+  // All districts (unfiltered) — used to resolve a thana's division during edit prefill
+  const { data: allDistrictsData } = useGetDistrictsQuery(undefined, { skip: !open });
+  const { data: districtsData, isFetching: isFetchingDistricts } = useGetDistrictsQuery(
+    form.divisionId || undefined,
+    { skip: !open || form.level !== "THANA" || !form.divisionId },
+  );
 
-  const handleUpload = async () => {
-    if (!file) return;
+  const [createLocation, { isLoading: isCreating }] = useCreateLocationMutation();
+  const [updateLocation, { isLoading: isUpdating }] = useUpdateLocationMutation();
+  const isSaving = isCreating || isUpdating;
 
-    setIsUploading(true);
+  const divisions = divisionsData?.data ?? [];
+  const parentOptions =
+    form.level === "DISTRICT"
+      ? divisions
+      : form.level === "THANA"
+        ? (districtsData?.data ?? [])
+        : [];
+
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    setErrors((e) => ({ ...e, [key === "name" ? "name" : "parentId"]: undefined }));
+  };
+
+  // Reset when dialog opens for a different location
+  useEffect(() => {
+    if (open) {
+      setForm(EMPTY_FORM);
+      setErrors({});
+      setPrefilledFor(null);
+    }
+  }, [open, locationId]);
+
+  // Prefill form once the location data arrives
+  useEffect(() => {
+    const loc = locationData?.data;
+    if (!open || !loc || prefilledFor === loc.id) return;
+    const parentDistrict =
+      loc.level === "THANA"
+        ? (allDistrictsData?.data ?? []).find((d) => d.id === loc.parent_id)
+        : undefined;
+    setForm({
+      name: loc.name ?? "",
+      nameLocal: loc.name_local ?? "",
+      level: loc.level,
+      divisionId: loc.level === "DISTRICT" ? (loc.parent_id ?? "") : (parentDistrict?.parent_id ?? ""),
+      parentId: loc.parent_id ?? "",
+      externalCode: loc.external_code ?? "",
+      sortOrder: loc.sort_order != null ? String(loc.sort_order) : "",
+      isCodSupported: Boolean(loc.is_cod_supported),
+      isDgCodSupported: Boolean(loc.is_dg_cod_supported),
+    });
+    setPrefilledFor(loc.id);
+  }, [open, locationData, allDistrictsData, prefilledFor]);
+
+  const handleSubmit = async () => {
+    const nextErrors: { name?: string; parentId?: string } = {};
+    if (form.name.trim().length < 2) nextErrors.name = "Name is required (at least 2 characters).";
+    if (form.level !== "DIVISION" && !form.parentId) nextErrors.parentId = "Please select a parent location.";
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    const payload = {
+      name: form.name.trim(),
+      nameLocal: form.nameLocal.trim() || undefined,
+      externalCode: form.externalCode.trim() || undefined,
+      sortOrder: form.sortOrder.trim() === "" ? undefined : Number(form.sortOrder),
+      isCodSupported: form.isCodSupported,
+      isDgCodSupported: form.isDgCodSupported,
+    };
+
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const result = await bulkUpload(formData).unwrap();
-      setUploadResult(result.data);
-      toast.success("Bulk upload completed successfully");
-    } catch (error: any) {
-      toast.error(error?.data?.message || "Upload failed");
-    } finally {
-      setIsUploading(false);
+      if (isEditing && locationId) {
+        await updateLocation({
+          id: locationId,
+          data: { ...payload, parentId: form.level === "DIVISION" ? undefined : form.parentId },
+        }).unwrap();
+        toast.success("Location updated successfully");
+      } else {
+        await createLocation({
+          ...payload,
+          level: form.level,
+          parentId: form.level === "DIVISION" ? undefined : form.parentId,
+        }).unwrap();
+        toast.success("Location created successfully");
+      }
+      onClose();
+    } catch (err: any) {
+      toast.error(err?.data?.message || "Failed to save location. Please try again.");
     }
   };
 
-  const handleDownloadTemplate = () => {
-    const templateData = [
-      ["Division", "District", "Thana", "DivisionCode", "DistrictCode", "ThanaCode", "IsCodSupported", "IsDgCodSupported"],
-      ["Dhaka", "Dhaka", "Gulshan", "DHA", "DHA-01", "GUL", "true", "false"],
-      ["Chittagong", "Chittagong", "Kotwali", "CTG", "CTG-01", "KOT", "true", "true"],
-    ];
-
-    const csvContent = templateData.map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "location_template.csv";
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  const handleClose = () => {
-    setFile(null);
-    setUploadResult(null);
-    setIsUploading(false);
-    onClose();
-  };
+  const parentLabel = form.level === "DISTRICT" ? "Division" : "District";
+  const isFetchingParents = form.level === "DISTRICT" ? isFetchingDivisions : isFetchingDistricts;
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Bulk Upload Locations</DialogTitle>
-          <DialogDescription>
-            Upload a CSV or Excel file to create multiple locations at once
-          </DialogDescription>
-        </DialogHeader>
-
-        {uploadResult ? (
-          <div className="space-y-4">
-            <div className="rounded-lg bg-green-50 p-4 border border-green-200">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <div>
-                  <h4 className="font-medium text-green-800">Upload Complete</h4>
-                  <p className="text-sm text-green-700">
-                    Your file has been processed successfully
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="rounded-lg border p-4 text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {uploadResult.divisions.created + uploadResult.divisions.updated}
-                </div>
-                <div className="text-sm text-gray-600">Divisions</div>
-              </div>
-              <div className="rounded-lg border p-4 text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {uploadResult.districts.created + uploadResult.districts.updated}
-                </div>
-                <div className="text-sm text-gray-600">Districts</div>
-              </div>
-              <div className="rounded-lg border p-4 text-center">
-                <div className="text-2xl font-bold text-purple-600">
-                  {uploadResult.thanas.created + uploadResult.thanas.updated}
-                </div>
-                <div className="text-sm text-gray-600">Thanas</div>
-              </div>
-            </div>
-
-            {uploadResult.errors.length > 0 && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <AlertCircle className="h-5 w-5 text-red-600" />
-                  <h4 className="font-medium text-red-800">
-                    Errors ({uploadResult.errors.length})
-                  </h4>
-                </div>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {uploadResult.errors.slice(0, 5).map((error: any, index: number) => (
-                    <div key={index} className="text-sm text-red-700">
-                      <span className="font-medium">Row {error.row}:</span>{" "}
-                      {error.message}
-                    </div>
-                  ))}
-                  {uploadResult.errors.length > 5 && (
-                    <div className="text-sm text-red-600">
-                      ... and {uploadResult.errors.length - 5} more errors
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <div
-              {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                isDragActive
-                  ? "border-primary bg-primary/5"
-                  : "border-gray-300 hover:border-primary"
-              }`}
-            >
-              <input {...getInputProps()} />
-              <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="font-medium mb-2">
-                {isDragActive ? "Drop file here" : "Drag & drop your file here"}
-              </h3>
-              <p className="text-sm text-gray-500 mb-4">or click to browse</p>
-              <p className="text-xs text-gray-400">
-                Supports: CSV, Excel (Max 10MB)
-              </p>
-            </div>
-
-            {file && (
-              <div className="rounded-lg border p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <File className="h-8 w-8 text-gray-400" />
-                    <div>
-                      <p className="font-medium">{file.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {(file.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setFile(null)}
-                    disabled={isUploading}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                {isUploading && <Progress value={66} className="mt-4" />}
-              </div>
-            )}
-
-            <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
-                <div className="space-y-2">
-                  <h4 className="font-medium text-blue-800">File Format</h4>
-                  <p className="text-sm text-blue-700">
-                    Required columns: Division, District, Thana, DivisionCode,
-                    DistrictCode, ThanaCode, IsCodSupported, IsDgCodSupported
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDownloadTemplate}
-                    className="mt-2"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Download Template
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={handleClose}>
-            {uploadResult ? "Close" : "Cancel"}
+    <Modal
+      open={open}
+      title={isEditing ? "Edit Location" : "Add Location"}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSubmit} loading={isSaving}>
+            {isEditing ? "Save Changes" : "Create Location"}
           </Button>
-          {!uploadResult && file && (
-            <Button onClick={handleUpload} disabled={isUploading}>
-              {isUploading ? "Uploading..." : "Upload File"}
-            </Button>
+        </>
+      }
+    >
+      {isEditing && isFetchingLocation ? (
+        <Skeleton rows={5} />
+      ) : (
+        <div className="space-y-4">
+          <Field label="Level" hint={isEditing ? "Level cannot be changed after creation." : "Select the hierarchy level."}>
+            <select
+              className={inputCls}
+              value={form.level}
+              disabled={isEditing}
+              onChange={(e) => {
+                const level = e.target.value as LocationLevel;
+                setForm((f) => ({ ...f, level, divisionId: "", parentId: "" }));
+              }}
+            >
+              {LEVEL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Name (English)" error={errors.name}>
+              <input
+                className={inputCls}
+                value={form.name}
+                onChange={(e) => set("name", e.target.value)}
+                placeholder="e.g. Dhaka"
+                maxLength={120}
+              />
+            </Field>
+            <Field label="Name (Local)" hint="Optional — shown in Bangla where supported.">
+              <input
+                className={inputCls}
+                value={form.nameLocal}
+                onChange={(e) => set("nameLocal", e.target.value)}
+                placeholder="e.g. ঢাকা"
+                maxLength={120}
+              />
+            </Field>
+          </div>
+
+          {form.level === "THANA" && (
+            <Field label="Division">
+              <select
+                className={inputCls}
+                value={form.divisionId}
+                onChange={(e) => setForm((f) => ({ ...f, divisionId: e.target.value, parentId: "" }))}
+              >
+                <option value="">Select division</option>
+                {divisions.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          {form.level !== "DIVISION" && (
+            <Field label={parentLabel} error={errors.parentId} hint={form.level === "THANA" && !form.divisionId ? "Select a division first." : undefined}>
+              <select
+                className={inputCls}
+                value={form.parentId}
+                disabled={form.level === "THANA" && !form.divisionId}
+                onChange={(e) => set("parentId", e.target.value)}
+              >
+                <option value="">
+                  {isFetchingParents ? "Loading..." : `Select ${parentLabel.toLowerCase()}`}
+                </option>
+                {parentOptions.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="External Code" hint="Optional — courier / sync reference code.">
+              <input
+                className={inputCls}
+                value={form.externalCode}
+                onChange={(e) => set("externalCode", e.target.value)}
+                placeholder="e.g. DHA-01"
+                maxLength={40}
+              />
+            </Field>
+            <Field label="Sort Order" hint="Optional — lower values appear first.">
+              <input
+                className={inputCls}
+                type="number"
+                value={form.sortOrder}
+                onChange={(e) => set("sortOrder", e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+            <Toggle
+              checked={form.isCodSupported}
+              onChange={(v) => set("isCodSupported", v)}
+              label="Cash on Delivery (COD)"
+              hint="Orders in this location can be delivered with cash collection."
+            />
+            <Toggle
+              checked={form.isDgCodSupported}
+              onChange={(v) => set("isDgCodSupported", v)}
+              label="Delivery Guarantee COD (DG COD)"
+              hint="Enable DG-supported cash collection for this location."
+            />
+          </div>
+
+          {!isEditing && (
+            <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
+              <MapPin className="h-3.5 w-3.5 text-[#4338CA]" />
+              New locations appear in the list, tree view, and courier area sync immediately.
+            </p>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      )}
+    </Modal>
   );
 }

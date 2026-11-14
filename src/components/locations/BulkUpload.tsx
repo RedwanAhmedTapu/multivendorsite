@@ -1,25 +1,19 @@
-// components/locations/bulk-upload.tsx
+// components/locations/BulkUpload.tsx
 "use client";
 
 import React, { useState } from "react";
-import { Upload, Download, X, AlertCircle, CheckCircle, File } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, FileSpreadsheet, Upload, X } from "lucide-react";
 import { useDropzone } from "react-dropzone";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { Button, Modal, Notice, cx } from "@/components/payouts/ui";
 import { useBulkUploadLocationsMutation } from "@/features/locationApi";
 
 interface BulkUploadProps {
   open: boolean;
   onClose: () => void;
 }
+
+const REQUIRED_COLUMNS = "Division, District, Thana, DivisionCode, DistrictCode, ThanaCode, IsCodSupported, IsDgCodSupported";
 
 export default function BulkUpload({ open, onClose }: BulkUploadProps) {
   const [file, setFile] = useState<File | null>(null);
@@ -38,7 +32,7 @@ export default function BulkUpload({ open, onClose }: BulkUploadProps) {
     maxSize: 10 * 1024 * 1024, // 10MB
     onDrop: (acceptedFiles, rejectedFiles) => {
       if (rejectedFiles.length > 0) {
-        toast.error("File too large or invalid format");
+        toast.error("File too large or invalid format (max 10MB, CSV/XLS/XLSX)");
         return;
       }
       setFile(acceptedFiles[0]);
@@ -87,156 +81,124 @@ export default function BulkUpload({ open, onClose }: BulkUploadProps) {
     onClose();
   };
 
+  const summaryCards = uploadResult
+    ? [
+        { label: "Divisions", value: uploadResult.divisions.created + uploadResult.divisions.updated, cls: "text-sky-600" },
+        { label: "Districts", value: uploadResult.districts.created + uploadResult.districts.updated, cls: "text-emerald-600" },
+        { label: "Thanas", value: uploadResult.thanas.created + uploadResult.thanas.updated, cls: "text-indigo-600" },
+      ]
+    : [];
+
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Bulk Upload Locations</DialogTitle>
-          <DialogDescription>
-            Upload a CSV or Excel file to create multiple locations at once
-          </DialogDescription>
-        </DialogHeader>
-
-        {uploadResult ? (
-          <div className="space-y-4">
-            <div className="rounded-lg bg-green-50 p-4 border border-green-200">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <div>
-                  <h4 className="font-medium text-green-800">Upload Complete</h4>
-                  <p className="text-sm text-green-700">
-                    Your file has been processed successfully
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="rounded-lg border p-4 text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {uploadResult.divisions.created + uploadResult.divisions.updated}
-                </div>
-                <div className="text-sm text-gray-600">Divisions</div>
-              </div>
-              <div className="rounded-lg border p-4 text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {uploadResult.districts.created + uploadResult.districts.updated}
-                </div>
-                <div className="text-sm text-gray-600">Districts</div>
-              </div>
-              <div className="rounded-lg border p-4 text-center">
-                <div className="text-2xl font-bold text-purple-600">
-                  {uploadResult.thanas.created + uploadResult.thanas.updated}
-                </div>
-                <div className="text-sm text-gray-600">Thanas</div>
-              </div>
-            </div>
-
-            {uploadResult.errors.length > 0 && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <AlertCircle className="h-5 w-5 text-red-600" />
-                  <h4 className="font-medium text-red-800">
-                    Errors ({uploadResult.errors.length})
-                  </h4>
-                </div>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {uploadResult.errors.slice(0, 5).map((error: any, index: number) => (
-                    <div key={index} className="text-sm text-red-700">
-                      <span className="font-medium">Row {error.row}:</span>{" "}
-                      {error.message}
-                    </div>
-                  ))}
-                  {uploadResult.errors.length > 5 && (
-                    <div className="text-sm text-red-600">
-                      ... and {uploadResult.errors.length - 5} more errors
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <div
-              {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                isDragActive
-                  ? "border-primary bg-primary/5"
-                  : "border-gray-300 hover:border-primary"
-              }`}
-            >
-              <input {...getInputProps()} />
-              <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="font-medium mb-2">
-                {isDragActive ? "Drop file here" : "Drag & drop your file here"}
-              </h3>
-              <p className="text-sm text-gray-500 mb-4">or click to browse</p>
-              <p className="text-xs text-gray-400">
-                Supports: CSV, Excel (Max 10MB)
-              </p>
-            </div>
-
-            {file && (
-              <div className="rounded-lg border p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <File className="h-8 w-8 text-gray-400" />
-                    <div>
-                      <p className="font-medium">{file.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {(file.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setFile(null)}
-                    disabled={isUploading}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                {isUploading && <Progress value={66} className="mt-4" />}
-              </div>
-            )}
-
-            <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
-                <div className="space-y-2">
-                  <h4 className="font-medium text-blue-800">File Format</h4>
-                  <p className="text-sm text-blue-700">
-                    Required columns: Division, District, Thana, DivisionCode,
-                    DistrictCode, ThanaCode, IsCodSupported, IsDgCodSupported
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDownloadTemplate}
-                    className="mt-2"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Download Template
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={handleClose}>
+    <Modal
+      open={open}
+      title="Bulk Upload Locations"
+      onClose={handleClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={handleClose}>
             {uploadResult ? "Close" : "Cancel"}
           </Button>
-          {!uploadResult && file && (
-            <Button onClick={handleUpload} disabled={isUploading}>
+          {!uploadResult && (
+            <Button onClick={handleUpload} disabled={!file} loading={isUploading}>
               {isUploading ? "Uploading..." : "Upload File"}
             </Button>
           )}
+        </>
+      }
+    >
+      {uploadResult ? (
+        <div className="space-y-4">
+          <Notice tone="green">
+            <span className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              Upload complete — your file has been processed successfully.
+            </span>
+          </Notice>
+
+          <div className="grid grid-cols-3 gap-3">
+            {summaryCards.map((c) => (
+              <div key={c.label} className="rounded-lg border border-slate-200 bg-white p-3 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                <div className={cx("text-[20px] font-semibold tabular-nums", c.cls)}>{c.value}</div>
+                <div className="text-[11px] text-slate-500">{c.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {uploadResult.errors.length > 0 && (
+            <Notice tone="red">
+              <p className="mb-1.5 font-semibold">
+                {uploadResult.errors.length} row{uploadResult.errors.length === 1 ? "" : "s"} failed
+              </p>
+              <div className="max-h-36 space-y-1 overflow-y-auto">
+                {uploadResult.errors.slice(0, 5).map((error: any, index: number) => (
+                  <p key={index}>Row {error.row}: {error.message}</p>
+                ))}
+                {uploadResult.errors.length > 5 && (
+                  <p>... and {uploadResult.errors.length - 5} more errors</p>
+                )}
+              </div>
+            </Notice>
+          )}
         </div>
-      </DialogContent>
-    </Dialog>
+      ) : (
+        <div className="space-y-4">
+          <div
+            {...getRootProps()}
+            className={cx(
+              "cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors",
+              isDragActive
+                ? "border-[#4338CA] bg-indigo-50/60"
+                : "border-slate-300 hover:border-[#4338CA]/60 hover:bg-slate-50/60",
+            )}
+          >
+            <input {...getInputProps()} />
+            <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-lg bg-indigo-50 text-[#4338CA]">
+              <Upload className="h-5 w-5" />
+            </span>
+            <p className="text-[13px] font-semibold text-slate-800">
+              {isDragActive ? "Drop the file here" : "Drag & drop your file here"}
+            </p>
+            <p className="mt-1 text-[12px] text-slate-500">
+              or click to browse · CSV, XLS, XLSX · max 10MB
+            </p>
+          </div>
+
+          {file && (
+            <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+              <div className="flex items-center gap-2.5">
+                <FileSpreadsheet className="h-5 w-5 shrink-0 text-[#4338CA]" />
+                <div>
+                  <p className="text-[12px] font-medium text-slate-800">{file.name}</p>
+                  <p className="text-[11px] text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                </div>
+              </div>
+              {isUploading ? (
+                <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full w-2/3 animate-pulse rounded-full bg-[#4338CA]" />
+                </div>
+              ) : (
+                <Button size="sm" variant="ghost" title="Remove file" onClick={() => setFile(null)}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          )}
+
+          <Notice tone="violet">
+            <p className="mb-1.5 flex items-center gap-1.5 font-semibold">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> Required columns
+            </p>
+            <p className="break-words">{REQUIRED_COLUMNS}</p>
+          </Notice>
+
+          <div>
+            <Button variant="secondary" size="sm" onClick={handleDownloadTemplate}>
+              <Download className="h-3.5 w-3.5" /> Download Template
+            </Button>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }

@@ -1,150 +1,136 @@
-// components/locations/location-tree-view.tsx
+// components/locations/LocationTreeView.tsx
 "use client";
 
 import React, { useState } from "react";
-import { Search, ChevronRight, ChevronDown, Building, MapPin, Navigation, CheckCircle } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useGetAllLocationsQuery } from "@/features/locationApi";
+import { Building, CheckCircle, ChevronDown, ChevronRight, MapPin, Navigation, TreePine } from "lucide-react";
+import { Badge, Card, EmptyState, Notice, SearchBox, Skeleton, cx } from "@/components/payouts/ui";
+import { useGetAllLocationsQuery, type LocationTree } from "@/features/locationApi";
 
 interface TreeNodeProps {
-  node: any;
+  node: LocationTree;
   level: number;
   searchTerm: string;
 }
 
-const TreeNode: React.FC<TreeNodeProps> = ({ node, level, searchTerm }) => {
+function TreeNode({ node, level, searchTerm }: TreeNodeProps) {
   const [isExpanded, setIsExpanded] = useState(level === 0);
 
-  const matchesSearch = searchTerm === "" || 
-    node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    node.name_local?.toLowerCase().includes(searchTerm.toLowerCase());
+  const q = searchTerm.trim().toLowerCase();
+  const matchesSearch =
+    q === "" ||
+    node.name.toLowerCase().includes(q) ||
+    node.name_local?.toLowerCase().includes(q) ||
+    node.external_code?.toLowerCase().includes(q);
 
-  if (!matchesSearch && (!node.children || node.children.length === 0)) {
-    return null;
-  }
+  if (!matchesSearch && (!node.children || node.children.length === 0)) return null;
 
   const hasChildren = node.children && node.children.length > 0;
-  const Icon = node.level === "DIVISION" 
-    ? Building 
-    : node.level === "DISTRICT" 
-    ? MapPin 
-    : Navigation;
+  const Icon = node.level === "DIVISION" ? Building : node.level === "DISTRICT" ? MapPin : Navigation;
+  const rowTone =
+    node.level === "DIVISION"
+      ? "bg-sky-50 text-sky-600"
+      : node.level === "DISTRICT"
+        ? "bg-emerald-50 text-emerald-600"
+        : "bg-indigo-50 text-indigo-600";
 
   return (
-    <div className="ml-4">
+    <div className={level > 0 ? "ml-4 border-l border-slate-100" : undefined}>
       <div
-        className="flex items-center gap-2 py-2 px-3 rounded hover:bg-gray-100 cursor-pointer"
-        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 transition-colors hover:bg-indigo-50/50"
+        onClick={() => hasChildren && setIsExpanded(!isExpanded)}
       >
         {hasChildren ? (
-          isExpanded ? (
-            <ChevronDown className="h-4 w-4 text-gray-500" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-gray-500" />
-          )
+          isExpanded
+            ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />
         ) : (
-          <div className="w-4" />
+          <span className="w-3.5 shrink-0" />
         )}
-        <Icon className="h-4 w-4 text-gray-500" />
-        <span className="font-medium">{node.name}</span>
-        {node.name_local && (
-          <span className="text-sm text-gray-500">({node.name_local})</span>
-        )}
-        {node.is_cod_supported && (
-          <CheckCircle className="h-4 w-4 text-green-600 ml-2" />
-        )}
+        <span className={cx("grid h-6 w-6 shrink-0 place-items-center rounded-md [&>svg]:h-3.5 [&>svg]:w-3.5", rowTone)}>
+          <Icon />
+        </span>
+        <span className="text-[13px] font-medium text-slate-800">{node.name}</span>
+        {node.name_local && <span className="text-[11px] text-slate-400">({node.name_local})</span>}
+        {node.is_cod_supported && <CheckCircle className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-label="COD supported" />}
         {node.external_code && (
-          <code className="ml-2 px-2 py-1 text-xs bg-gray-100 rounded">
-            {node.external_code}
-          </code>
+          <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">{node.external_code}</code>
         )}
       </div>
       {isExpanded && hasChildren && (
-        <div className="border-l ml-2">
-          {node.children.map((child: any) => (
-            <TreeNode
-              key={child.id}
-              node={child}
-              level={level + 1}
-              searchTerm={searchTerm}
-            />
+        <div className="ml-4">
+          {node.children.map((child) => (
+            <TreeNode key={child.id} node={child} level={level + 1} searchTerm={searchTerm} />
           ))}
         </div>
       )}
     </div>
   );
-};
+}
 
 export default function LocationTreeView() {
   const [searchTerm, setSearchTerm] = useState("");
-  const { data, isLoading, error } = useGetAllLocationsQuery();
+  const { data, isLoading, error, refetch } = useGetAllLocationsQuery();
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-      </div>
+      <Card>
+        <div className="mb-3"><Skeleton rows={1} /></div>
+        <div className="space-y-1.5">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-2" style={{ marginLeft: (i % 3) * 16 }}>
+              <Skeleton rows={1} />
+            </div>
+          ))}
+        </div>
+      </Card>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-        <p className="text-sm text-red-800">Failed to load location tree</p>
-      </div>
+      <Notice tone="red">
+        Failed to load the location tree. Please try again.
+        <button className="ml-2 font-semibold underline" onClick={() => refetch()}>Retry</button>
+      </Notice>
     );
   }
 
-  const locations = data?.data || [];
+  const locations = data?.data ?? [];
 
   return (
-    <div className="space-y-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-        <Input
-          placeholder="Search in tree..."
+    <Card>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SearchBox
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
+          onChange={setSearchTerm}
+          placeholder="Search in tree by name or code..."
+          className="w-full sm:w-72"
         />
+        <span className="ml-auto text-[11px] text-slate-400">
+          {locations.length} root division{locations.length === 1 ? "" : "s"}
+        </span>
       </div>
 
-      <div className="border rounded-lg p-4 max-h-[500px] overflow-y-auto">
-        {locations.length === 0 ? (
-          <p className="text-center text-gray-500 py-8">No locations found</p>
-        ) : (
-          locations.map((node) => (
-            <TreeNode
-              key={node.id}
-              node={node}
-              level={0}
-              searchTerm={searchTerm}
-            />
-          ))
-        )}
-      </div>
+      {locations.length === 0 ? (
+        <EmptyState
+          icon={<TreePine />}
+          title="No locations yet"
+          body="Add divisions, districts, and thanas to build the delivery hierarchy."
+        />
+      ) : (
+        <div className="max-h-[480px] overflow-y-auto rounded-md border border-slate-100 p-2">
+          {locations.map((node) => (
+            <TreeNode key={node.id} node={node} level={0} searchTerm={searchTerm} />
+          ))}
+        </div>
+      )}
 
-      <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-        <div className="flex items-center gap-2">
-          <Building className="h-4 w-4" />
-          <span>Division</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4" />
-          <span>District</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Navigation className="h-4 w-4" />
-          <span>Thana</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          <span>COD Supported</span>
-        </div>
+      <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-2.5 text-[11px] text-slate-500">
+        <span className="flex items-center gap-1.5"><Building className="h-3.5 w-3.5 text-sky-500" /> Division</span>
+        <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-emerald-500" /> District</span>
+        <span className="flex items-center gap-1.5"><Navigation className="h-3.5 w-3.5 text-indigo-500" /> Thana</span>
+        <span className="flex items-center gap-1.5"><CheckCircle className="h-3.5 w-3.5 text-emerald-500" /> COD supported</span>
       </div>
-    </div>
+    </Card>
   );
 }
