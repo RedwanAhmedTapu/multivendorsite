@@ -4,8 +4,8 @@
 import { useState, useEffect } from "react";
 import {
   Activity, BarChart3, Building2, Check, ChevronRight, DollarSign, Info,
-  MapPin, Package, PencilLine, Plus, Power, RefreshCw, Search, Trash2, Truck,
-  Upload, X,
+  MapPin, Package, PencilLine, Plus, Power, Search, Trash2, Truck,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -20,7 +20,6 @@ import {
   useLazyPathaoGetZonesQuery,
   useLazyPathaoGetAreasQuery,
   useRedxGetAreasQuery,
-  useSyncServiceableAreasMutation,
   useGetServiceableAreasQuery,
   useDeleteServiceableAreaMutation,
   type PathaoCity,
@@ -932,8 +931,6 @@ function ServiceableAreasManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
-  const [syncServiceableAreas, { isLoading: isSyncing }] =
-    useSyncServiceableAreasMutation();
   const [deleteArea, { isLoading: isDeleting }] = useDeleteServiceableAreaMutation();
 
   const { data: areasData, isLoading: areasLoading, refetch } =
@@ -948,37 +945,6 @@ function ServiceableAreasManagement() {
       area.courierCityName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       area.locations?.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const handleBulkSync = async () => {
-    if (!selectedCourier) {
-      toast.error("Please select a courier provider");
-      return;
-    }
-
-    try {
-      const sampleAreas = [
-        {
-          locationId: "sample-location-id",
-          courierAreaId: "123",
-          courierAreaName: "Sample Area",
-          homeDeliveryAvailable: true,
-          pickupAvailable: false,
-        },
-      ];
-
-      await syncServiceableAreas({
-        courierProviderId: selectedCourier,
-        areas: sampleAreas,
-      }).unwrap();
-
-      toast.success(`Successfully synced ${sampleAreas.length} areas`);
-      refetch();
-    } catch (error: any) {
-      toast.error("Failed to sync areas", {
-        description: error?.data?.message || "Please try again",
-      });
-    }
-  };
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
@@ -1046,22 +1012,9 @@ function ServiceableAreasManagement() {
                 ))}
               </select>
             </Field>
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                disabled={!selectedCourier}
-                onClick={() => toast.info("CSV upload feature coming soon")}
-              >
-                <Upload className="h-3.5 w-3.5" /> Upload CSV
-              </Button>
-              <Button
-                onClick={handleBulkSync}
-                disabled={!selectedCourier || isSyncing}
-                loading={isSyncing}
-              >
-                <RefreshCw className="h-3.5 w-3.5" /> Sync Areas
-              </Button>
-            </div>
+            <p className="text-xs text-slate-500 sm:pb-2.5">
+              New mappings are added from the Pathao and RedX tabs above.
+            </p>
           </div>
 
           {areas.length > 0 && (

@@ -71,9 +71,23 @@ export function AdminSidebar({
     setOpenMenus((prev) => ({ ...prev, [title]: !prev[title] }));
   };
 
-  const isActive = (href: string) => pathname === href;
+  // Nested routes belong to their parent: /admin-dashboard/courier/credentials
+  // must keep the Courier section highlighted. Among hrefs that match the
+  // pathname (exact or as a path prefix — never a bare startsWith, which would
+  // false-positive on /admin-dashboard/couriers), only the LONGEST one is
+  // active, so sibling items like "Courier Provider" don't light up when a
+  // deeper sibling such as "Courier Credentials" is the real match.
+  const allHrefs = sections.flatMap((section) =>
+    section.items.flatMap((item) =>
+      item.subItems ? item.subItems.map((sub) => sub.href) : [item.href]
+    )
+  );
+  const hrefMatches = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`);
+  const activeHref = allHrefs.filter(hrefMatches).sort((a, b) => b.length - a.length)[0];
+  const isActive = (href: string) => href === activeHref && hrefMatches(href);
   const isParentActive = (subItems?: MenuItem[]) =>
-    subItems?.some((item) => pathname === item.href) || false;
+    subItems?.some((item) => isActive(item.href)) || false;
 
   const handleLogout = async () => {
     try {
@@ -185,6 +199,11 @@ export function AdminSidebar({
         >
           {sections.map((section, sIdx) => (
             <div key={sIdx} className={sIdx > 0 ? "mt-4 border-t border-slate-100 pt-4" : ""}>
+              {section.title && !renderCollapsed && (
+                <p className="mb-1.5 px-3 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400/80">
+                  {section.title}
+                </p>
+              )}
               {section.items.map((item) => {
                 const parentActive = isParentActive(item.subItems);
                 return (
