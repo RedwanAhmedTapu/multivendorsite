@@ -353,7 +353,7 @@ function LiveChat() {
   ];
 
   return (
-    <div className="flex h-[calc(100dvh-3rem)] flex-col gap-3">
+    <div className="live-chat-shell flex h-[calc(100dvh-3rem)] flex-col gap-3">
       <PageHeader
         icon={<MessageSquare />}
         title="Live Chat"
@@ -380,8 +380,10 @@ function LiveChat() {
         loading={loadingList}
       />
 
-      <Card flush className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex min-h-0 flex-1">
+      {/* Plain card surface instead of the kit Card: its inner wrapper div is not a flex
+          container, which broke the bounded-height chain and made the thread overflow. */}
+      <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        <div className="flex h-full min-h-0 flex-1">
           {/* ── Left: inbox ─────────────────────────────────── */}
           <aside
             aria-label="Conversations"
@@ -484,7 +486,7 @@ function LiveChat() {
           {/* ── Right: details (desktop) ────────────────────── */}
           <aside
             aria-label="Conversation details"
-            className={cx("hidden w-[290px] shrink-0 flex-col border-l border-slate-100 xl:flex", selected ? "flex" : "hidden")}
+            className={cx("w-[290px] shrink-0 flex-col border-l border-slate-100", selected ? "hidden xl:flex" : "hidden")}
           >
             {selected ? (
               <DetailsPanel item={selected} online={!!selected.ownerId && online.has(selected.ownerId)} />
@@ -520,7 +522,7 @@ function LiveChat() {
             </div>
           </>
         )}
-      </Card>
+      </section>
 
       <NewChatDialog
         open={newChatOpen}
@@ -561,6 +563,35 @@ function LiveChat() {
         @keyframes slidein { from { transform: translateX(100%); } to { transform: translateX(0); } }
         @media (prefers-reduced-motion: reduce) {
           .animate-pulse { animation: none !important; }
+        }
+        /* Slim, rounded scrollbars for every scroll area inside the chat shell
+           (inbox list, message log, details panel). */
+        .live-chat-shell,
+        .live-chat-shell * {
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 transparent;
+        }
+        .live-chat-shell ::-webkit-scrollbar,
+        .live-chat-shell::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        .live-chat-shell ::-webkit-scrollbar-track,
+        .live-chat-shell::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .live-chat-shell ::-webkit-scrollbar-thumb,
+        .live-chat-shell::-webkit-scrollbar-thumb {
+          background-color: #cbd5e1;
+          border-radius: 9999px;
+        }
+        .live-chat-shell ::-webkit-scrollbar-thumb:hover,
+        .live-chat-shell::-webkit-scrollbar-thumb:hover {
+          background-color: #94a3b8;
+        }
+        /* The shared ChatBox message log must shrink so it scrolls, not the page. */
+        .live-chat-shell .chat-messages-scroll {
+          min-height: 0;
         }
       `}</style>
     </div>
