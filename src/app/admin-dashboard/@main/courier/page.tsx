@@ -191,7 +191,7 @@ function CourierOverview() {
             {providers.map((provider) => (
               <Card key={provider.id} className="p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex min-w-0 items-center gap-2.5">
                     <span
                       className={cx(
                         "grid h-9 w-9 shrink-0 place-items-center rounded-lg [&>svg]:h-4 [&>svg]:w-4",
