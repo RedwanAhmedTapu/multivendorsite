@@ -17,6 +17,7 @@ import {
   type AdminCommissionStatus,
 } from "@/features/agentAdminApi";
 import { AgentAdminHeader, Btn, Empty, Panel, Pill, bdt, fmtDate, inputCls, pct, tdCls, thCls, type Tone } from "@/components/agent-admin/AgentAdminUI";
+import { TableSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 const STATUSES: Array<{ value: "ALL" | AdminCommissionStatus; label: string }> = [
   { value: "ALL", label: "All" },
@@ -152,7 +153,7 @@ export default function AgentCommissionsPage() {
         {isError ? (
           <p className="p-6 text-sm text-red-600">{apiErrorMessage(error)}</p>
         ) : isLoading ? (
-          <p className="p-6 text-sm text-slate-400">Loading…</p>
+          <TableSkeleton rows={8} cols={7} />
         ) : !data?.items.length ? (
           <Empty title="No commissions match" text="Commissions are created when an attributed vendor's order is delivered." />
         ) : (

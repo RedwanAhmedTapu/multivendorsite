@@ -1,7 +1,7 @@
 // app/pos/components/views/CustomersView.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, Plus, Pencil, Phone, Mail, MapPin, Wallet, CreditCard } from "lucide-react";
 import {
   useGetCustomersQuery,
@@ -18,6 +18,13 @@ export default function CustomersView({ staff }: { staff: PosStaff }) {
   const customers = data?.data ?? [];
 
   const [editing, setEditing] = useState<PosCustomer | null | undefined>(undefined);
+  const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const canManage = staff.isAdmin || !!staff.permissions?.canManageCustomers;
   // posCredit on the server; the form only sends credit terms when this is true.
@@ -132,7 +139,17 @@ export default function CustomersView({ staff }: { staff: PosStaff }) {
       </div>
 
       {editing !== undefined && (
-        <CustomerFormModal editData={editing} canSetCredit={canSetCredit} onClose={() => setEditing(undefined)} onSaved={() => setEditing(undefined)} />
+        <CustomerFormModal
+          editData={editing}
+          canSetCredit={canSetCredit}
+          onClose={() => setEditing(undefined)}
+          onSaved={() => { setEditing(undefined); setToast("✅ Customer saved"); }}
+        />
+      )}
+      {toast && (
+        <div role="status" className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[300] rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+          {toast}
+        </div>
       )}
     </div>
   );

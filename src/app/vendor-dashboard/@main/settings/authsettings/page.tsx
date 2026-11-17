@@ -35,6 +35,7 @@ import {
   X,
 } from "lucide-react";
 import { startRegistration } from "@simplewebauthn/browser";
+import MfaSettingsSection from "@/components/auth/MfaSettingsSection";
 
 /* ─── Shared primitives ────────────────────────────────────────────────── */
 
@@ -1363,6 +1364,9 @@ export default function AuthSettingsPage() {
           <ProfileUpdateSection />
           <PasswordChangeSection />
         </div>
+
+        {/* ── MFA (2FA) + sessions (full width) ── */}
+        <MfaSettingsSection />
 
         {/* ── WebAuthn (full width) ── */}
         <WebAuthnSection />

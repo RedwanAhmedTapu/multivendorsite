@@ -609,31 +609,149 @@ test("a server credit refusal (e.g. another till used the headroom) is shown and
   });
 });
 
-test("customer form: staff without POS Credit never send credit terms (profile edits work); credit holders get the limit field", { skip }, async () => {
-  const writes = [];
-  const onCustomerWrite = async (method, body) => (writes.push({ method, body }), ok({ ...KARIM, ...body }));
-  await withDom({ auth: OWNER_AUTH, route: posBackend({ customers: [KARIM], onCustomerWrite }) }, async (ui, React) => {
+test("customer form: 3 tabs keep state; typing in Credit Limit/Interest never remounts the input; non-credit staff save profile only", { skip }, async () => {
+  // Non-credit user: loan tab explains the missing right and offers no credit controls.
+  const writes1 = [];
+  await withDom({ auth: OWNER_AUTH, route: posBackend({ customers: [KARIM], onCustomerWrite: async (method, body) => (writes1.push({ method, body }), ok({ ...KARIM, ...body })) }) }, async (ui, React) => {
     const { default: CustomerFormModal } = await import("../src/app/pos/components/CustomerFormModal.tsx");
     await ui.render(React.createElement(CustomerFormModal, { editData: KARIM, canSetCredit: false, onClose() {}, onSaved() {} }));
-    assert.equal(ui.byLabel("Credit limit"), null, "no limit field");
-    assert.match(ui.text(), /Changing it needs the POS Credit Sales permission/);
+
+    const dialog = ui.doc.querySelector('[role="dialog"]');
+    for (const c of ["w-[80vw]", "max-w-none", "h-[80vh]", "max-h-[80dvh]", "rounded-[20px]", "flex-col", "overflow-hidden"]) {
+      assert.ok(dialog.className.includes(c), `customer modal keeps ${c}`);
+    }
+    assert.ok(dialog.querySelector('[role="tabpanel"]').className.includes("overflow-y-auto"), "only the body scrolls");
+
+    const tabs = [...ui.doc.querySelectorAll('[role="tab"]')].map((t) => t.textContent.trim());
+    assert.deepEqual(tabs, ["👤 Basic Info", "🪪 Identity", "💳 Loan/Credit"]);
+    assert.equal(ui.doc.querySelector('[role="tab"][aria-selected="true"]').textContent.trim(), "👤 Basic Info");
+
+    await ui.type(ui.byLabel("Full name"), "Karim Uddin");
+    await ui.click(btnWith(ui, "🪪 Identity"));
+    assert.ok(ui.byLabel("NID"), "identity tab shows its fields");
+    await ui.click(btnWith(ui, "👤 Basic Info"));
+    assert.equal(ui.byLabel("Full name").value, "Karim Uddin", "form state survives tab changes");
+
+    await ui.click(btnWith(ui, "💳 Loan/Credit"));
+    assert.match(ui.text(), /Permission Required/);
+    assert.match(ui.text(), /Contact Admin to manage loan settings/);
+    assert.equal(ui.byLabel("Credit limit"), null, "no editable credit terms");
+    assert.match(ui.text(), /Credit limit৳100/, "existing terms stay visible, read-only");
+
     await ui.click(btnWith(ui, "Save Customer"));
-    assert.equal(writes.length, 1);
-    assert.equal(writes[0].method, "PUT");
-    assert.ok(!("loanLimit" in writes[0].body), "no credit terms from a non-credit user");
-    assert.equal(writes[0].body.name, "Karim");
+    assert.equal(writes1.length, 1);
+    assert.equal(writes1[0].method, "PUT");
+    assert.deepEqual(Object.keys(writes1[0].body).sort(), ["address", "email", "name", "nid", "note", "phone", "referrerEmail", "referrerName"]);
+    assert.equal(writes1[0].body.name, "Karim Uddin");
+    assert.ok(!("loanLimit" in writes1[0].body), "no credit terms from a non-credit user");
   });
-  await withDom({ auth: OWNER_AUTH, route: posBackend({ customers: [KARIM], onCustomerWrite }) }, async (ui, React) => {
+
+  // Credit holder: focus must survive typing, the summary must follow the state, and only the whitelist is sent.
+  const writes2 = [];
+  await withDom({ auth: OWNER_AUTH, route: posBackend({ customers: [KARIM], onCustomerWrite: async (method, body) => (writes2.push({ method, body }), ok({ ...KARIM, ...body })) }) }, async (ui, React) => {
     const { default: CustomerFormModal } = await import("../src/app/pos/components/CustomerFormModal.tsx");
     await ui.render(React.createElement(CustomerFormModal, { editData: KARIM, canSetCredit: true, onClose() {}, onSaved() {} }));
-    assert.match(ui.text(), /Outstanding due 60\.00 · 40\.00 available/);
-    await ui.type(ui.byLabel("Credit limit"), "250");
+    await ui.click(btnWith(ui, "💳 Loan/Credit"));
+
+    const limit = ui.byLabel("Credit limit");
+    const interest = ui.byLabel("Interest rate");
+    assert.ok(limit && interest);
+    assert.match(ui.byLabel("Loan summary").textContent, /৳40.*60%/s, "available 40 of limit 100 with 60 outstanding");
+
+    limit.focus();
+    assert.equal(ui.doc.activeElement, limit);
+    await ui.type(limit, "50000");
+    assert.equal(ui.byLabel("Credit limit"), limit, "same DOM node — nothing remounted");
+    assert.equal(ui.doc.activeElement, limit, "focus stays in Credit Limit while typing");
+    assert.equal(limit.value, "50000");
+    assert.match(ui.byLabel("Loan summary").textContent, /৳49,940/, "summary is derived from the typed limit");
+
+    interest.focus();
+    await ui.type(interest, "24");
+    assert.equal(ui.doc.activeElement, interest, "focus stays in Interest while typing");
+    assert.match(ui.byLabel("Loan summary").textContent, /৳49,940/);
+
     await ui.click(btnWith(ui, "Save Customer"));
-    assert.equal(writes[1].body.loanLimit, 250);
+    assert.equal(writes2.length, 1);
+    const body = writes2[0].body;
+    assert.equal(body.loanLimit, 50000);
+    assert.equal(body.loanInterestRate, 24);
+    assert.equal(body.creditScore, "Good");
+    for (const k of ["due", "loanBalance", "walletBalance", "orders", "spent", "lastOrderAt", "id", "vendorId", "createdAt"]) {
+      assert.ok(!(k in body), `${k} is never sent by the form`);
+    }
+
     await ui.type(ui.byLabel("Credit limit"), "-5");
     await ui.click(btnWith(ui, "Save Customer"));
     assert.match(ui.text(), /Credit limit must be 0 or more/);
-    assert.equal(writes.length, 2, "invalid limit not sent");
+    assert.equal(writes2.length, 1, "an invalid limit is not sent");
+  });
+
+  // Add: required fields block the save; a valid save POSTs only the whitelist.
+  const writes3 = [];
+  await withDom({ auth: OWNER_AUTH, route: posBackend({ onCustomerWrite: async (method, body) => (writes3.push({ method, body }), ok({ id: "C9", ...body })) }) }, async (ui, React) => {
+    const { default: CustomerFormModal } = await import("../src/app/pos/components/CustomerFormModal.tsx");
+    let saved = null;
+    await ui.render(React.createElement(CustomerFormModal, { editData: null, canSetCredit: true, onClose() {}, onSaved: (c) => (saved = c) }));
+    await ui.click(btnWith(ui, "💳 Loan/Credit"));
+    await ui.type(ui.byLabel("Credit limit"), "500");
+    await ui.click(btnWith(ui, "Save Customer"));
+    assert.match(ui.text(), /Name and phone are required/);
+    assert.equal(writes3.length, 0, "nothing sent yet");
+
+    await ui.click(btnWith(ui, "👤 Basic Info"));
+    await ui.type(ui.byLabel("Full name"), "New Person");
+    await ui.type(ui.byLabel("Phone"), "01900000000");
+    await ui.click(btnWith(ui, "💳 Loan/Credit"));
+    await ui.click(btnWith(ui, "Save Customer"));
+    assert.equal(writes3.length, 1);
+    assert.equal(writes3[0].method, "POST");
+    assert.deepEqual(Object.keys(writes3[0].body).sort(), ["address", "creditScore", "email", "loanInterestRate", "loanLimit", "loanTenureDays", "name", "nid", "note", "phone", "referrerEmail", "referrerName"]);
+    assert.equal(writes3[0].body.loanLimit, 500);
+    assert.equal(writes3[0].body.name, "New Person");
+    assert.equal(saved.id, "C9", "the saved row is handed back to the POS");
+  });
+});
+
+test("terminal: Enable Loan opens the customer form on the Loan/Credit tab; without posCredit the box says to contact the admin", { skip }, async () => {
+  // Owner with posCredit: the amber box has the action, and the new limit is saved for the selected customer.
+  const writes = [];
+  const onCustomerWrite = async (method, body) => (writes.push({ method, body }), ok({ ...NOLIMIT, loanLimit: body.loanLimit }));
+  await withDom({ auth: OWNER_AUTH, route: posBackend({ customers: [KARIM, NOLIMIT], onCustomerWrite }) }, async (ui, React) => {
+    const { default: PosPage } = await import("../src/app/pos/page.tsx");
+    await ui.render(React.createElement(PosPage));
+    await ui.settle(8);
+    await ui.click(ui.byLabel("Add Shirt - Red"));
+    await pickCustomer(ui, "Walk-in Customer", "Rahim");
+    await ui.type(ui.byLabel("Paid amount"), "50"); // 105 bill → 55 due
+
+    const enable = btnWith(ui, "Enable Loan for Rahim");
+    assert.ok(enable, "no-facility box offers the action");
+    await ui.click(enable);
+    assert.equal(ui.doc.querySelector('[role="tab"][aria-selected="true"]').textContent.trim(), "💳 Loan/Credit", "opens on the loan tab");
+    await ui.type(ui.byLabel("Credit limit"), "500");
+    await ui.click(btnWith(ui, "Save Customer"));
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].method, "PUT");
+    assert.equal(writes[0].body.loanLimit, 500);
+    assert.match(ui.text(), /✅ Customer saved/, "toast after saving");
+    assert.ok(!btnWith(ui, "Enable Loan for Rahim"), "the selected customer now has a facility");
+  });
+
+  // Staff without posCredit: same situation, but only the "contact admin" notice.
+  const empMe = { ...ME_OWNER, role: "EMPLOYEE", employeeId: "E1", permissions: { posAccess: true } };
+  const empPos = { ...POS_ME_OWNER, employeeId: "E1", isOwner: false, displayName: "Rina", grants: { posDiscount: false, posCredit: false, posRefund: false, posReports: false } };
+  const empAuth = { user: { id: "E1", role: "EMPLOYEE", vendorId: "V1", employeeId: "E1" }, accessToken: "t" };
+  await withDom({ auth: empAuth, route: posBackend({ me: empMe, posMe: empPos, customers: [NOLIMIT] }) }, async (ui, React) => {
+    const { default: PosPage } = await import("../src/app/pos/page.tsx");
+    await ui.render(React.createElement(PosPage));
+    await ui.settle(8);
+    await ui.click(ui.byLabel("Add Shirt - Red"));
+    await pickCustomer(ui, "Walk-in Customer", "Rahim");
+    await ui.type(ui.byLabel("Paid amount"), "50");
+    assert.match(ui.text(), /No Credit Facility/);
+    assert.match(ui.text(), /Contact Admin to enable credit/);
+    assert.ok(!btnWith(ui, "Enable Loan"), "no action without posCredit");
   });
 });
 

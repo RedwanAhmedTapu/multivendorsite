@@ -33,7 +33,7 @@ import {
   type RuleViolation,
 } from "@/features/marketingAdminApi";
 import { discountPercent, mapServerError } from "@/lib/marketing/campaign-admin";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import { EmptyState, ErrorState, LoadingRows, NoticeBox, RegistrationStatusBadge, useMoney, useRuleLabel } from "./MarketingShared";
 
 const REASON_MAX = 500;
@@ -63,7 +63,36 @@ function ViolationList({ violations }: { violations: RuleViolation[] }) {
 export function RegistrationsTab({ pageId }: { pageId: string }) {
   const t = useTranslations("marketing.registrations");
   const { data, isLoading, isError, error, refetch } = useGetCampaignProgrammeQuery(pageId);
-  if (isLoading) return <Skeleton className="h-48 w-full" />;
+  if (isLoading) {
+    return (
+      <div aria-busy="true" aria-label="Loading registrations" className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Sk className="h-8 w-24 rounded-md" />
+          <Sk className="h-8 w-24 rounded-md" />
+          <Sk soft className="ml-auto h-3 w-20" />
+        </div>
+        <div className="rounded-lg border">
+          <div className="flex items-center gap-4 border-b bg-slate-50/60 px-4 py-3">
+            <Sk soft className="h-2.5 w-24" />
+            <Sk soft className="h-2.5 w-32" />
+            <Sk soft className="ml-auto h-2.5 w-16" />
+            <Sk soft className="h-2.5 w-16" />
+          </div>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 border-b px-4 py-3 last:border-b-0">
+              <Sk soft className="h-8 w-8 rounded-full" />
+              <div className="flex-1 space-y-1.5">
+                <Sk className={i % 2 ? "h-3 w-1/3" : "h-3 w-2/5"} />
+                <Sk soft className="h-2.5 w-1/4" />
+              </div>
+              <Sk soft className="h-3 w-16" />
+              <Sk className="h-6 w-20 rounded-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (isError || !data) return <ErrorState message={(error as any)?.data?.message} onRetry={refetch} />;
   if (!data.data.programme) return <NoticeBox title={t("noProgrammeTitle")}>{t("noProgrammeBody")}</NoticeBox>;
   return <RegistrationsPanel programme={data.data.programme} />;

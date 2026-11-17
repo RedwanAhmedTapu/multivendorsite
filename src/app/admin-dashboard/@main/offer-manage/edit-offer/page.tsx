@@ -3,6 +3,7 @@
 import React, { use } from 'react';
 import { EditOfferPage } from '@/components/admin/offers/edit-offer-dialog';
 import { useGetOfferByIdQuery } from '@/features/offerApi';
+import { FormSkeleton, HeaderSkeleton, PageSkeleton } from '@/components/admin/ui/AdminSkeletons';
 
 // Next.js 15+ - params is now a Promise
 export default function EditOfferRoute({ 
@@ -17,12 +18,11 @@ export default function EditOfferRoute({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading offer...</p>
-        </div>
-      </div>
+      <PageSkeleton>
+        <HeaderSkeleton actions={2} />
+        <FormSkeleton sections={2} fields={4} />
+        <FormSkeleton sections={1} fields={3} footer={false} />
+      </PageSkeleton>
     );
   }
 

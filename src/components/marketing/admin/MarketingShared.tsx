@@ -7,7 +7,7 @@ import * as React from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { AlertTriangle, Inbox, Languages, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import { useAppLocale, LOCALES, type AppLocale } from "@/i18n/MarketingIntlProvider";
 import { formatTaka, type FieldError } from "@/lib/marketing/campaign-admin";
 import type { ProgrammePhase as CampaignPhase, ProgrammeStatus as CampaignStatus, RegistrationStatus } from "@/features/marketingAdminApi";
@@ -78,9 +78,16 @@ export function RegistrationStatusBadge({ status }: { status: RegistrationStatus
 export function LoadingRows({ rows = 4 }: { rows?: number }) {
   const t = useTranslations("marketing.common");
   return (
-    <div className="space-y-3 p-4" aria-busy="true" aria-label={t("loading")}>
+    <div className="space-y-2 p-4" aria-busy="true" aria-label={t("loading")}>
       {Array.from({ length: rows }, (_, i) => (
-        <Skeleton key={i} className="h-12 w-full" />
+        <div key={i} className="flex items-center gap-3 rounded-xl border border-[#E7EEF6] px-3 py-2.5">
+          <Sk className="h-10 w-10 shrink-0 rounded-lg" />
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <Sk className={i % 2 ? "h-3 w-2/5" : "h-3 w-1/2"} />
+            <Sk soft className="h-2.5 w-1/4" />
+          </div>
+          <Sk soft className="h-5 w-16 shrink-0 rounded-full" />
+        </div>
       ))}
     </div>
   );

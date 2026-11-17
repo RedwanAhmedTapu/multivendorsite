@@ -7,10 +7,11 @@ import {
   Settings, PlusCircle, Mail, HelpCircle, Database, CreditCard,
   BarChart2, Home, ShoppingCart, FileText, Star, MapPin, Bell,
   Calendar, ChevronLeft, ChevronRight, RotateCcw, Megaphone, ShieldCheck, Scale,
-  MessageSquare, Palette
+  MessageSquare, Palette, Percent
 } from "lucide-react";
 
 import { AdminSidebar } from "./sidebar/AdminSidebar";
+import { ShellSkeleton } from "@/components/admin/ui/AdminSkeletons";
 import PrivateRoute from "@/components/privateroute/PrivateRoute";
 import { usePermissions } from "@/hooks/usePermissions";
 import { filterSectionsByPermission, type PermissionAwareSection } from "@/utils/permissionNav";
@@ -71,11 +72,21 @@ function AdminLayout({ main }: { main: ReactNode }) {
   // reasonable, conservative default (when in doubt, OWNER_ONLY).
   const sections: PermissionAwareSection[] = [
     {
+      title: "Overview",
       items: [
         { title: "Dashboard", href: "/admin-dashboard", icon: Home, color: "text-[#4f46e5]" },
       ],
     },
     {
+      title: "Account",
+      items: [
+        // Self-service account security (MFA, sessions) — every staff member,
+        // not OWNER_ONLY: MFA policy can require platform employees to enroll.
+        { title: "Account Security", href: "/admin-dashboard/settings/authsettings", icon: ShieldCheck, color: "text-[#0d9488]" },
+      ],
+    },
+    {
+      title: "Marketplace",
       items: [
         {
           title: "Vendors",
@@ -86,6 +97,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
           subItems: [
             { title: "All Vendors", href: "/admin-dashboard/vendormanage/vendor-approval", icon: Users },
             { title: "Vendor Payouts", href: "/admin-dashboard/payouts", icon: CreditCard },
+            { title: "Commission", href: "/admin-dashboard/commission", icon: Percent },
             { title: "Performance", href: "/admin-dashboard/vendormanage/performance", icon: BarChart2 },
             { title: "Promotional Offers", href: "/admin-dashboard/vendormanage/promotions", icon: Tag },
           ],
@@ -94,6 +106,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
       ],
     },
     {
+      title: "Customers",
       items: [
         {
           title: "Customers",
@@ -110,6 +123,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
       ],
     },
     {
+      title: "Team",
       items: [
         {
           title: "Employees",
@@ -125,6 +139,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
       ],
     },
     {
+      title: "Sales",
       items: [
         {
           title: "Orders",
@@ -142,6 +157,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
       ],
     },
     {
+      title: "Catalog",
       items: [
         {
           title: "Categories",
@@ -156,10 +172,6 @@ function AdminLayout({ main }: { main: ReactNode }) {
             { title: "Brand Management", href: "/admin-dashboard/brands/management", icon: Layers },
           ],
         },
-      ],
-    },
-    {
-      items: [
         {
           title: "Products",
           href: "#",
@@ -173,12 +185,9 @@ function AdminLayout({ main }: { main: ReactNode }) {
       ],
     },
     {
+      title: "Logistics",
       items: [
         { title: "Locations", href: "/admin-dashboard/locations", icon: MapPin, color: "text-[#6d28d9]", permissionKey: "OWNER_ONLY" },
-      ],
-    },
-    {
-      items: [
         {
           title: "Courier & Shipping",
           href: "#",
@@ -194,6 +203,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
       ],
     },
     {
+      title: "Marketing",
       items: [
         {
           title: "Offers & Coupons",
@@ -209,10 +219,6 @@ function AdminLayout({ main }: { main: ReactNode }) {
         },
         // ADMIN only until an advertisement-approval permission exists for staff (UI visibility, not authorization).
         { title: "Advertisements", href: "/admin-dashboard/advertisements", icon: Megaphone, color: "text-[#7c3aed]", permissionKey: "OWNER_ONLY" },
-      ],
-    },
-    {
-      items: [
         {
           title: "Subscriptions & Memberships",
           href: "#",
@@ -225,15 +231,12 @@ function AdminLayout({ main }: { main: ReactNode }) {
            
           ],
         },
-      ],
-    },
-    {
-      items: [
         // Agent Commission admin area (ADMIN, or admin staff holding agentManagement).
         { title: "Agents", href: "/admin-dashboard/agents", icon: Users, color: "text-[#0d9488]", permissionKey: "agentManagement" },
       ],
     },
     {
+      title: "System",
       items: [
         {
           title: "Settings",
@@ -257,6 +260,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
       ],
     },
     {
+      title: "Content",
       items: [
         {
           title: "Content",
@@ -286,7 +290,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
   // show nothing (or a skeleton) rather than briefly revealing sections an
   // employee shouldn't see.
   if (permissionsLoading) {
-    return <div className="flex h-screen items-center justify-center" style={{ backgroundColor: "#f5f5ff" }}>Loading…</div>;
+    return <ShellSkeleton />;
   }
 
   return (
@@ -324,8 +328,8 @@ function AdminLayout({ main }: { main: ReactNode }) {
       {/* ── Main content area ── */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: "#f5f5ff" }}>
-          <div className="pt-2">
-            <div className="p-4 sm:p-6">{main}</div>
+          <div className="pt-1.5">
+            <div className="p-3 sm:p-4">{main}</div>
           </div>
         </main>
       </div>
@@ -345,7 +349,7 @@ function AdminLayout({ main }: { main: ReactNode }) {
 function RequireAdminSide({ children }: { children: ReactNode }) {
   const { me, isLoading, isAdminSide, role } = usePermissions();
 
-  if (isLoading) return <div className="flex h-screen items-center justify-center">Loading…</div>;
+  if (isLoading) return <ShellSkeleton />;
   if (role === "EMPLOYEE" && !isAdminSide) {
     return (
       <div className="flex h-screen items-center justify-center text-center p-6">

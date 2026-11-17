@@ -8,7 +8,8 @@ import {
 import type { Brand, BrandStatus } from "@/types/brand";
 import { StatusBadge } from "@/components/brand/BrandformShared";
 import BrandDetailsModal from "@/components/brand/BranddetailsModal";
-import { Eye, Check, XCircle, Loader2, Inbox, Search, ShieldCheck } from "lucide-react";
+import { Eye, Check, XCircle, Inbox, Search, ShieldCheck } from "lucide-react";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 
 const STATUS_TABS: { label: string; value: BrandStatus | "ALL" }[] = [
   { label: "All", value: "ALL" },
@@ -135,8 +136,36 @@ export default function AdminBrandsPage() {
 
         {/* List */}
         {isLoading ? (
-          <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
-            <Loader2 size={22} color="#1D4ED8" style={{ animation: "spin 1s linear infinite" }} />
+          <div style={{ background: "#fff", border: "1.5px solid #E5EAF2", borderRadius: 14, overflow: "hidden" }} aria-busy="true" aria-label="Loading brands">
+            <div
+              className="brand-table-header"
+              style={{ display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 1fr 1.2fr", gap: 10, padding: "10px 16px", background: "#FAFBFD", borderBottom: "1px solid #F0F4FA" }}
+            >
+              {["Brand", "Vendor", "Relationship", "Status", ""].map((h) => (
+                <div key={h} style={{ display: "flex", justifyContent: h === "" ? "flex-end" : "flex-start" }}>
+                  <Sk className="h-2.5 w-16" />
+                </div>
+              ))}
+            </div>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="brand-row"
+                style={{ display: "grid", gridTemplateColumns: "2fr 1.3fr 1fr 1fr 1.2fr", gap: 10, padding: "12px 16px", borderBottom: "1px solid #F0F4FA", alignItems: "center" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Sk soft className="h-[30px] w-[30px] shrink-0 rounded-lg" />
+                  <Sk soft className="h-3.5 w-32" />
+                </div>
+                <Sk soft className="h-3 w-24" />
+                <Sk soft className="h-3 w-20" />
+                <Sk className="h-5 w-16 rounded-full" />
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                  <Sk className="h-7 w-16 rounded-md" />
+                  <Sk className="h-7 w-12 rounded-md" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : brands.length === 0 ? (
           <div

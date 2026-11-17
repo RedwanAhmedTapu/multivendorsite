@@ -52,7 +52,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 
 // API hooks
 import {
@@ -327,13 +327,44 @@ export default function VendorProfileManager({
   // Loading state
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Button variant="outline" onClick={onBackToList} className="mb-4">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Vendors
-        </Button>
-        <Skeleton className="h-12 w-1/3" />
-        <Skeleton className="h-64 w-full" />
+      <div aria-busy="true" aria-label="Loading vendor profile" className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={onBackToList}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Vendors
+          </Button>
+          <Sk className="h-16 w-16 rounded-full" />
+          <div className="space-y-2">
+            <Sk className="h-6 w-52" />
+            <div className="flex items-center gap-2">
+              <Sk className="h-5 w-20 rounded-full" />
+              <Sk soft className="h-3 w-40" />
+            </div>
+          </div>
+          <div className="ml-auto space-y-2 text-right">
+            <Sk soft className="ml-auto h-3 w-14" />
+            <Sk className="ml-auto h-4 w-24" />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {["profile", "commission", "payouts", "performance", "actions"].map((t, i) => (
+            <Sk key={t} className={i === 0 ? "h-8 w-24 rounded-md bg-slate-300/70" : "h-8 w-28 rounded-md"} />
+          ))}
+        </div>
+        <Card>
+          <CardHeader className="space-y-2">
+            <Sk className="h-4 w-40" />
+            <Sk soft className="h-3 w-64" />
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="space-y-1.5">
+                <Sk soft className="h-2.5 w-24" />
+                <Sk className="h-9 w-full rounded-md" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
     );
   }

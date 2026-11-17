@@ -16,6 +16,7 @@ import {
   useLookupAgentsQuery,
 } from "@/features/agentAdminApi";
 import { AgentAdminHeader, Btn, Empty, FieldRow, Modal, Panel, Pill, fmtDate, inputCls, pct, tdCls, thCls } from "@/components/agent-admin/AgentAdminUI";
+import { TableSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 type Scope = "VENDOR" | "AGENT" | "CATEGORY";
 const SCOPE_LABEL: Record<Scope, string> = { VENDOR: "Vendor", AGENT: "Agent", CATEGORY: "Category" };
@@ -216,7 +217,7 @@ export default function AgentOverridesPage() {
 
       <Panel>
         {isLoading ? (
-          <p className="p-6 text-sm text-slate-400">Loading…</p>
+          <TableSkeleton rows={6} cols={6} />
         ) : !data?.items.length ? (
           <Empty title={`No ${active ? "active " : ""}${SCOPE_LABEL[scope].toLowerCase()} overrides`} />
         ) : (

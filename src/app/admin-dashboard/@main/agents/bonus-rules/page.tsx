@@ -13,6 +13,7 @@ import {
   type BonusRule,
 } from "@/features/agentAdminApi";
 import { AgentAdminHeader, Btn, Empty, FieldRow, Modal, Panel, Pill, bdt, fmtDate, inputCls, tdCls, thCls } from "@/components/agent-admin/AgentAdminUI";
+import { TableSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 const METRIC_LABEL: Record<BonusRule["metric"], string> = {
   DELIVERED_ORDERS: "Delivered orders",
@@ -152,7 +153,7 @@ export default function AgentBonusRulesPage() {
       />
       <Panel>
         {isLoading ? (
-          <p className="p-6 text-sm text-slate-400">Loading…</p>
+          <TableSkeleton rows={5} cols={7} />
         ) : !rules?.length ? (
           <Empty title="No bonus rules" text="For example: ৳ 2,000 once an agent reaches 10 active vendors." />
         ) : (

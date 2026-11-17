@@ -15,6 +15,7 @@ import {
   type LevelInput,
 } from "@/features/agentAdminApi";
 import { AgentAdminHeader, Btn, Empty, FieldRow, Modal, Panel, Pill, bdt, inputCls, pct, tdCls, thCls } from "@/components/agent-admin/AgentAdminUI";
+import { TableSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 type Draft = {
   name: string;
@@ -139,7 +140,7 @@ export default function AgentLevelsPage() {
       />
       <Panel>
         {isLoading ? (
-          <p className="p-6 text-sm text-slate-400">Loading…</p>
+          <TableSkeleton rows={5} cols={7} />
         ) : !levels?.length ? (
           <Empty title="No levels yet" text="Create the first level (for example Bronze, rank 1)." />
         ) : (

@@ -19,9 +19,11 @@ declare global {
 interface SocialAuthProps {
   enableOneTap?: boolean; // Enable/disable One Tap
   onSuccess?: () => void; // Callback after successful login
+  /** MFA gate: called instead of onSuccess when a second factor is required. */
+  onMfaRequired?: (challengeId: string, enrollmentRequired: boolean) => void;
 }
 
-const SocialAuth = ({ enableOneTap = true, onSuccess }: SocialAuthProps) => {
+const SocialAuth = ({ enableOneTap = true, onSuccess, onMfaRequired }: SocialAuthProps) => {
   const [isLoading, setIsLoading] = useState<"google" | "facebook" | null>(null);
   const [googleLoaded, setGoogleLoaded] = useState(false);
   const [facebookLoaded, setFacebookLoaded] = useState(false);
@@ -379,6 +381,15 @@ const SocialAuth = ({ enableOneTap = true, onSuccess }: SocialAuthProps) => {
 
       console.log("Social login API response received:", { hasAccessToken: !!result?.accessToken }); // Phase 3: never log the token
 
+      // MFA gate: a protected account must complete the second factor first.
+      if (result?.mfaRequired && result?.challengeId) {
+        if (onMfaRequired) {
+          onMfaRequired(result.challengeId, !!result.enrollmentRequired);
+          return;
+        }
+        throw new Error("This account requires two-factor authentication. Please sign in with your password.");
+      }
+
       dispatch(setReduxCredentials({ 
         user: result.user, 
         accessToken: result.accessToken || "" 
@@ -503,6 +514,15 @@ const SocialAuth = ({ enableOneTap = true, onSuccess }: SocialAuthProps) => {
       }).unwrap();
 
       console.log("Social login API response received:", { hasAccessToken: !!result?.accessToken }); // Phase 3: never log the token
+
+      // MFA gate: a protected account must complete the second factor first.
+      if (result?.mfaRequired && result?.challengeId) {
+        if (onMfaRequired) {
+          onMfaRequired(result.challengeId, !!result.enrollmentRequired);
+          return;
+        }
+        throw new Error("This account requires two-factor authentication. Please sign in with your password.");
+      }
 
       dispatch(setReduxCredentials({ 
         user: result.user, 

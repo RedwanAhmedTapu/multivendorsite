@@ -1,4 +1,4 @@
-// src/app/admin/dashboard/page.tsx
+// src/app/admin-dashboard/page.tsx
 
 import AdminProtectedLayout from "./layout";
 

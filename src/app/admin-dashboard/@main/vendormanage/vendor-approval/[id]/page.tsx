@@ -47,6 +47,7 @@ import {
   useRequestReVerificationStatusMutation,
   useUpdateDocumentStatusMutation,
 } from "@/features/vendorManageApi";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 
 /* ─── Design tokens (shared with AddProductForm) ────────────────────────── */
 
@@ -402,17 +403,73 @@ export default function VendorDetailPage() {
         style={{
           background: PAGE_BG,
           minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-          color: SUBTLE,
+          padding: 20,
           fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
         }}
       >
-        <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
-        Loading vendor profile…
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div
+          aria-busy="true"
+          aria-label="Loading vendor profile"
+          style={{ maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 }}
+        >
+          <Sk className="h-2.5 w-56" />
+          <Sk className="h-3 w-28" />
+          <div style={{ background: "#fff", border: `1.5px solid ${CARD_BORDER}`, borderRadius: 14, padding: 20 }}>
+            <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+              <Sk className="h-14 w-14 shrink-0 rounded-[14px] bg-indigo-100" />
+              <div className="min-w-0 flex-1 space-y-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Sk className="h-4 w-48" />
+                  <Sk soft className="h-5 w-20 rounded-full" />
+                  <Sk soft className="h-5 w-16 rounded-full" />
+                </div>
+                <div className="flex flex-wrap gap-4">
+                  <Sk soft className="h-2.5 w-44" />
+                  <Sk soft className="h-2.5 w-32" />
+                  <Sk soft className="h-2.5 w-28" />
+                </div>
+              </div>
+            </div>
+            <div style={{ borderTop: "1px solid #EEF3FB", marginTop: 14, paddingTop: 12 }} className="flex flex-wrap gap-2">
+              <Sk className="h-8 w-36 rounded-lg bg-indigo-100" />
+              <Sk className="h-8 w-24 rounded-lg" />
+              <Sk className="h-8 w-20 rounded-lg" />
+            </div>
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <Sk soft className="h-2.5 w-32" />
+                <Sk soft className="h-2.5 w-10" />
+              </div>
+              <Sk className="h-2 w-full rounded-full" />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} style={{ flex: "1 1 180px", background: "#fff", border: `1.5px solid ${CARD_BORDER}`, borderRadius: 12, padding: "14px 16px" }}>
+                <Sk soft className="h-2.5 w-20" />
+                <Sk className="mt-2 h-5 w-16" />
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} style={{ background: "#fff", border: `1.5px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
+                <div className="flex items-center gap-2">
+                  <Sk soft className="h-4 w-4 rounded" />
+                  <Sk className="h-3.5 w-40" />
+                </div>
+                <div className="mt-4 space-y-3">
+                  {Array.from({ length: 4 }).map((_, j) => (
+                    <div key={j} className="flex items-center justify-between border-b border-slate-100 pb-2 last:border-0">
+                      <Sk soft className="h-2.5 w-24" />
+                      <Sk soft className="h-3 w-32" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

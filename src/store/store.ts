@@ -7,6 +7,7 @@ import { useDispatch, useSelector } from "react-redux";
 // Import all your APIs
 import { apiSlice } from "../features/apiSlice";
 import { authApi } from "../features/authApi";
+import { mfaApi } from "../features/mfaApi";
 import customerProfileApi from "@/features/customerProfileApi";
 import authReducer from "../features/authSlice";
 import { sliderApi } from "../features/sliderApi";
@@ -22,6 +23,8 @@ import { offerApi } from "../features/offerApi";
 import { userOrderApi } from "@/features/userorderApi";
 import { adminOrderApi } from "@/features/adminOrderApi";
 import { adminFraudProviderApi } from "@/features/adminFraudProviderApi";
+import { adminDashboardApi } from "@/features/adminDashboardApi";
+import { commissionApi } from "@/features/commissionApi";
 
 import { vendorOrderApi } from "@/features/vendorOrderApi";
 import { employeeApi } from "@/features/employeeApi";
@@ -58,6 +61,7 @@ import { productrequiredfieldsettingsAdminApi } from "@/features/productrequired
 const apiMiddlewares = [
   apiSlice.middleware,
   authApi.middleware,
+  mfaApi.middleware,
   customerProfileApi.middleware,
   sliderApi.middleware,
   productApiBase.middleware,
@@ -71,6 +75,8 @@ const apiMiddlewares = [
   userOrderApi.middleware,
   adminOrderApi.middleware,
   adminFraudProviderApi.middleware,
+  adminDashboardApi.middleware,
+  commissionApi.middleware,
   vendorOrderApi.middleware,
   employeeApi.middleware,
   locationApi.middleware,
@@ -106,6 +112,7 @@ const apiReducers = {
   chat: chatReducer,
   [apiSlice.reducerPath]: apiSlice.reducer,
   [authApi.reducerPath]: authApi.reducer,
+  [mfaApi.reducerPath]: mfaApi.reducer,
   [customerProfileApi.reducerPath]: customerProfileApi.reducer,
   [sliderApi.reducerPath]: sliderApi.reducer,
   [productApiBase.reducerPath]: productApiBase.reducer,
@@ -119,6 +126,8 @@ const apiReducers = {
   [userOrderApi.reducerPath]: userOrderApi.reducer,
   [adminOrderApi.reducerPath]: adminOrderApi.reducer,
   [adminFraudProviderApi.reducerPath]:adminFraudProviderApi.reducer,
+  [adminDashboardApi.reducerPath]: adminDashboardApi.reducer,
+  [commissionApi.reducerPath]: commissionApi.reducer,
   [vendorOrderApi.reducerPath]: vendorOrderApi.reducer,
   [employeeApi.reducerPath]: employeeApi.reducer,
   [storeDecorationApi.reducerPath]: storeDecorationApi.reducer,

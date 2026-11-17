@@ -36,6 +36,7 @@ import {
   Filter,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import { useGetCategoriesQuery } from "@/features/apiSlice";
 import {
   useGetVendorsQuery,
@@ -462,12 +463,10 @@ function CategoryScopeSelect({
           {selected.includes(ALL_SCOPE) && <Check size={12} />}
         </button>
 
-        {isLoading && (
-          <span style={{ fontSize: 11.5, color: "#94A3B8", display: "flex", alignItems: "center", gap: 5 }}>
-            <Loader2 size={11} className="animate-spin" />
-            Loading categories…
-          </span>
-        )}
+        {isLoading &&
+          Array.from({ length: 3 }).map((_, i) => (
+            <Sk key={`cat-sk-${i}`} soft className="inline-block h-7 w-28 rounded-full" />
+          ))}
 
         {(categories ?? []).map((c: any) => {
           const active = selected.includes(c.id);
@@ -594,9 +593,20 @@ function AssignmentsList({
         }}
       >
         {isFetching && (
-          <div style={{ padding: 30, textAlign: "center", color: "#94A3B8", fontSize: 12 }}>
-            <Loader2 size={16} className="animate-spin" style={{ display: "inline-block", marginBottom: 6 }} />
-            <div>Loading assignments…</div>
+          <div aria-busy="true" aria-label="Loading assignments" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: "#FAFBFD", border: "1px solid #F0F4FA" }}
+              >
+                <Sk soft className="h-7 w-7 rounded-lg" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Sk soft className="h-3 w-40 max-w-full" />
+                  <Sk soft className="h-2.5 w-24" />
+                </div>
+                <Sk className="h-6 w-16 rounded-md" />
+              </div>
+            ))}
           </div>
         )}
 

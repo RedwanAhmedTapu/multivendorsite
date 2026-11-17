@@ -200,15 +200,24 @@ export function VendorListTable({ vendors, isLoading, onCreateStore }: Props) {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr>
-                  <td colSpan={5} style={{ padding: 24, textAlign: "center" }}>
-                    <RefreshCw
-                      size={16}
-                      color="#94A3B8"
-                      style={{ animation: "spin 1s linear infinite" }}
-                    />
-                  </td>
-                </tr>
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid #F0F4FA" }}>
+                    {[0, 1, 2, 3, 4].map((j) => (
+                      <td key={j} style={{ padding: "9px 12px" }}>
+                        <div
+                          className="animate-pulse"
+                          style={{
+                            height: j === 0 ? 26 : 10,
+                            width: j === 0 ? 26 : j === 3 ? 60 : j === 4 ? 70 : 110,
+                            borderRadius: j === 0 ? 7 : 4,
+                            background: j === 0 ? "#EEF2F8" : "#F1F5F9",
+                            marginLeft: j === 4 ? "auto" : undefined,
+                          }}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))
               ) : filtered.length === 0 ? (
                 <tr>
                   <td

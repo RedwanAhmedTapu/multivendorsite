@@ -17,6 +17,7 @@ import {
   type SettingKey,
 } from "@/features/agentAdminApi";
 import { AgentAdminHeader, Btn, FieldRow, Panel, Pill, bdt, fmtDateTime, inputCls } from "@/components/agent-admin/AgentAdminUI";
+import { FormSkeleton, HeaderSkeleton, PageSkeleton, PanelSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 type Form = {
   defaultCommissionPercent: string;
@@ -158,7 +159,20 @@ export default function AgentSettingsPage() {
   const current = form ? payloadOf(form) : {};
   const dirtyKeys = (Object.keys(current) as SettingKey[]).filter((k) => missing.has(k) || !same(current[k], baseline[k]));
 
-  if (isLoading || !form || !data) return <div className="p-6 text-sm text-slate-400">Loading settings…</div>;
+  if (isLoading || !form || !data) {
+    return (
+      <PageSkeleton>
+        <HeaderSkeleton actions={2} tabs={10} />
+        <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
+          <div className="space-y-6">
+            <FormSkeleton sections={2} fields={4} footer={false} />
+            <FormSkeleton sections={1} fields={3} footer={false} />
+          </div>
+          <PanelSkeleton rows={5} cols={3} title />
+        </div>
+      </PageSkeleton>
+    );
+  }
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm({ ...form, [k]: v });
 
   async function onSave() {

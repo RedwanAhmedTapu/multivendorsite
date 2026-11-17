@@ -12,6 +12,7 @@ import {
   Building2,
   CalendarDays,
 } from "lucide-react";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 
 /* ─── Compact stat chip ──────────────────────────────────────────────────── */
 function StatChip({ label, value }: { label: string; value: string | number }) {
@@ -104,15 +105,49 @@ export default function BankDetailPage() {
 
         {isLoading && !bank ? (
           <div
+            aria-busy="true"
+            aria-label="Loading bank"
             style={{
               background: "#fff",
-              borderRadius: 14,
-              padding: 40,
-              textAlign: "center",
               border: "1px solid #E5EAF2",
+              borderRadius: 14,
+              overflow: "hidden",
             }}
           >
-            <Loader2 size={20} style={{ animation: "spin 1s linear infinite" }} />
+            <div style={{ padding: "14px 18px", background: "linear-gradient(135deg,#1D4ED8,#7C3AED)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.18)" }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <Sk className="h-4 w-40 bg-white/40" />
+                  <Sk className="h-2.5 w-56 bg-white/25" />
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: "10px 18px", borderBottom: "1px solid #E5EAF2", background: "#FAFBFD" }}>
+              <Sk soft className="h-7 w-72 max-w-full rounded-md" />
+            </div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#FAFBFD", borderBottom: "1px solid #E5EAF2" }}>
+                  {[0, 1, 2, 3].map((i) => (
+                    <th key={i} style={thStyle}>
+                      <Sk soft className="h-2.5 w-16" />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid #F0F4FA" }}>
+                    {[0, 1, 2, 3].map((c) => (
+                      <td key={c} style={tdStyle}>
+                        <Sk soft className={c === 0 ? "h-3.5 w-36" : "h-3 w-20"} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : !bank ? (
           <div
@@ -242,11 +277,15 @@ export default function BankDetailPage() {
                 </thead>
                 <tbody>
                   {isBranchesLoading ? (
-                    <tr>
-                      <td colSpan={4} style={{ padding: 28, textAlign: "center" }}>
-                        <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
-                      </td>
-                    </tr>
+                    Array.from({ length: 6 }).map((_, i) => (
+                      <tr key={`sk-${i}`} style={{ borderBottom: "1px solid #F0F4FA" }}>
+                        {[0, 1, 2, 3].map((c) => (
+                          <td key={c} style={tdStyle}>
+                            <Sk soft className={c === 0 ? "h-3.5 w-40" : "h-3 w-20"} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
                   ) : filteredBranches.length === 0 ? (
                     <tr>
                       <td

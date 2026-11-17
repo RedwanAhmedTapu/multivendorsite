@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { HeaderSkeleton, PageSkeleton, Sk } from "@/components/admin/ui/AdminSkeletons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -140,7 +140,37 @@ export default function ThemePalettesPage() {
   );
 
   if (permissionsLoading) {
-    return <div className="p-8 text-sm text-gray-500">Loading…</div>;
+    return (
+      <PageSkeleton>
+        <HeaderSkeleton actions={1} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Sk className="h-10 w-full rounded-lg sm:w-72" />
+          <Sk className="h-9 w-56 rounded-lg" />
+          <Sk className="ml-auto h-9 w-32 rounded-lg" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <Sk className="h-4 w-32" />
+                <Sk soft className="h-5 w-16 rounded-full" />
+              </div>
+              <div className="flex gap-1.5">
+                {Array.from({ length: 6 }).map((_, s) => (
+                  <Sk key={s} soft className="h-8 flex-1 rounded-md" />
+                ))}
+              </div>
+              <Sk soft className="h-3 w-2/3" />
+              <Sk soft className="h-3 w-1/3" />
+              <div className="flex items-center justify-between pt-1">
+                <Sk className="h-7 w-24 rounded-md" />
+                <Sk soft className="h-7 w-8 rounded-md" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </PageSkeleton>
+    );
   }
   if (!me || !allowed) {
     return (
@@ -268,12 +298,24 @@ export default function ThemePalettesPage() {
 
       {/* content states */}
       {palettesQuery.isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {[0, 1, 2].map((i) => (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Loading palettes">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-4 w-2/3" />
-              <Skeleton className="h-4 w-1/3" />
+              <div className="flex items-center justify-between gap-3">
+                <Sk className="h-4 w-32" />
+                <Sk soft className="h-5 w-16 rounded-full" />
+              </div>
+              <div className="flex gap-1.5">
+                {Array.from({ length: 6 }).map((_, s) => (
+                  <Sk key={s} soft className="h-8 flex-1 rounded-md" />
+                ))}
+              </div>
+              <Sk soft className="h-3 w-2/3" />
+              <Sk soft className="h-3 w-1/3" />
+              <div className="flex items-center justify-between pt-1">
+                <Sk className="h-7 w-24 rounded-md" />
+                <Sk soft className="h-7 w-8 rounded-md" />
+              </div>
             </div>
           ))}
         </div>

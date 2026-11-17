@@ -3,8 +3,8 @@
 
 import { useGetOfferByIdQuery } from "@/features/offerApi";
 import { use } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
 import { EditOfferPage } from "@/components/admin/offers/edit-offer-dialog";
+import { PageSkeleton, Sk } from "@/components/admin/ui/AdminSkeletons";
 
 interface EditOfferRouteProps {
   params: Promise<{
@@ -14,42 +14,52 @@ interface EditOfferRouteProps {
 
 function LoadingState() {
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <PageSkeleton>
       <div className="flex items-center gap-4">
-        <Skeleton className="h-10 w-24" />
+        <Sk className="h-10 w-24 rounded-lg" />
         <div className="space-y-2">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-96" />
+          <Sk className="h-8 w-64 max-w-full" />
+          <Sk soft className="h-4 w-96 max-w-full" />
         </div>
       </div>
-      
-      {/* Progress Steps Skeleton */}
-      <div className="flex items-center justify-between max-w-2xl mx-auto">
+
+      {/* Progress steps */}
+      <div className="mx-auto flex max-w-2xl items-center justify-between">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="flex items-center">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            {i < 3 && <Skeleton className="w-16 h-0.5 mx-4" />}
+            <Sk className="h-8 w-8 rounded-full" />
+            {i < 3 && <Sk soft className="mx-4 h-0.5 w-16" />}
           </div>
         ))}
       </div>
 
-      {/* Tabs Skeleton */}
-      <div className="max-w-2xl mx-auto">
-        <Skeleton className="h-12 w-full" />
+      <div className="mx-auto max-w-2xl">
+        <Sk className="h-12 w-full rounded-xl" />
       </div>
 
-      {/* Content Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Skeleton className="h-64 w-full rounded-lg" />
-          <Skeleton className="h-48 w-full rounded-lg" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
+            <Sk className="h-4 w-40" />
+            <Sk soft className="h-40 w-full rounded-lg" />
+          </div>
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
+            <Sk className="h-4 w-32" />
+            <Sk soft className="h-28 w-full rounded-lg" />
+          </div>
         </div>
         <div className="space-y-6">
-          <Skeleton className="h-32 w-full rounded-lg" />
-          <Skeleton className="h-48 w-full rounded-lg" />
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
+            <Sk className="h-4 w-24" />
+            <Sk soft className="h-16 w-full rounded-lg" />
+          </div>
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
+            <Sk className="h-4 w-24" />
+            <Sk soft className="h-28 w-full rounded-lg" />
+          </div>
         </div>
       </div>
-    </div>
+    </PageSkeleton>
   );
 }
 

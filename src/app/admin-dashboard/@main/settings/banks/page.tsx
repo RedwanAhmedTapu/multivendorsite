@@ -37,6 +37,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 
 /* ─── Small reusable bits, compact sizing ────────────────────────────────── */
 
@@ -1001,11 +1002,15 @@ function BranchesTable({
             </thead>
             <tbody>
               {isLoading ? (
-                <tr>
-                  <td colSpan={5} style={{ padding: 24, textAlign: "center" }}>
-                    <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
-                  </td>
-                </tr>
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={`sk-${i}`} style={{ borderBottom: "1px solid #F0F4FA" }}>
+                    {Array.from({ length: 5 }).map((_, c) => (
+                      <td key={c} style={{ padding: "9px 12px" }}>
+                        <Sk soft className={c === 0 ? "h-3.5 w-40" : "h-3 w-20"} />
+                      </td>
+                    ))}
+                  </tr>
+                ))
               ) : branches.length === 0 ? (
                 <tr>
                   <td
@@ -1379,14 +1384,15 @@ export default function BankListPage() {
                   </thead>
                   <tbody>
                     {isLoading ? (
-                      <tr>
-                        <td colSpan={6} style={{ padding: 24, textAlign: "center" }}>
-                          <Loader2
-                            size={16}
-                            style={{ animation: "spin 1s linear infinite" }}
-                          />
-                        </td>
-                      </tr>
+                      Array.from({ length: 6 }).map((_, i) => (
+                        <tr key={`sk-${i}`} style={{ borderBottom: "1px solid #F0F4FA" }}>
+                          {Array.from({ length: 6 }).map((_, c) => (
+                            <td key={c} style={{ padding: "9px 12px" }}>
+                              <Sk soft className={c === 0 ? "h-3.5 w-40" : "h-3 w-20"} />
+                            </td>
+                          ))}
+                        </tr>
+                      ))
                     ) : paginatedBanks.length === 0 ? (
                       <tr>
                         <td

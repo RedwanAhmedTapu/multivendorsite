@@ -19,6 +19,7 @@ import {
   Tag,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 
 // NOTE: the backend only exposes create / bulkCreate / remove for the
 // brand catalog (see BrandCatalogService + routes) — there is no update
@@ -386,8 +387,31 @@ export default function AdminBrandCatalogPage() {
 
         {/* ── Table ── */}
         {isLoading ? (
-          <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
-            <Loader2 size={22} color="#1D4ED8" style={{ animation: "spin 1s linear infinite" }} />
+          <div style={{ background: "#fff", border: "1.5px solid #E5EAF2", borderRadius: 14, overflow: "hidden" }} aria-busy="true" aria-label="Loading brand names">
+            <div
+              className="catalog-table-header"
+              style={{ display: "grid", gridTemplateColumns: "2.5fr 1fr auto", gap: 10, padding: "10px 16px", background: "#FAFBFD", borderBottom: "1px solid #F0F4FA" }}
+            >
+              <Sk className="h-2.5 w-20" />
+              <Sk className="h-2.5 w-12" />
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <Sk className="h-2.5 w-14" />
+              </div>
+            </div>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="catalog-row"
+                style={{ display: "grid", gridTemplateColumns: "2.5fr 1fr auto", gap: 10, padding: "10px 16px", borderBottom: "1px solid #F0F4FA", alignItems: "center" }}
+              >
+                <Sk soft className="h-3.5 w-44" />
+                <Sk soft className="h-3 w-20" />
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                  <Sk className="h-7 w-14 rounded-md" />
+                  <Sk className="h-7 w-10 rounded-md" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : entries.length === 0 ? (
           <div

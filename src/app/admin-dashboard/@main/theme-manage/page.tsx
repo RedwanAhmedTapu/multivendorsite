@@ -23,6 +23,7 @@ import {
   Loader2,
   Info
 } from 'lucide-react';
+import { CardsSkeleton, HeaderSkeleton, PageSkeleton, StatsSkeleton } from '@/components/admin/ui/AdminSkeletons';
 
 const ThemeManager = () => {
   const [selectedLayout, setSelectedLayout] = useState<LayoutType | null>(null);
@@ -84,12 +85,11 @@ const ThemeManager = () => {
   // Loading state
   if (themesLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-slate-600 text-lg">Loading themes...</p>
-        </div>
-      </div>
+      <PageSkeleton>
+        <HeaderSkeleton actions={1} />
+        <StatsSkeleton count={3} cols="sm:grid-cols-3" />
+        <CardsSkeleton count={6} height="h-32" />
+      </PageSkeleton>
     );
   }
 

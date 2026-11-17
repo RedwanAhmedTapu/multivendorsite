@@ -1,10 +1,5 @@
-import ApprovalVendor from '@/components/vendor-management/ApprovalVendor'
-import React from 'react'
+import VendorDirectory from "@/components/vendor-management/VendorDirectory";
 
-const page = () => {
-  return (
-    <ApprovalVendor/>
-  )
+export default function Page() {
+  return <VendorDirectory />;
 }
-
-export default page

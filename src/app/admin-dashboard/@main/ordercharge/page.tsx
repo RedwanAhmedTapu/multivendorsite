@@ -17,6 +17,7 @@ import {
   ChargeAppliesTo,
   type OrderChargeType,
 } from "@/features/orderChargeapi";
+import { TableSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -714,10 +715,7 @@ export default function OrderChargesPage() {
           {/* Table */}
           <div className="overflow-x-auto">
             {isLoading ? (
-              <div className="flex items-center justify-center py-20 gap-2 text-cyan-500">
-                <Loader2 size={22} className="animate-spin" />
-                <span className="text-sm font-medium">Loading charges...</span>
-              </div>
+              <TableSkeleton rows={6} cols={7} />
             ) : charges.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-300">
                 <ReceiptText size={40} className="mb-3 opacity-30" />

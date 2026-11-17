@@ -36,6 +36,7 @@ import {
   Download,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import {
   useGetCategoriesQuery,
   useCreateAttributeMutation,
@@ -951,9 +952,30 @@ const AttributesTab: React.FC<AttributesTabProps> = ({ selectedChildId }) => {
 
   if (categoriesLoading || attributesLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 space-y-4">
-        <Loader2 className="h-12 w-12 animate-spin text-teal-500" />
-        <p className="text-gray-500">Loading attributes...</p>
+      <div aria-busy="true" aria-label="Loading attributes" className="space-y-4 pb-4">
+        <Sk className="h-12 w-full rounded-xl" />
+        <div className="flex items-center gap-2">
+          <Sk className="h-8 w-28 rounded-lg bg-slate-300/70" />
+          <Sk className="h-8 w-32 rounded-lg" />
+          <Sk className="h-8 w-36 rounded-lg" />
+        </div>
+        <div className="rounded-xl border border-slate-200">
+          <div className="flex items-center gap-4 border-b bg-slate-50/60 px-4 py-3">
+            <Sk soft className="h-2.5 w-32" />
+            <Sk soft className="ml-auto h-2.5 w-20" />
+            <Sk soft className="h-2.5 w-16" />
+          </div>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 border-b px-4 py-3 last:border-b-0">
+              <div className="flex-1 space-y-1.5">
+                <Sk className={i % 2 ? "h-3 w-1/4" : "h-3 w-1/3"} />
+                <Sk soft className="h-2.5 w-1/5" />
+              </div>
+              <Sk className="h-5 w-16 rounded-full" />
+              <Sk soft className="h-3 w-10" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

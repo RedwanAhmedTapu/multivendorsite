@@ -7,6 +7,7 @@ import { useLoginMutation } from "@/features/authApi";
 import { useDispatch } from "react-redux";
 import { setCredentials as setReduxCredentials } from "@/features/authSlice";
 import { useRouter } from "next/navigation";
+import MfaChallengeModal from "@/components/auth/MfaChallengeModal";
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -33,6 +34,10 @@ export function LoginModal({
   const [phoneError, setPhoneError] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [mfaChallenge, setMfaChallenge] = useState<{
+    challengeId: string;
+    enrollmentRequired: boolean;
+  } | null>(null);
 
   const dispatch = useDispatch();
   const [login, { isLoading }] = useLoginMutation();
@@ -45,6 +50,7 @@ export function LoginModal({
       setError("");
       setSuccess("");
       setPhoneError("");
+      setMfaChallenge(null);
     }
   }, [isOpen]);
 
@@ -140,58 +146,90 @@ export function LoginModal({
         password: credentials.password,
       }).unwrap();
 
-      dispatch(
-        setReduxCredentials({
-          user: response.user,
-          accessToken: response.accessToken || "",
-        })
-      );
-
-      setSuccess("Login successful! Redirecting...");
-
-      // Call success callback if provided
-      if (onLoginSuccess) {
-        onLoginSuccess();
+      // MFA gate: a protected account returns a challenge instead of tokens.
+      if (response.mfaRequired && response.challengeId) {
+        setMfaChallenge({
+          challengeId: response.challengeId,
+          enrollmentRequired: !!response.enrollmentRequired,
+        });
+        return;
       }
 
-      // Close modal after successful login
-      setTimeout(() => {
-        onClose();
-        
-        // Redirect if path provided
-        if (redirectPath) {
-          router.push(redirectPath);
-        } else {
-          // Role-based navigation
-          const userRole = response.user?.role;
-          const userId = response.user?.id;
-
-          if (userRole === "CUSTOMER") {
-            router.push(`/user-dashboard?userid=${userId}`);
-          } else if (userRole === "VENDOR") {
-            router.push("/vendor-dashboard");
-          } else if (userRole === "ADMIN") {
-            router.push("/admin-dashboard");
-          } else if (userRole === "EMPLOYEE") {
-            // Employees have no standalone dashboard — send them to their HR
-            // self-service page on the side their account belongs to.
-            router.push(
-              response.user?.employee?.vendorId
-                ? "/vendor-dashboard/hrm/my-profile"
-                : "/admin-dashboard/employees/hrm/my-profile"
-            );
-          } else {
-            router.push("/dashboard");
-          }
-        }
-      }, 1500);
+      completeLogin(response);
 
     } catch (error: any) {
       setError(error.data?.message || error.message || "Unable to sign in. Please try again.");
     }
   };
 
+  // Shared post-authentication handler (direct login or after MFA verify).
+  const completeLogin = (response: any) => {
+    dispatch(
+      setReduxCredentials({
+        user: response.user,
+        accessToken: response.accessToken || "",
+      })
+    );
+
+    setSuccess("Login successful! Redirecting...");
+
+    // Call success callback if provided
+    if (onLoginSuccess) {
+      onLoginSuccess();
+    }
+
+    // Close modal after successful login
+    setTimeout(() => {
+      onClose();
+
+      // Redirect if path provided
+      if (redirectPath) {
+        router.push(redirectPath);
+      } else {
+        // Role-based navigation
+        const userRole = response.user?.role;
+        const userId = response.user?.id;
+
+        if (userRole === "CUSTOMER") {
+          router.push(`/user-dashboard?userid=${userId}`);
+        } else if (userRole === "VENDOR") {
+          router.push("/vendor-dashboard");
+        } else if (userRole === "ADMIN") {
+          router.push("/admin-dashboard");
+        } else if (userRole === "EMPLOYEE") {
+          // Employees have no standalone dashboard — send them to their HR
+          // self-service page on the side their account belongs to.
+          router.push(
+            response.user?.employee?.vendorId
+              ? "/vendor-dashboard/hrm/my-profile"
+              : "/admin-dashboard/employees/hrm/my-profile"
+          );
+        } else {
+          router.push("/dashboard");
+        }
+      }
+    }, 1500);
+  };
+
   if (!isOpen) return null;
+
+  if (mfaChallenge) {
+    return (
+      <MfaChallengeModal
+        challengeId={mfaChallenge.challengeId}
+        enrollmentRequired={mfaChallenge.enrollmentRequired}
+        onSuccess={(response) => {
+          setMfaChallenge(null);
+          completeLogin(response);
+        }}
+        onCancel={() => setMfaChallenge(null)}
+        showError={(_title, message) => {
+          setMfaChallenge(null);
+          setError(message);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">

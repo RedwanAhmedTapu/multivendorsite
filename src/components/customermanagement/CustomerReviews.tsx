@@ -34,6 +34,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import { toast } from "sonner";
 
 // ------------------------------
@@ -146,11 +147,22 @@ export default function CustomerReviewManagement() {
 
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-6">
-                      Loading customers...
-                    </TableCell>
-                  </TableRow>
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={`sk-${i}`}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Sk soft className="h-8 w-8 rounded-full" />
+                          <div className="space-y-1.5">
+                            <Sk soft className="h-3 w-32" />
+                            <Sk soft className="h-2.5 w-40" />
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell><Sk className="h-5 w-20 rounded-full" /></TableCell>
+                      <TableCell><Sk soft className="h-3 w-24" /></TableCell>
+                      <TableCell><Sk className="ml-auto h-7 w-24 rounded-md" /></TableCell>
+                    </TableRow>
+                  ))
                 ) : customers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-6">
@@ -219,9 +231,21 @@ export default function CustomerReviewManagement() {
           </DialogHeader>
 
           {reviewsLoading ? (
-            <div className="py-6 text-center">
-              <Loader2 className="inline-block mr-2 animate-spin" />
-              Loading reviews...
+            <div aria-busy="true" aria-label="Loading reviews" className="space-y-3 py-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="space-y-2 rounded-lg border border-slate-100 p-3">
+                  <div className="flex items-center gap-2">
+                    <Sk soft className="h-8 w-8 rounded-full" />
+                    <div className="space-y-1.5">
+                      <Sk soft className="h-3 w-32" />
+                      <Sk soft className="h-2.5 w-20" />
+                    </div>
+                    <Sk className="ml-auto h-5 w-16 rounded-full" />
+                  </div>
+                  <Sk soft className="h-2.5 w-full" />
+                  <Sk soft className="h-2.5 w-4/5" />
+                </div>
+              ))}
             </div>
           ) : reviewsList.length === 0 ? (
             <div className="py-6 text-center text-muted-foreground">

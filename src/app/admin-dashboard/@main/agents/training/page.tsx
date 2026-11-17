@@ -15,6 +15,7 @@ import {
   type TrainingResource,
 } from "@/features/agentAdminApi";
 import { AgentAdminHeader, Btn, Empty, FieldRow, Modal, Panel, Pill, fmtDate, inputCls, tdCls, thCls } from "@/components/agent-admin/AgentAdminUI";
+import { TableSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 type Draft = { category: string; title: string; summary: string; body: string; url: string; coverImage: string; isFeatured: boolean; isPublished: boolean };
 const EMPTY: Draft = { category: "", title: "", summary: "", body: "", url: "", coverImage: "", isFeatured: false, isPublished: false };
@@ -98,7 +99,7 @@ export default function AgentTrainingPage() {
         {isError ? (
           <p className="p-6 text-sm text-red-600">{apiErrorMessage(error)}</p>
         ) : isLoading ? (
-          <p className="p-6 text-sm text-slate-400">Loading…</p>
+          <TableSkeleton rows={6} cols={5} />
         ) : !data?.items.length ? (
           <Empty title="No training resources yet" text="Create one to help agents onboard vendors." />
         ) : (

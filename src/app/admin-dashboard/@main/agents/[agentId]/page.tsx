@@ -20,6 +20,7 @@ import {
   useUpdateAdminAgentMutation,
 } from "@/features/agentAdminApi";
 import { AgentAdminHeader, Btn, Empty, FieldRow, Modal, Panel, Pill, STATUS_TONE, bdt, fmtDate, fmtDateTime, inputCls, tdCls, thCls } from "@/components/agent-admin/AgentAdminUI";
+import { DetailSkeleton, PageSkeleton, Sk } from "@/components/admin/ui/AdminSkeletons";
 
 type Action = "approve" | "suspend" | "reactivate" | "deactivate";
 const ACTION_META: Record<Action, { label: string; needsReason: boolean; variant: "success" | "danger" | "outline"; text: string }> = {
@@ -70,7 +71,13 @@ export default function AdminAgentDetailPage() {
     if (data) setProfile({ name: data.agent.name, phone: data.agent.phone ?? "", levelId: data.agent.level?.id ?? "" });
   }, [data]);
 
-  if (isLoading) return <p className="p-8 text-sm text-slate-400">Loading…</p>;
+  if (isLoading) {
+    return (
+      <PageSkeleton>
+        <DetailSkeleton stats={4} />
+      </PageSkeleton>
+    );
+  }
   if (error || !data) {
     return (
       <div className="mx-auto max-w-screen-xl px-4 py-8 sm:px-6">
@@ -438,7 +445,14 @@ function WalletPanel({ agentId }: { agentId: string }) {
       {isError ? (
         <p className="p-5 text-sm text-red-600">{apiErrorMessage(error)}</p>
       ) : !w ? (
-        <p className="p-5 text-sm text-slate-400">Loading…</p>
+        <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Sk className="h-2.5 w-20" />
+              <Sk className="h-4 w-24" />
+            </div>
+          ))}
+        </div>
       ) : (
         <>
           <dl className="grid grid-cols-2 gap-3 p-5 text-sm sm:grid-cols-5">

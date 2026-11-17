@@ -14,6 +14,11 @@ export interface Vendor {
   currentCommissionRate?: number;
   createdAt: string;
   updatedAt: string;
+  verificationStatus?: "PENDING" | "UNDER_REVIEW" | "VERIFIED" | "REJECTED" | "SUSPENDED";
+  verifiedAt?: string | null;
+  rejectedAt?: string | null;
+  rejectionReason?: string | null;
+  accountType?: "INDIVIDUAL" | "BUSINESS";
   user?: {
     id: string;
     email?: string;
@@ -28,10 +33,18 @@ export interface Vendor {
     avgRating: number;
     lastCalculatedAt?: string | null;
   };
+  // Included by GET /vendormanagement (list) and complete-profile.
+  personalInfo?: VendorPersonalInfo | null;
+  pickupAddress?: VendorAddress | null;
+  subscription?: VendorSubscription | null;
+  onboarding?: VendorOnboardingStatus | null;
+  documents?: VendorDocument[];
+  paymentAccounts?: VendorPaymentAccount[];
   _count?: {
     products: number;
     orders: number;
     flags: number;
+    documents?: number;
     monthlyCharges?: number;
     offers?: [];
   };
@@ -124,10 +137,34 @@ export interface VendorFilterQuery {
   commissionMax?: number;
   createdFrom?: string;
   createdTo?: string;
+  /** Subscription plan. "NONE" = vendors without a subscription row. */
+  planType?: "FREE" | "BASIC" | "PREMIUM" | "ENTERPRISE" | "NONE";
+  /** Payout rule cycle. "NONE" = vendors without a payout rule override. */
+  payoutCycle?: "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "QUARTERLY" | "CUSTOM" | "NONE";
   page?: number;
   limit?: number;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+}
+
+export interface VendorQuarterInsights {
+  quarter: { key: string; from: string; to: string; toExclusive: boolean };
+  currency: string;
+  /** Σ VendorOrder.subtotal for DELIVERED rows bucketed by deliveredAt. */
+  gmv: number;
+  /** Net commission income (credits − debits); commission VAT excluded. */
+  platformTake: number;
+  coverage: {
+    deliveredOrders: number;
+    ledgerEntries: number;
+    ledgerFrom: string | null;
+    ledgerTo: string | null;
+  };
+}
+
+export interface VendorInsightsResponse {
+  success: boolean;
+  data: VendorQuarterInsights;
 }
 
 export interface VendorPerformanceMetrics {
@@ -374,7 +411,8 @@ export interface VendorDocument {
 }
 
 export interface VendorSubscriptionRequest {
-  planType: "FREE" | "BASIC" | "PRO" | "ENTERPRISE";
+  // Matches the Prisma SubscriptionPlan enum (FREE | BASIC | PREMIUM | ENTERPRISE).
+  planType: "FREE" | "BASIC" | "PREMIUM" | "ENTERPRISE";
   isActive: boolean;
 }
 
@@ -385,6 +423,12 @@ export interface VendorSubscription {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  // Dynamic subscription platform fields (null on legacy rows).
+  status?: "PENDING" | "ACTIVE" | "EXPIRED" | "CANCELLED" | "SUSPENDED" | null;
+  packageId?: string | null;
+  startedAt?: string | null;
+  expiresAt?: string | null;
+  autoRenew?: boolean;
 }
 
 export interface VendorSettingsRequest {
@@ -650,6 +694,16 @@ export const vendorManageApi = createApi({
         url: "/vendormanagement",
         method: "GET",
         params,
+      }),
+      providesTags: ["Vendor"],
+    }),
+
+    // Platform-wide quarterly KPIs (admin only)
+    getVendorInsights: builder.query<VendorInsightsResponse, { quarter?: string } | void>({
+      query: (params) => ({
+        url: "/vendormanagement/insights",
+        method: "GET",
+        ...(params?.quarter ? { params: { quarter: params.quarter } } : {}),
       }),
       providesTags: ["Vendor"],
     }),
@@ -1627,6 +1681,7 @@ export const {
   // Vendor CRUD
   useCreateVendorMutation,
   useGetVendorsQuery,
+  useGetVendorInsightsQuery,
   useGetVendorByIdQuery,
   useUpdateVendorProfileMutation,
   useUpdateVendorStatusMutation,

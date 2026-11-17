@@ -22,6 +22,7 @@ import {
 } from "@/features/posSubscriptionAdminApi";
 import { ENTITLEMENT_LABEL, SOURCE_LABEL, durationText, formatDate, formatTaka } from "@/lib/pos/subscription-view";
 import { validateLifecycleForm } from "@/lib/pos/admin-subscription";
+import { HeaderSkeleton, PageSkeleton, Sk, TableSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 const card = "rounded-[20px] border border-[#e4e1ff] bg-white p-4 shadow-[0_6px_20px_rgba(79,70,229,0.08)]";
 const input = "h-11 w-full rounded-[12px] border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] px-3 text-sm text-[#1e1b4b] placeholder:text-[#64748b] focus:border-[#7c3aed] focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/40";
@@ -46,7 +47,25 @@ export default function PosSubscriptionsAdminPage() {
   const isAdmin = meRes?.data?.role === "ADMIN";
   const [tab, setTab] = useState<"vendors" | "plans" | "policy">("vendors");
 
-  if (isLoading) return <div className={card}>Loading…</div>;
+  if (isLoading) {
+    return (
+      <PageSkeleton>
+        <HeaderSkeleton actions={0} tabs={3} />
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
+          <div className="overflow-hidden rounded-[20px] border border-[#e4e1ff] bg-white">
+            <TableSkeleton rows={8} cols={6} />
+          </div>
+          <div className={`${card} space-y-3 p-4`}>
+            <Sk className="h-4 w-40" />
+            <Sk soft className="h-2.5 w-52" />
+            <Sk soft className="h-16 w-full rounded-lg" />
+            <Sk soft className="h-3 w-32" />
+            <Sk soft className="h-8 w-full rounded-lg" />
+          </div>
+        </div>
+      </PageSkeleton>
+    );
+  }
   if (!can("posSubscriptionManagement")) {
     return <div className={card}><p className="text-sm text-[#3D5068]">You don&apos;t have POS subscription management permission.</p></div>;
   }
@@ -117,7 +136,7 @@ function VendorsTab() {
             <option value="SUSPENDED">Status: suspended</option>
           </select>
         </div>
-        {list.isLoading ? <p className="p-4 text-sm text-[#7A90AB]">Loading…</p> : list.isError ? (
+        {list.isLoading ? <TableSkeleton rows={8} cols={6} /> : list.isError ? (
           <p role="alert" className="p-4 text-sm text-rose-600">{errText(list.error)}</p>
         ) : rows.length === 0 ? <p className="p-4 text-sm text-[#7A90AB]">No vendors match.</p> : (
           <div className="overflow-x-auto">
@@ -179,7 +198,30 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
     }
   };
 
-  if (d.isLoading) return <div className={card}>Loading…</div>;
+  if (d.isLoading) {
+    return (
+      <div className={`${card} space-y-4`} aria-busy="true" aria-label="Loading vendor POS detail">
+        <div className="space-y-2">
+          <Sk className="h-4 w-40" />
+          <Sk soft className="h-2.5 w-52" />
+          <Sk soft className="h-5 w-28 rounded-full" />
+        </div>
+        <div className="space-y-3 rounded-xl bg-[#FAFBFD] p-3 ring-1 ring-[#EEF2F7]">
+          <Sk soft className="h-2.5 w-16" />
+          <Sk className="h-11 w-full rounded-xl" />
+          <Sk soft className="h-2.5 w-24" />
+          <Sk className="h-11 w-full rounded-xl" />
+          <Sk className="h-16 w-full rounded-xl" />
+          <Sk className="h-11 w-32 rounded-xl" />
+        </div>
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Sk key={i} soft className="h-9 w-full rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (d.isError || !detail) return <div className={card}><p role="alert" className="text-sm text-rose-600">{errText(d.error)}</p></div>;
   const s = detail.subscription;
   return (
@@ -283,7 +325,7 @@ function PlansTab({ isAdmin }: { isAdmin: boolean }) {
 `}</style>
       <div className="pos-inner space-y-4">
       <section className={card} aria-label="Plans">
-        {plans.isLoading ? <p className="text-sm text-[#7A90AB]">Loading…</p> : !plans.data?.data?.length ? <p className="text-sm text-[#7A90AB]">No plans yet. Vendors can&apos;t buy until a plan exists.</p> : (
+        {plans.isLoading ? <TableSkeleton rows={4} cols={5} /> : !plans.data?.data?.length ? <p className="text-sm text-[#7A90AB]">No plans yet. Vendors can&apos;t buy until a plan exists.</p> : (
           <table className="w-full text-sm">
             <thead><tr className="text-left text-[11px] uppercase tracking-wide text-[#7A90AB]"><th className="py-2">Plan</th><th>Price</th><th>Duration</th><th>Status</th><th /></tr></thead>
             <tbody className="divide-y divide-[#EEF2F7]">
@@ -330,7 +372,19 @@ function PolicyTab({ isAdmin }: { isAdmin: boolean }) {
     const p = pol.data?.data;
     if (p && !form) setForm({ trialEnabled: p.trialEnabled, trialDays: p.trialDays ? String(p.trialDays) : "", graceDays: String(p.graceDays) });
   }, [pol.data, form]);
-  if (pol.isLoading || !form) return <div className={card}>Loading…</div>;
+  if (pol.isLoading || !form) {
+    return (
+      <div className={`${card} max-w-lg space-y-3`} aria-busy="true" aria-label="Loading trial policy">
+        <Sk soft className="h-3.5 w-72 max-w-full" />
+        <Sk className="h-11 w-full rounded-xl" />
+        <Sk soft className="h-3.5 w-56" />
+        <Sk className="h-11 w-full rounded-xl" />
+        <Sk soft className="h-3.5 w-52" />
+        <Sk className="h-11 w-full rounded-xl" />
+        <Sk className="h-11 w-32 rounded-xl" />
+      </div>
+    );
+  }
   const submit = async () => {
     setMsg(null);
     try {

@@ -16,6 +16,7 @@ import {
   type AdminWithdrawalStatus,
 } from "@/features/agentAdminApi";
 import { AgentAdminHeader, Btn, Empty, FieldRow, Modal, Panel, Pill, bdt, fmtDateTime, inputCls, tdCls, thCls, type Tone } from "@/components/agent-admin/AgentAdminUI";
+import { ModalSkeleton, TableSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 const STATUSES: Array<{ value: AdminWithdrawalStatus | ""; label: string }> = [
   { value: "REQUESTED", label: "Requested" },
@@ -95,7 +96,7 @@ export default function AgentWithdrawalsPage() {
         {isError ? (
           <p className="p-6 text-sm text-red-600">{apiErrorMessage(error)}</p>
         ) : isLoading ? (
-          <p className="p-6 text-sm text-slate-400">Loading…</p>
+          <TableSkeleton rows={7} cols={6} />
         ) : !data?.items.length ? (
           <Empty title="No withdrawals here" text="Agents request withdrawals from their wallet in the agent portal." />
         ) : (
@@ -230,7 +231,7 @@ function WithdrawalDialog({ id, onClose }: { id: string; onClose: () => void }) 
       {isError ? (
         <p className="text-sm text-red-600">{apiErrorMessage(error)}</p>
       ) : isLoading || !w ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <ModalSkeleton rows={5} />
       ) : (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">

@@ -1,7 +1,8 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { PanelBottom, Plus, Trash2, Loader2 } from "lucide-react";
+import { PanelBottom, Plus, Trash2 } from "lucide-react";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import { useGetBlogFooterQuery, useUpsertBlogFooterMutation, type BlogFooterColumn } from "@/features/blogApi";
 import { SectionCard, FieldLabel, TextInput, TextArea, PrimaryButton, SecondaryButton, IconButton, COLORS } from "./ui";
 
@@ -91,9 +92,21 @@ export default function FooterTab() {
 
   if (isLoading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: COLORS.muted, fontSize: 13, padding: 24 }}>
-        <Loader2 size={16} style={{ animation: "fm-blogadmin-spin 1s linear infinite" }} />
-        Loading footer…
+      <div aria-busy="true" aria-label="Loading footer" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {Array.from({ length: 2 }).map((_, section) => (
+          <div key={section} style={{ borderRadius: 12, border: `1px solid ${COLORS.cardBorder}`, background: "#fff", padding: 18 }}>
+            <Sk className="h-4 w-40" />
+            <Sk soft className="mt-2 h-2.5 w-64 max-w-full" />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14, marginTop: 16 }}>
+              {Array.from({ length: 3 }).map((_, field) => (
+                <div key={field} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <Sk soft className="h-2.5 w-20" />
+                  <Sk className="h-9 w-full rounded-lg" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }

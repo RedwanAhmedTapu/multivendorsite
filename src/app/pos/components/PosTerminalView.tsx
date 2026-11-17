@@ -103,7 +103,8 @@ export default function PosTerminalView({ staff, storeName, vendorId }: { staff:
     setPayAccountId(list.length === 1 ? list[0].id : "");
   };
   const [showPicker, setShowPicker] = useState(false);
-  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  // null = closed; editData null = add; focusLoan opens the Loan/Credit tab.
+  const [customerModal, setCustomerModal] = useState<null | { editData: PosCustomer | null; focusLoan?: boolean }>(null);
   const [receipt, setReceipt] = useState<{ sale: PosSale; change: number } | null>(null);
   const [toast, setToast] = useState("");
   const [confirm, setConfirm] = useState<null | { kind: "due" | "change"; amount: number }>(null);
@@ -414,6 +415,23 @@ export default function PosTerminalView({ staff, storeName, vendorId }: { staff:
                 <span className="font-mono text-xs font-extrabold text-amber-700">{fmt(est.due)}</span>
               </div>
             )}
+            {est.due > 0 && customer && !credit.hasFacility &&
+              (canCredit ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <div className="text-[9px] font-bold text-amber-600 mb-1.5">⚠ No Credit Facility</div>
+                  <button
+                    onClick={() => setCustomerModal({ editData: customer, focusLoan: true })}
+                    className="w-full py-1.5 bg-blue-600 text-white text-[10px] font-bold rounded-lg hover:bg-blue-700 transition-all"
+                  >
+                    💳 Enable Loan for {customer.name}
+                  </button>
+                </div>
+              ) : (
+                <div role="alert" className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <div className="text-[10px] font-bold text-red-600">🚫 No Credit Facility</div>
+                  <div className="text-[9px] text-red-500 mt-0.5">Contact Admin to enable credit.</div>
+                </div>
+              ))}
             {est.change > 0 && (
               <div className="flex justify-between items-center bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
                 <span className="text-[10px] font-bold text-blue-600">Change to return</span>
@@ -434,11 +452,17 @@ export default function PosTerminalView({ staff, storeName, vendorId }: { staff:
         <CustomerPickerModal
           onClose={() => setShowPicker(false)}
           onSelect={(c) => { setCustomer(c); setShowPicker(false); }}
-          onAddNew={() => { setShowPicker(false); setShowNewCustomer(true); }}
+          onAddNew={() => { setShowPicker(false); setCustomerModal({ editData: null }); }}
         />
       )}
-      {showNewCustomer && (
-        <CustomerFormModal canSetCredit={canCredit} onClose={() => setShowNewCustomer(false)} onSaved={(c) => { setCustomer(c); setShowNewCustomer(false); }} />
+      {customerModal && (
+        <CustomerFormModal
+          editData={customerModal.editData}
+          focusLoan={customerModal.focusLoan}
+          canSetCredit={canCredit}
+          onClose={() => setCustomerModal(null)}
+          onSaved={(c) => { setCustomer(c); setCustomerModal(null); showToast("✅ Customer saved"); }}
+        />
       )}
 
       {confirm && (

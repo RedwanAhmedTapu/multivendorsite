@@ -10,12 +10,21 @@ import { use } from "react";
 import { ShieldAlert } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PaletteEditor } from "@/components/admin/theme-palettes/PaletteEditor";
+import { FormSkeleton, HeaderSkeleton, PageSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 export default function ThemePaletteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { me, isLoading, can } = usePermissions();
 
-  if (isLoading) return <div className="p-8 text-sm text-gray-500">Loading…</div>;
+  if (isLoading) {
+    return (
+      <PageSkeleton>
+        <HeaderSkeleton actions={3} />
+        <FormSkeleton sections={2} fields={4} />
+        <FormSkeleton sections={1} fields={3} footer={false} />
+      </PageSkeleton>
+    );
+  }
   if (!me || !can("themeManagement")) {
     return (
       <div className="m-6 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-6">

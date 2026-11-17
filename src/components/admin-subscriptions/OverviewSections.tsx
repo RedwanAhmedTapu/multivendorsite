@@ -14,7 +14,7 @@ export function OverviewSection({ go }: { go: (tab: string) => void }) {
   if (isError || !data) return <Notice tone="red">Couldn&apos;t load the overview. Is the subscription migration applied?</Notice>;
   const o = data.data;
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard label="Active subscribers" value={o.totals.active} hint={o.totals.grace ? `${o.totals.grace} in grace period` : "All in good standing"} icon={<Users className="h-5 w-5" />} accent="violet" />
         <StatCard label="Revenue this month" value={taka(o.totals.revenueThisMonth)} hint={`${taka(o.totals.revenue12m)} in 12 months`} icon={<Wallet className="h-5 w-5" />} accent="indigo" />
@@ -33,7 +33,7 @@ export function OverviewSection({ go }: { go: (tab: string) => void }) {
           <button className="font-semibold underline" onClick={() => go("transactions")}>Review payments</button>
         </Notice>
       )}
-      <div className="grid gap-5 xl:grid-cols-5">
+      <div className="grid gap-3 xl:grid-cols-5">
         <Card title="Subscription revenue (last 12 months)" className="xl:col-span-3">
           <MonthlyBars label="Subscription revenue by month" data={o.revenueByMonth.map((m) => ({ month: m.month, value: Number(m.revenue) }))} />
         </Card>
@@ -51,7 +51,7 @@ export function ReportsSection() {
   const o = data.data;
   const total = o.revenueByMonth.reduce((s, m) => s + Number(m.revenue), 0);
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <Card title="Revenue by plan (12 months)">
         <div className="overflow-x-auto">
           <table className={tableCls}>

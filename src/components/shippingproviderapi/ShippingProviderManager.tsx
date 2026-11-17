@@ -52,6 +52,7 @@ import {
   Power,
 } from "lucide-react";
 import { toast } from "sonner";
+import { CardsSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 interface FormState {
   name: string;
@@ -312,8 +313,8 @@ export default function ShippingProviderManager() {
 
           {/* Providers Grid */}
           {isLoading ? (
-            <div className="flex justify-center py-10">
-              <p>Loading providers...</p>
+            <div aria-busy="true" aria-label="Loading providers">
+              <CardsSkeleton count={6} height="h-28" />
             </div>
           ) : filteredProviders && filteredProviders.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -9,6 +9,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { apiErrorMessage, useAgentPayableReportQuery } from "@/features/agentAdminApi";
 import { AgentAdminHeader, Btn, Empty, Panel, Pill, STATUS_TONE, bdt, fmtDateTime, tdCls, thCls } from "@/components/agent-admin/AgentAdminUI";
+import { StatsSkeleton, TableSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 export default function AgentPayablesPage() {
   const [page, setPage] = useState(1);
@@ -26,23 +27,29 @@ export default function AgentPayablesPage() {
     <div className="mx-auto max-w-screen-xl px-4 py-6 sm:px-6">
       <AgentAdminHeader title="Payable to agents" subtitle="What FinixMart owes its agents right now, per agent. All amounts in ৳." />
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        {cards.map(([label, value, hint]) => (
-          <Panel key={label}>
-            <div className="p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
-              <p className="mt-1 text-xl font-extrabold tabular-nums text-slate-800">{bdt(value ?? "0")}</p>
-              <p className="text-[11px] text-slate-400">{hint}</p>
-            </div>
-          </Panel>
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="mb-4">
+          <StatsSkeleton count={5} cols="sm:grid-cols-2 lg:grid-cols-5" />
+        </div>
+      ) : (
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {cards.map(([label, value, hint]) => (
+            <Panel key={label}>
+              <div className="p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+                <p className="mt-1 text-xl font-extrabold tabular-nums text-slate-800">{bdt(value ?? "0")}</p>
+                <p className="text-[11px] text-slate-400">{hint}</p>
+              </div>
+            </Panel>
+          ))}
+        </div>
+      )}
 
       <Panel>
         {isError ? (
           <p className="p-6 text-sm text-red-600">{apiErrorMessage(error)}</p>
         ) : isLoading ? (
-          <p className="p-6 text-sm text-slate-400">Loading…</p>
+          <TableSkeleton rows={7} cols={6} />
         ) : !data?.items.length ? (
           <Empty title="Nothing owed" text="Agents' balances appear here once commission is earned." />
         ) : (

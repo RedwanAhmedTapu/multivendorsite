@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { usePermissions } from "../../../hooks/usePermissions";
 import { HrmWorkspaceEntry } from "@/components/hrm/HrmWorkspaceEntry";
+import { HeaderSkeleton, PanelSkeleton, Sk } from "@/components/admin/ui/AdminSkeletons";
 import { EmployeeTable } from "../components/EmployeeTable";
 import { OrgStructureManager } from "../components/OrgStructureManager";
 import { EmployeeFormModal } from "../components/EmployeeFormModal";
@@ -27,7 +28,18 @@ export default function EmployeeManagementPage({ scope }: { scope: "admin" | "ve
   const { isOwner, isLoading } = usePermissions();
   const router = useRouter();
 
-  if (isLoading) return <p className="p-6 text-sm text-gray-400">Loading…</p>;
+  if (isLoading) {
+    return (
+      <div aria-busy="true" aria-label="Loading employees" className="space-y-6">
+        <HeaderSkeleton actions={1} />
+        <div className="flex gap-1 border-b border-slate-200">
+          <Sk className="h-9 w-24 rounded-t-lg bg-indigo-100" />
+          <Sk className="h-9 w-44 rounded-t-lg" />
+        </div>
+        <PanelSkeleton rows={8} cols={6} />
+      </div>
+    );
+  }
 
   const employee360Path = (id: string) =>
     scope === "admin" ? `/admin-dashboard/employees/${id}` : `/vendor-dashboard/hrm/employees/${id}`;

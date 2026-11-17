@@ -1,231 +1,462 @@
-import React from 'react';
-import { DollarSign, Users, ShoppingCart } from 'lucide-react';
-import { HrmWorkspaceEntry } from '@/components/hrm/HrmWorkspaceEntry';
+"use client";
 
+import React, { useMemo, useState } from "react";
+import Link from "next/link";
+import {
+  DollarSign, ShoppingCart, Users, Store, Clock, PackageX,
+  RotateCcw, Truck, TrendingUp, TrendingDown, Minus, CalendarDays,
+} from "lucide-react";
+import { HrmWorkspaceEntry } from "@/components/hrm/HrmWorkspaceEntry";
+import {
+  useGetAdminDashboardSummaryQuery,
+  type DashboardPreset,
+  type DashboardQueryArgs,
+} from "@/features/adminDashboardApi";
+import {
+  ChartCard, EmptyState, fmtMoney, Sparkline, RadialGauge, MiniBars,
+  RevenueTrendChart, StatusDonut, PaymentDonut, CategoryBars, CustomerGrowthChart,
+  TopVendorsList, TopProductsList, RecentOrdersList, PendingOrdersList,
+  LowStockList, RecentPaymentsList, NewCustomersList,
+} from "@/components/admin/dashboard/DashboardWidgets";
+
+// ── delta chip ───────────────────────────────────────────────────────────────
+function Delta({ current, previous }: { current: number; previous: number }) {
+  if (!previous) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400">
+        <Minus className="h-3 w-3" /> no prior data
+      </span>
+    );
+  }
+  const pct = ((current - previous) / previous) * 100;
+  const up = pct >= 0;
+  const Icon = pct === 0 ? Minus : up ? TrendingUp : TrendingDown;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+        pct === 0 ? "bg-slate-100 text-slate-500" : up ? "bg-emerald-100/80 text-emerald-600" : "bg-rose-100/80 text-rose-600"
+      }`}
+    >
+      <Icon className="h-3 w-3" />
+      {up && pct > 0 ? "+" : ""}
+      {pct.toFixed(1)}%
+    </span>
+  );
+}
+
+// ── colorful stat card with a micro visual ───────────────────────────────────
+type Tint = {
+  card: string;      // card background + border
+  icon: string;      // icon chip gradient
+  color: string;     // accent hex (sparkline/gauge)
+};
+
+function StatCard({
+  icon: Icon, label, value, current, previous, href, tint, visual,
+}: {
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  label: string;
+  value: string;
+  current?: number;
+  previous?: number;
+  href?: string;
+  tint: Tint;
+  visual?: React.ReactNode;
+}) {
+  const body = (
+    <div
+      className={`group h-full rounded-2xl border p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_16px_-6px_rgba(79,70,229,0.18)] ${tint.card}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${tint.icon} shadow-sm`}>
+          <Icon className="h-[18px] w-[18px] text-white" />
+        </div>
+        {visual}
+      </div>
+      <p className="mt-2.5 text-[22px] font-black leading-none tracking-tight text-slate-900">{value}</p>
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        <p className="text-[12px] font-medium text-slate-500">{label}</p>
+        {current !== undefined && previous !== undefined && <Delta current={current} previous={previous} />}
+      </div>
+    </div>
+  );
+  return href ? <Link href={href}>{body}</Link> : body;
+}
+
+function StatCardSkeleton() {
+  return (
+    <div className="animate-pulse rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
+      <div className="flex justify-between">
+        <div className="h-10 w-10 rounded-xl bg-slate-100" />
+        <div className="h-12 w-24 rounded-lg bg-slate-50" />
+      </div>
+      <div className="mt-2.5 h-6 w-24 rounded bg-slate-100" />
+      <div className="mt-2 h-3.5 w-32 rounded bg-slate-100" />
+    </div>
+  );
+}
+
+function ChartSkeleton({ className = "" }: { className?: string }) {
+  return (
+    <div className={`animate-pulse rounded-2xl border border-slate-100 bg-white p-4 shadow-sm ${className}`}>
+      <div className="h-4 w-40 rounded bg-slate-100" />
+      <div className="mt-3 h-[200px] rounded-xl bg-slate-50" />
+    </div>
+  );
+}
+
+// ── filter bar ───────────────────────────────────────────────────────────────
+const PRESETS: { key: Exclude<DashboardPreset, "custom">; label: string }[] = [
+  { key: "today", label: "Today" },
+  { key: "7d", label: "7D" },
+  { key: "30d", label: "30D" },
+  { key: "90d", label: "90D" },
+  { key: "year", label: "Year" },
+];
+
+function FilterBar({
+  preset, onPreset, customFrom, customTo, onCustom,
+}: {
+  preset: DashboardPreset;
+  onPreset: (p: DashboardPreset) => void;
+  customFrom: string;
+  customTo: string;
+  onCustom: (from: string, to: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+        {PRESETS.map((p) => (
+          <button
+            key={p.key}
+            onClick={() => onPreset(p.key)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+              preset === p.key
+                ? "bg-gradient-to-r from-[#4f46e5] to-[#6366f1] text-white shadow-[0_4px_12px_-4px_rgba(79,70,229,0.5)]"
+                : "text-slate-500 hover:bg-indigo-50 hover:text-[#4f46e5]"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+        <button
+          onClick={() => onPreset("custom")}
+          className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+            preset === "custom"
+              ? "bg-gradient-to-r from-[#4f46e5] to-[#6366f1] text-white shadow-[0_4px_12px_-4px_rgba(79,70,229,0.5)]"
+              : "text-slate-500 hover:bg-indigo-50 hover:text-[#4f46e5]"
+          }`}
+        >
+          <CalendarDays className="h-3.5 w-3.5" /> Custom
+        </button>
+      </div>
+      {preset === "custom" && (
+        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
+          <input
+            type="date"
+            value={customFrom}
+            onChange={(e) => onCustom(e.target.value, customTo)}
+            className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-1 text-xs text-slate-600 outline-none focus:border-[#4f46e5]"
+          />
+          <span className="text-xs text-slate-400">→</span>
+          <input
+            type="date"
+            value={customTo}
+            onChange={(e) => onCustom(customFrom, e.target.value)}
+            className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-1 text-xs text-slate-600 outline-none focus:border-[#4f46e5]"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── tints ────────────────────────────────────────────────────────────────────
+const TINTS: Record<string, Tint> = {
+  indigo:  { card: "bg-indigo-50/60 border-indigo-100",   icon: "bg-gradient-to-br from-[#4f46e5] to-[#6366f1]", color: "#4f46e5" },
+  violet:  { card: "bg-violet-50/60 border-violet-100",   icon: "bg-gradient-to-br from-[#7c3aed] to-[#8b5cf6]", color: "#7c3aed" },
+  cyan:    { card: "bg-cyan-50/60 border-cyan-100",       icon: "bg-gradient-to-br from-[#06b6d4] to-[#0891b2]", color: "#06b6d4" },
+  amber:   { card: "bg-amber-50/60 border-amber-100",     icon: "bg-gradient-to-br from-[#f59e0b] to-[#f97316]", color: "#f59e0b" },
+  emerald: { card: "bg-emerald-50/60 border-emerald-100", icon: "bg-gradient-to-br from-[#10b981] to-[#059669]", color: "#10b981" },
+  rose:    { card: "bg-rose-50/60 border-rose-100",       icon: "bg-gradient-to-br from-[#f43f5e] to-[#e11d48]", color: "#f43f5e" },
+  purple:  { card: "bg-purple-50/60 border-purple-100",   icon: "bg-gradient-to-br from-[#8b5cf6] to-[#7c3aed]", color: "#8b5cf6" },
+};
+
+// ── page ─────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const stats = [
-    { icon: DollarSign, value: '$1k', label: 'Total Sales', change: '+8% from yesterday' },
-    { icon: Users, value: '8', label: 'New Customers', change: '0.5% from yesterday' },
-    { icon: ShoppingCart, value: '300', label: 'Total Order', change: '+2% from yesterday' }
-  ];
+  const [preset, setPreset] = useState<DashboardPreset>("30d");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
 
-  const trafficSources = [
-    { name: 'Facebook', value: 37 },
-    { name: 'Website', value: 25 },
-    { name: 'Fans', value: 10 },
-    { name: 'Etsy', value: 7 },
-    { name: 'Others', value: 21 }
-  ];
+  const queryArgs: DashboardQueryArgs = useMemo(() => {
+    if (preset === "custom" && customFrom && customTo) {
+      return { preset: "custom", from: customFrom, to: `${customTo}T23:59:59.999Z` };
+    }
+    return { preset: preset === "custom" ? "30d" : preset };
+  }, [preset, customFrom, customTo]);
 
-  const revenueData = [
-    { day: 'Monday', online: 12, offline: 8 },
-    { day: 'Tuesday', online: 8, offline: 15 },
-    { day: 'Wednesday', online: 20, offline: 10 },
-    { day: 'Thursday', online: 15, offline: 6 },
-    { day: 'Friday', online: 18, offline: 12 },
-    { day: 'Saturday', online: 22, offline: 8 },
-    { day: 'Sunday', online: 25, offline: 5 }
-  ];
+  const { data, isLoading, isError, refetch, isFetching } = useGetAdminDashboardSummaryQuery(queryArgs);
 
-  const topProducts = [
-    { id: '01', name: 'Home Decor Range', popularity: 45, sales: '45%' },
-    { id: '02', name: 'Disney Princess Pink Bag 18', popularity: 29, sales: '29%' },
-    { id: '03', name: 'Bathroom Essentials', popularity: 18, sales: '18%' },
-    { id: '04', name: 'Apple Smartwatches', popularity: 25, sales: '25%' }
-  ];
+  const s = data?.stats;
 
-  const sessionsByLocation = [
-    { id: '01', name: 'Chicago', popularity: 85, sales: '85%', color: 'bg-blue-500' },
-    { id: '02', name: 'San Antonio', popularity: 29, sales: '29%', color: 'bg-green-500' },
-    { id: '03', name: 'San Francisco', popularity: 18, sales: '18%', color: 'bg-indigo-500' },
-    { id: '04', name: 'Portland', popularity: 25, sales: '25%', color: 'bg-orange-500' }
-  ];
+  // micro-visual series (all from the same real payload)
+  const revenueSeries = data?.revenueTrend.map((d) => d.revenue) ?? [];
+  const ordersSeries = data?.revenueTrend.map((d) => d.orders) ?? [];
+  const customerSeries = data?.customerGrowth.map((d) => d.count) ?? [];
+  const aovSeries = data
+    ? data.revenueTrend.map((d) => (d.orders ? Math.round(d.revenue / Math.max(d.orders, 1)) : 0))
+    : [];
+  const lowStockSeries = data?.lists.lowStock.map((l) => l.available) ?? [];
+  const pendingShare = s && s.orders > 0 ? Math.round((s.pendingOrders / Math.max(s.pendingOrders + s.orders, 1)) * 100) : 0;
+  const vendorShare = s && s.totalVendors > 0 ? Math.round((s.activeVendors / s.totalVendors) * 100) : 0;
 
   return (
-    <div className="min-h-screen  ">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex justify-end"><HrmWorkspaceEntry /></div>
-        {/* Top Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat, index) => (
-            <div key={index} className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-lg shadow-md">
-                  <stat.icon className="w-5 h-5 text-white" />
-                </div>
-              </div>
-              <div className="text-3xl font-bold mb-1 text-gray-800">{stat.value}</div>
-              <div className="text-gray-600 text-sm mb-2 font-medium">{stat.label}</div>
-              <div className="text-green-600 text-xs font-semibold">{stat.change}</div>
-            </div>
-          ))}
-
-          {/* New Traffic Card */}
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
-            <div className="text-3xl font-bold mb-1 text-gray-800">121</div>
-            <div className="text-gray-600 text-sm mb-4 font-medium">New Traffic</div>
-            <div className="text-xs text-gray-500 mb-3">+5% more from last month</div>
-            <div className="space-y-2">
-              {trafficSources.map((source, index) => (
-                <div key={index} className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600 font-medium">{source.name}</span>
-                  <div className="flex items-center gap-2 flex-1 mx-3">
-                    <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
-                      <div 
-                        className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full rounded-full transition-all duration-500" 
-                        style={{ width: `${source.value}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="text-gray-800 font-semibold">{source.value}%</span>
-                </div>
-              ))}
-            </div>
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-[1400px] space-y-3">
+        {/* header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-black tracking-tight text-slate-900">Dashboard</h1>
+            <p className="text-xs text-slate-400">
+              {data
+                ? `${new Date(data.range.from).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – ${new Date(data.range.to).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} · compared with the previous period`
+                : "Platform performance at a glance"}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <HrmWorkspaceEntry />
+            <FilterBar
+              preset={preset}
+              onPreset={setPreset}
+              customFrom={customFrom}
+              customTo={customTo}
+              onCustom={(f, t) => { setCustomFrom(f); setCustomTo(t); }}
+            />
           </div>
         </div>
 
-        {/* Revenue and Sales Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Total Revenue */}
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
-            <h3 className="text-lg font-bold mb-6 text-gray-800">Total Revenue</h3>
-            <div className="flex items-end justify-between h-48 gap-4">
-              {revenueData.map((data, index) => (
-                <div key={index} className="flex flex-col items-center flex-1 h-full justify-end">
-                  <div className="w-full flex flex-col gap-1 items-center" style={{ height: '85%' }}>
-                    <div className="w-full bg-gradient-to-t from-blue-400 to-blue-500 rounded-t shadow-sm hover:shadow-md transition-shadow" style={{ height: `${data.online * 3}%` }}></div>
-                    <div className="w-full bg-gradient-to-t from-gray-300 to-gray-400 rounded-t shadow-sm hover:shadow-md transition-shadow" style={{ height: `${data.offline * 3}%` }}></div>
-                  </div>
-                  <div className="text-xs text-gray-600 mt-2 font-medium">{data.day.slice(0, 3)}</div>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-center gap-6 mt-6 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 shadow"></div>
-                <span className="text-gray-600 font-medium">Online Sales</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 shadow"></div>
-                <span className="text-gray-600 font-medium">Offline Sales</span>
-              </div>
-            </div>
+        {isError ? (
+          <div className="rounded-2xl border border-rose-100 bg-white p-10 text-center shadow-sm">
+            <p className="text-sm font-semibold text-rose-600">Couldn&apos;t load dashboard analytics.</p>
+            <p className="mt-1 text-xs text-slate-400">Admin access is required for this data.</p>
+            <button
+              onClick={() => refetch()}
+              className="mt-4 rounded-xl bg-gradient-to-r from-[#4f46e5] to-[#6366f1] px-4 py-2 text-xs font-bold text-white shadow-[0_4px_12px_-4px_rgba(79,70,229,0.5)]"
+            >
+              Retry
+            </button>
           </div>
+        ) : (
+          <>
+            {/* primary stats */}
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+              {isLoading || !s ? (
+                <>
+                  <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
+                </>
+              ) : (
+                <>
+                  <StatCard
+                    icon={DollarSign} label="Revenue (delivered)" value={fmtMoney(s.revenue)}
+                    current={s.revenue} previous={s.previous.revenue}
+                    href="/admin-dashboard/order" tint={TINTS.indigo}
+                    visual={<Sparkline values={revenueSeries} color={TINTS.indigo.color} />}
+                  />
+                  <StatCard
+                    icon={ShoppingCart} label="Orders" value={s.orders.toLocaleString()}
+                    current={s.orders} previous={s.previous.orders}
+                    href="/admin-dashboard/order" tint={TINTS.violet}
+                    visual={<Sparkline values={ordersSeries} color={TINTS.violet.color} />}
+                  />
+                  <StatCard
+                    icon={Users} label="New customers" value={s.newCustomers.toLocaleString()}
+                    current={s.newCustomers} previous={s.previous.newCustomers}
+                    href="/admin-dashboard/customer-manage/accountmanage" tint={TINTS.cyan}
+                    visual={<Sparkline values={customerSeries} color={TINTS.cyan.color} />}
+                  />
+                  <StatCard
+                    icon={TrendingUp} label="Avg. order value" value={fmtMoney(s.aov)}
+                    href="/admin-dashboard/order" tint={TINTS.amber}
+                    visual={<Sparkline values={aovSeries} color={TINTS.amber.color} />}
+                  />
+                </>
+              )}
+            </div>
 
-          {/* Sales Overview */}
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-gray-800">Sales overview</h3>
-              <span className="text-xs text-green-600 font-semibold">(+5) more in 2021</span>
+            {/* secondary stats */}
+            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+              {isLoading || !s ? (
+                <>
+                  <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
+                </>
+              ) : (
+                <>
+                  <StatCard
+                    icon={Clock} label="Pending orders" value={s.pendingOrders.toLocaleString()}
+                    href="/admin-dashboard/order" tint={TINTS.amber}
+                    visual={<RadialGauge pct={pendingShare} color={TINTS.amber.color} label={`${pendingShare}%`} />}
+                  />
+                  <StatCard
+                    icon={Store} label="Active vendors" value={s.activeVendors.toLocaleString()}
+                    href="/admin-dashboard/vendormanage/vendor-approval" tint={TINTS.emerald}
+                    visual={<RadialGauge pct={vendorShare} color={TINTS.emerald.color} label={`${vendorShare}%`} />}
+                  />
+                  <StatCard
+                    icon={PackageX} label="Low-stock variants" value={s.lowStockCount.toLocaleString()}
+                    href="/admin-dashboard/products" tint={TINTS.rose}
+                    visual={<MiniBars values={lowStockSeries} color={TINTS.rose.color} />}
+                  />
+                  <StatCard
+                    icon={Truck} label="Avg. fulfillment" value={`${s.fulfillment.avgHours}h`}
+                    href="/admin-dashboard/order" tint={TINTS.purple}
+                    visual={<RadialGauge pct={s.fulfillment.deliveredShare} color={TINTS.purple.color} label={`${Math.round(s.fulfillment.deliveredShare)}%`} />}
+                  />
+                </>
+              )}
             </div>
-            <div className="relative h-48">
-              <svg className="w-full h-full" viewBox="0 0 400 150" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="grad1" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style={{ stopColor: 'rgb(6, 182, 212)', stopOpacity: 0.5 }} />
-                    <stop offset="100%" style={{ stopColor: 'rgb(6, 182, 212)', stopOpacity: 0.05 }} />
-                  </linearGradient>
-                  <linearGradient id="grad2" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style={{ stopColor: 'rgb(59, 130, 246)', stopOpacity: 0.5 }} />
-                    <stop offset="100%" style={{ stopColor: 'rgb(59, 130, 246)', stopOpacity: 0.05 }} />
-                  </linearGradient>
-                </defs>
-                
-                {/* Background area - cyan */}
-                <path
-                  d="M0,80 Q50,60 100,70 T200,85 T300,75 T400,90 L400,150 L0,150 Z"
-                  fill="url(#grad1)"
-                />
-                
-                {/* Foreground area - blue */}
-                <path
-                  d="M0,100 Q50,85 100,95 T200,65 T300,80 T400,70 L400,150 L0,150 Z"
-                  fill="url(#grad2)"
-                />
-                
-                {/* Cyan line */}
-                <path
-                  d="M0,80 Q50,60 100,70 T200,85 T300,75 T400,90"
-                  fill="none"
-                  stroke="rgb(6, 182, 212)"
-                  strokeWidth="2.5"
-                />
-                
-                {/* Blue line */}
-                <path
-                  d="M0,100 Q50,85 100,95 T200,65 T300,80 T400,70"
-                  fill="none"
-                  stroke="rgb(59, 130, 246)"
-                  strokeWidth="2.5"
-                />
-              </svg>
-            </div>
-            <div className="flex items-center justify-between text-xs text-gray-600 mt-4 font-medium">
-              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month) => (
-                <span key={month}>{month}</span>
-              ))}
-            </div>
-          </div>
-        </div>
 
-        {/* Bottom Tables */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Top Products */}
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
-            <h3 className="text-lg font-bold mb-6 text-gray-800">Top Products</h3>
-            <div className="space-y-4">
-              <div className="grid grid-cols-12 gap-4 text-xs text-gray-600 font-semibold pb-2 border-b-2 border-gray-200">
-                <div className="col-span-1">#</div>
-                <div className="col-span-6">Name</div>
-                <div className="col-span-3">Popularity</div>
-                <div className="col-span-2 text-right">Sales</div>
-              </div>
-              {topProducts.map((product) => (
-                <div key={product.id} className="grid grid-cols-12 gap-4 items-center text-sm hover:bg-gray-50 p-2 rounded-lg transition-colors">
-                  <div className="col-span-1 text-gray-500 font-medium">{product.id}</div>
-                  <div className="col-span-6 text-gray-800 font-medium">{product.name}</div>
-                  <div className="col-span-3">
-                    <div className="bg-gray-200 rounded-full h-2 overflow-hidden">
-                      <div 
-                        className="bg-gradient-to-r from-blue-400 to-blue-600 h-full rounded-full transition-all duration-500" 
-                        style={{ width: `${product.popularity}%` }}
-                      />
+            {/* charts row 1 */}
+            <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-3">
+              {isLoading || !data ? (
+                <>
+                  <ChartSkeleton className="xl:col-span-2" /><ChartSkeleton />
+                </>
+              ) : (
+                <>
+                  <ChartCard
+                    title="Revenue trend"
+                    subtitle="Delivered revenue & orders per day"
+                    className="xl:col-span-2"
+                    action={<Delta current={s!.revenue} previous={s!.previous.revenue} />}
+                  >
+                    <RevenueTrendChart data={data.revenueTrend} />
+                  </ChartCard>
+                  <ChartCard title="Order status" subtitle="Distribution in period">
+                    <StatusDonut data={data.ordersByStatus} />
+                  </ChartCard>
+                </>
+              )}
+            </div>
+
+            {/* charts row 2 */}
+            <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2 xl:grid-cols-3">
+              {isLoading || !data ? (
+                <>
+                  <ChartSkeleton /><ChartSkeleton /><ChartSkeleton />
+                </>
+              ) : (
+                <>
+                  <ChartCard title="Payment methods" subtitle="Order count & value by method">
+                    <PaymentDonut data={data.paymentsByMethod} />
+                  </ChartCard>
+                  <ChartCard title="Sales by category" subtitle="Delivered revenue, top categories">
+                    <CategoryBars data={data.salesByCategory} />
+                  </ChartCard>
+                  <ChartCard
+                    title="Customer growth"
+                    subtitle="New sign-ups per day"
+                    action={<Delta current={s!.newCustomers} previous={s!.previous.newCustomers} />}
+                  >
+                    <CustomerGrowthChart data={data.customerGrowth} />
+                  </ChartCard>
+                </>
+              )}
+            </div>
+
+            {/* leaders row */}
+            <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+              {isLoading || !data ? (
+                <>
+                  <ChartSkeleton /><ChartSkeleton />
+                </>
+              ) : (
+                <>
+                  <ChartCard title="Top vendors" subtitle="By delivered revenue">
+                    <TopVendorsList data={data.topVendors} />
+                  </ChartCard>
+                  <ChartCard title="Best-selling products" subtitle="By units sold (delivered)">
+                    <TopProductsList data={data.topProducts} />
+                  </ChartCard>
+                </>
+              )}
+            </div>
+
+            {/* operations row */}
+            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+              {isLoading || !data ? (
+                <>
+                  <ChartSkeleton /><ChartSkeleton /><ChartSkeleton />
+                </>
+              ) : (
+                <>
+                  <ChartCard title="Pending orders" subtitle="Newest first" action={
+                    <Link href="/admin-dashboard/order" className="text-xs font-bold text-[#4f46e5] hover:underline">View all</Link>
+                  }>
+                    <PendingOrdersList data={data.lists.pendingOrders} />
+                  </ChartCard>
+                  <ChartCard title="Low stock" subtitle="Variants at or below 5 available" action={
+                    <Link href="/admin-dashboard/products" className="text-xs font-bold text-[#4f46e5] hover:underline">Manage</Link>
+                  }>
+                    <LowStockList data={data.lists.lowStock} />
+                  </ChartCard>
+                  <ChartCard title="New customers" subtitle="Latest sign-ups" action={
+                    <Link href="/admin-dashboard/customer-manage/accountmanage" className="text-xs font-bold text-[#4f46e5] hover:underline">View all</Link>
+                  }>
+                    <NewCustomersList data={data.lists.newCustomers} />
+                  </ChartCard>
+                </>
+              )}
+            </div>
+
+            {/* activity row */}
+            <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+              {isLoading || !data ? (
+                <>
+                  <ChartSkeleton /><ChartSkeleton />
+                </>
+              ) : (
+                <>
+                  <ChartCard title="Recent orders" subtitle="Latest across all statuses" action={
+                    <Link href="/admin-dashboard/order" className="text-xs font-bold text-[#4f46e5] hover:underline">View all</Link>
+                  }>
+                    <RecentOrdersList data={data.lists.recentOrders} />
+                  </ChartCard>
+                  <ChartCard title="Recent transactions" subtitle="Latest completed payments">
+                    <RecentPaymentsList data={data.lists.recentPayments} />
+                  </ChartCard>
+                </>
+              )}
+            </div>
+
+            {/* refunds strip */}
+            {!isLoading && data && s && (
+              <ChartCard title="Refunds" subtitle="Requests in period">
+                {data.refunds.byStatus.length ? (
+                  <div className="flex flex-wrap items-center gap-5">
+                    <div>
+                      <p className="text-2xl font-black text-slate-900">{fmtMoney(s.refundAmount)}</p>
+                      <p className="text-xs text-slate-400">{s.refundCount} requests · {s.refundRate}% of revenue</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {data.refunds.byStatus.map((r) => (
+                        <span key={r.status} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
+                          <RotateCcw className="h-3 w-3 text-slate-400" />
+                          {r.status}: {r.count} ({fmtMoney(r.amount)})
+                        </span>
+                      ))}
                     </div>
                   </div>
-                  <div className="col-span-2 text-right text-gray-800 font-semibold">{product.sales}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+                ) : (
+                  <EmptyState label="No refund requests in this period" />
+                )}
+              </ChartCard>
+            )}
+          </>
+        )}
 
-          {/* Session By State/Zip code */}
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
-            <h3 className="text-lg font-bold mb-6 text-gray-800">Session By State/Zip code</h3>
-            <div className="space-y-4">
-              <div className="grid grid-cols-12 gap-4 text-xs text-gray-600 font-semibold pb-2 border-b-2 border-gray-200">
-                <div className="col-span-1">#</div>
-                <div className="col-span-6">Name</div>
-                <div className="col-span-3">Popularity</div>
-                <div className="col-span-2 text-right">Sales</div>
-              </div>
-              {sessionsByLocation.map((location) => (
-                <div key={location.id} className="grid grid-cols-12 gap-4 items-center text-sm hover:bg-gray-50 p-2 rounded-lg transition-colors">
-                  <div className="col-span-1 text-gray-500 font-medium">{location.id}</div>
-                  <div className="col-span-6 text-gray-800 font-medium">{location.name}</div>
-                  <div className="col-span-3">
-                    <div className="bg-gray-200 rounded-full h-2 overflow-hidden">
-                      <div 
-                        className={`${location.color} h-full rounded-full transition-all duration-500`}
-                        style={{ width: `${location.popularity}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="col-span-2 text-right text-gray-800 font-semibold">{location.sales}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        {isFetching && !isLoading && (
+          <p className="text-right text-[11px] font-medium text-slate-400">Refreshing…</p>
+        )}
       </div>
     </div>
   );

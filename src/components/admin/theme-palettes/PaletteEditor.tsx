@@ -35,6 +35,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -346,8 +347,34 @@ export function PaletteEditor(props: { mode: "create" | "edit"; paletteId?: stri
   // ── render states ──
   if (!isCreate && detailQuery.isLoading) {
     return (
-      <div className="flex items-center gap-2 p-8 text-sm text-gray-500">
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading palette…
+      <div className="space-y-5 p-4 md:p-6" aria-busy="true" aria-label="Loading palette">
+        <Sk soft className="h-3 w-24" />
+        <div className="space-y-2">
+          <Sk className="h-6 w-56" />
+          <Sk soft className="h-3.5 w-80 max-w-full" />
+        </div>
+        <Sk className="h-12 w-full rounded-lg" />
+        <div className="grid gap-6 xl:grid-cols-2">
+          <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4">
+            <Sk className="h-4 w-32" />
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between gap-3">
+                <Sk soft className="h-3 w-24" />
+                <Sk soft className="h-9 w-36 rounded-md" />
+              </div>
+            ))}
+          </div>
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+            <Sk className="h-4 w-32" />
+            <Sk soft className="h-44 w-full rounded-lg" />
+            <Sk soft className="h-3 w-48" />
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Sk key={i} soft className="h-8 rounded-md" />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

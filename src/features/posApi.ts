@@ -238,6 +238,8 @@ export interface PosCustomer {
   nid: string | null;
   address: string | null;
   note: string | null;
+  referrerName: string | null;
+  referrerEmail: string | null;
   loanLimit: number;
   loanBalance: number;
   loanInterestRate: number;
@@ -258,13 +260,15 @@ export interface CreateCustomerRequest {
   nid?: string;
   address?: string;
   note?: string;
+  referrerName?: string;
+  referrerEmail?: string;
   loanLimit?: number;
-}
-
-export type UpdateCustomerRequest = Partial<CreateCustomerRequest> & {
   loanInterestRate?: number;
   loanTenureDays?: number;
-};
+  creditScore?: string;
+}
+
+export type UpdateCustomerRequest = Partial<CreateCustomerRequest>;
 
 /* ==================== STAFF TYPES ==================== */
 

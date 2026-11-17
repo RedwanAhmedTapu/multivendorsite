@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { useChangePasswordMutation } from "@/features/authApi";
+import MfaSettingsSection from "@/components/auth/MfaSettingsSection";
 import {
   Eye,
   EyeOff,
@@ -151,7 +152,7 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f7f8] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[#f5f7f8] flex flex-col items-center justify-center gap-6 p-6">
       <div className="w-full max-w-[480px] bg-white rounded-2xl shadow-lg overflow-hidden">
 
         {/* Header */}
@@ -234,6 +235,11 @@ export default function ChangePasswordPage() {
             <ArrowLeft size={14} /> Back
           </button>
         </div>
+      </div>
+
+      {/* Two-factor authentication — self-service for every user account. */}
+      <div className="w-full max-w-[480px]">
+        <MfaSettingsSection />
       </div>
     </div>
   );

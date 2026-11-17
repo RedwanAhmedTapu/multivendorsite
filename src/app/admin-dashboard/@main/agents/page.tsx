@@ -14,6 +14,7 @@ import {
   type AgentStatus,
 } from "@/features/agentAdminApi";
 import { AgentAdminHeader, Btn, Empty, FieldRow, Modal, Panel, Pill, STATUS_TONE, fmtDate, fmtDateTime, inputCls, tdCls, thCls } from "@/components/agent-admin/AgentAdminUI";
+import { TableSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 const STATUSES: Array<AgentStatus | ""> = ["", "PENDING", "ACTIVE", "SUSPENDED", "DEACTIVATED"];
 const STATUS_LABEL: Record<string, string> = { "": "All", PENDING: "Pending", ACTIVE: "Active", SUSPENDED: "Suspended", DEACTIVATED: "Deactivated" };
@@ -106,7 +107,7 @@ export default function AdminAgentsPage() {
 
       <Panel>
         {isLoading ? (
-          <p className="p-6 text-sm text-slate-400">Loading…</p>
+          <TableSkeleton rows={8} cols={9} />
         ) : !data?.items.length ? (
           <Empty title="No agents found" text={dq || status ? "Try a different filter." : "Agents appear here once they register or you add one."} />
         ) : (

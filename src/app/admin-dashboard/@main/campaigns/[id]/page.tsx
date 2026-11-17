@@ -20,6 +20,7 @@ import {
 import { useGetAllProductsQuery } from "@/features/productapi/adminProductApi";
 import { buildCampaignUpdate, campaignToForm, toDateTimeLocal, validateCampaignForm } from "@/lib/campaign/campaign-editor";
 import { Input } from "@/components/ui/input";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import {
   ArrowLeft,
   Image as ImageIcon,
@@ -504,9 +505,54 @@ export default function CampaignBuilderPage() {
   }, [campaign]);
 
   if (isLoading || !campaign) {
+    const cardStyle: React.CSSProperties = { borderRadius: 16, border: `1px solid ${PALETTE.border}`, background: "#fff", padding: 16 };
     return (
-      <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
-        <Loader2 size={24} className="animate-spin" color={PALETTE.primary} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-busy="true" aria-label="Loading campaign">
+        <div style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <Sk className="h-10 w-10 rounded-lg" />
+          <div style={{ flex: 1, minWidth: 180, display: "flex", flexDirection: "column", gap: 8 }}>
+            <Sk className="h-4 w-48" />
+            <Sk soft className="h-2.5 w-72 max-w-full" />
+          </div>
+          <Sk className="h-9 w-28 rounded-lg" />
+          <Sk className="h-9 w-24 rounded-lg" />
+        </div>
+        <div className="grid gap-3 lg:grid-cols-3">
+          <div className="space-y-3 lg:col-span-2">
+            <div style={cardStyle}>
+              <Sk className="h-3 w-28" />
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="space-y-1.5">
+                    <Sk soft className="h-2.5 w-20" />
+                    <Sk className="h-10 w-full rounded-lg" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12 }}>
+                <Sk soft className="h-10 w-10 rounded-lg" />
+                <div className="flex-1 space-y-2">
+                  <Sk className="h-3.5 w-40" />
+                  <Sk soft className="h-2.5 w-56 max-w-full" />
+                </div>
+                <Sk className="h-8 w-20 rounded-md" />
+              </div>
+            ))}
+          </div>
+          <div style={cardStyle}>
+            <Sk className="h-3 w-24" />
+            <div className="mt-4 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between gap-3">
+                  <Sk soft className="h-2.5 w-24" />
+                  <Sk soft className="h-3.5 w-16" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

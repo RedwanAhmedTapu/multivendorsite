@@ -145,7 +145,7 @@ function VendorDetailModal({ vendorId, onClose }: { vendorId: string; onClose: (
   return (
     <Modal open wide title={d ? d.vendor.storeName : "Vendor subscription"} onClose={onClose}>
       {isLoading || !d ? <Skeleton rows={5} /> : (
-        <div className="space-y-5">
+        <div className="space-y-3">
           <div className="flex flex-col gap-3 rounded-2xl bg-gradient-to-r from-[#4f46e5] to-[#9333ea] p-4 text-white sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs uppercase tracking-wide text-white/70">Current plan</p>
@@ -214,7 +214,7 @@ function ExtendModal({ busy, onClose, onSubmit }: { busy: boolean; onClose: () =
   const valid = Number.isInteger(days) && days >= 1 && days <= 3650 && reason.trim().length >= 3;
   return (
     <Modal open title="Extend subscription" onClose={onClose} footer={<><Button variant="secondary" onClick={onClose}>Back</Button><Button loading={busy} disabled={!valid} onClick={() => onSubmit(days, reason.trim())}>Extend</Button></>}>
-      <div className="space-y-4">
+      <div className="space-y-3">
         <Field label="Days to add" hint="Added to the current end date (or to today if it already passed). No charge."><input type="number" min={1} max={3650} className={inputCls} value={days} onChange={(e) => setDays(Number(e.target.value))} /></Field>
         <Field label="Reason" hint="Kept in the audit log."><textarea className={textareaCls} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} /></Field>
       </div>
@@ -261,7 +261,7 @@ function RecordPaymentModal({ vendorId, busy, onClose, onSubmit }: { vendorId: s
     <Modal open title="Record a received payment" onClose={onClose} footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button>
       <Button loading={busy} disabled={!packageId || !cycleId || !amount || reference.trim().length < 3 || (mismatch && overrideReason.trim().length < 3) || undefined}
         onClick={() => onSubmit({ packageId, cycleId, amount, method, reference, note: note || undefined, overrideReason: mismatch ? overrideReason : undefined, idempotencyKey })}>Record payment</Button></>}>
-      <div className="space-y-4">
+      <div className="space-y-3">
         <Notice tone="violet">Only record money you have already received. The plan period starts as soon as you save; recording twice is safe (same form = one payment).</Notice>
         <PlanCyclePickers packageId={packageId} cycleId={cycleId} onChange={(p, c) => { setPackageId(p); setCycleId(c); }} />
         {q?.data && (
@@ -297,7 +297,7 @@ function ActivateModal({ busy, onClose, onSubmit }: { busy: boolean; onClose: ()
     <Modal open title="Activate a plan without payment" onClose={onClose} footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button>
       <Button loading={busy} disabled={!packageId || !cycleId || reason.trim().length < 3 || (mode === "date" && !until)}
         onClick={() => onSubmit({ packageId, cycleId, source, reason, ...(mode === "date" ? { expiresAt: new Date(`${until}T23:59:59+06:00`).toISOString() } : mode === "open" ? { expiresAt: null } : {}) })}>Activate</Button></>}>
-      <div className="space-y-4">
+      <div className="space-y-3">
         <PlanCyclePickers packageId={packageId} cycleId={cycleId} onChange={(p, c) => { setPackageId(p); setCycleId(c); }} />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Type"><select className={inputCls} value={source} onChange={(e) => { setSource(e.target.value); if (e.target.value === "TRIAL" && mode === "open") setMode("cycle"); }}><option value="COMPLIMENTARY">Complimentary</option><option value="TRIAL">Trial</option><option value="ADMIN">Admin adjustment</option></select></Field>

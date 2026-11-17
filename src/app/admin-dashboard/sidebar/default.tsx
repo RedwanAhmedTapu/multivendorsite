@@ -1,4 +1,5 @@
-// app/admin-dashboard/@main/default.tsx
-export default function DefaultSidebar() {
-  return <div>Loading...</div>;
+import { SidebarSkeleton } from "@/components/admin/ui/AdminSkeletons";
+
+export default function SidebarDefault() {
+  return <SidebarSkeleton />;
 }

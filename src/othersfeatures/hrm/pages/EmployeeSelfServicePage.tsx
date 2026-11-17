@@ -12,6 +12,7 @@
 
 import { useState } from "react";
 import { HrmWorkspaceEntry } from "@/components/hrm/HrmWorkspaceEntry";
+import { HeaderSkeleton, PanelSkeleton, StatsSkeleton } from "@/components/admin/ui/AdminSkeletons";
 import {
   useGetMyProfileQuery,
   useCheckInMutation,
@@ -34,7 +35,20 @@ export default function EmployeeSelfServicePage() {
   const [leaveForm, setLeaveForm] = useState({ leaveTypeId: "", fromDate: "", toDate: "", days: 1, reason: "" });
   const [error, setError] = useState<string | null>(null);
 
-  if (profileLoading) return <p className="p-6 text-sm text-gray-400">Loading…</p>;
+  if (profileLoading) {
+    return (
+      <div aria-busy="true" aria-label="Loading HR profile" className="space-y-6">
+        <HeaderSkeleton actions={1} />
+        <StatsSkeleton count={4} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <PanelSkeleton rows={7} cols={5} />
+          </div>
+          <PanelSkeleton rows={5} cols={3} />
+        </div>
+      </div>
+    );
+  }
 
   // Owners (ADMIN/VENDOR) and unlinked accounts have no HR profile — every
   // section below would fail against the backend, so show a clean empty

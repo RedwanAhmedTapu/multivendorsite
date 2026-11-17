@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Sk } from '@/components/admin/ui/AdminSkeletons';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
@@ -334,12 +334,46 @@ export default function VendorPayoutCommissionManager({
   // ========================
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Button variant="outline" onClick={onBackToList} className="mb-4">
-          <ArrowLeft className="h-4 w-4 mr-2" /> Back to List
-        </Button>
-        <Skeleton className="h-12 w-1/3" />
-        <Skeleton className="h-64 w-full" />
+      <div aria-busy="true" aria-label="Loading vendor commission" className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={onBackToList}>
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back to List
+          </Button>
+          <Sk className="h-16 w-16 rounded-full" />
+          <div className="space-y-2">
+            <Sk className="h-6 w-48" />
+            <div className="flex gap-2">
+              <Sk className="h-5 w-20 rounded-full" />
+              <Sk className="h-5 w-24 rounded-full" />
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="space-y-2 pt-6">
+                <Sk className="h-7 w-16" />
+                <Sk soft className="h-3 w-28" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Sk key={i} className={i === 0 ? "h-8 w-40 rounded-md bg-slate-300/70" : "h-8 w-32 rounded-md"} />
+          ))}
+        </div>
+        <Card>
+          <CardContent className="space-y-3 pt-6">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Sk soft className="h-3 w-1/3" />
+                <Sk soft className="h-3 w-1/5" />
+                <Sk soft className="ml-auto h-3 w-16" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </div>
     );
   }

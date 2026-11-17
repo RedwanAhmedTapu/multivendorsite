@@ -4,7 +4,7 @@
 // Plan builder. Everything shown or sold comes from these records.
 
 import { useEffect, useMemo, useState } from "react";
-import { Archive, Copy, Eye, EyeOff, Layers, Pencil, Plus, Puzzle, Repeat, Send, Star, Trash2, Undo2 } from "lucide-react";
+import { Archive, Copy, Eye, EyeOff, Layers, Pencil, Plus, Puzzle, Repeat, Send, Star, Trash2, Undo2, Users } from "lucide-react";
 import {
   apiError,
   useSubsCyclesQuery,
@@ -24,7 +24,7 @@ import {
   type SubFeature,
   type SubPackage,
 } from "@/features/billingApi";
-import { STATE_TONE, limitText, perCycle, taka } from "@/lib/billing/format";
+import { STATE_TONE, limitText, perCycle, takaShort } from "@/lib/billing/format";
 import { Badge, Button, Card, EmptyState, Field, Modal, Notice, Skeleton, Toggle, cx, inputCls, tableCls, tdCls, textareaCls, thCls } from "@/components/billing/ui";
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
@@ -210,44 +210,109 @@ export function PlansSection() {
     try { await fn(); setMsg({ tone: "green", text: ok }); } catch (e) { setMsg({ tone: "red", text: apiError(e) }); }
   };
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-1 rounded-xl bg-white p-1 shadow-sm">
+        <div className="flex items-center gap-0.5 overflow-x-auto rounded-lg border border-slate-200 bg-white p-0.5">
           {[["", "All"], ["PUBLISHED", "Published"], ["DRAFT", "Draft"], ["ARCHIVED", "Archived"]].map(([k, l]) => (
-            <button key={k} onClick={() => setStatus(k)} className={cx("rounded-lg px-3 py-1.5 text-sm font-medium", status === k ? "bg-[#ede9fe] text-[#5b21b6]" : "text-[#64748b] hover:bg-[#f5f3ff]")}>{l}</button>
+            <button
+              key={k}
+              onClick={() => setStatus(k)}
+              aria-pressed={status === k}
+              className={cx(
+                "h-7 whitespace-nowrap rounded-md px-2.5 text-[11px] font-bold transition",
+                status === k ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+              )}
+            >
+              {l}
+            </button>
           ))}
         </div>
-        <Button onClick={() => setEditing("new")}><Plus className="h-4 w-4" />New plan</Button>
+        <Button size="sm" onClick={() => setEditing("new")}><Plus className="h-3.5 w-3.5" />New plan</Button>
       </div>
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
       {isLoading ? <Skeleton rows={4} /> : !plans.length ? (
         <EmptyState icon={<Layers className="h-5 w-5" />} title="No plans here" body="Create a plan, choose its features and limits, set a price for each billing cycle, then publish it." action={<Button onClick={() => setEditing("new")}>Create a plan</Button>} />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {plans.map((p) => {
             const active = (p.prices ?? []).filter((x) => x.isActive && x.cycle?.isActive).sort((a, b) => (a.cycle?.months ?? 0) - (b.cycle?.months ?? 0));
             const feats = (p.features ?? []).filter((f) => f.enabled && f.feature?.isActive);
+            const [hero, ...rest] = active;
+            const subscribers = p._count?.subscribers ?? 0;
+            const accent = p.color || "#4338CA";
             return (
-              <article key={p.id} className="flex flex-col overflow-hidden rounded-2xl border border-[#e6e3ff] bg-white shadow-[0_6px_24px_rgba(79,70,229,0.07)]">
-                <div className="h-1.5" style={{ background: p.color || "linear-gradient(90deg,#4f46e5,#9333ea)" }} />
-                <div className="flex flex-1 flex-col p-4">
+              <article
+                key={p.id}
+                className={cx(
+                  "group relative flex flex-col overflow-hidden rounded-xl border bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(67,56,202,0.14)]",
+                  p.isPopular ? "border-amber-300 ring-1 ring-amber-200/70" : "border-slate-200",
+                )}
+              >
+                <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, ${accent}, ${accent}99)` }} />
+                <div className="flex flex-1 flex-col p-3.5">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="flex items-center gap-1.5 text-lg font-bold text-[#1e1b4b]">{p.name}{p.isPopular && <Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-label="Popular" />}</h3>
-                      <p className="text-xs text-[#64748b]">/{p.slug} · {p._count?.subscribers ?? 0} subscriber{p._count?.subscribers === 1 ? "" : "s"}</p>
+                    <div className="min-w-0">
+                      <h3 className="flex items-center gap-1.5 truncate text-sm font-bold text-slate-900">
+                        {p.name}
+                        {p.isPopular && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" aria-label="Popular" />}
+                      </h3>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
+                        <span className="inline-flex items-center gap-1 text-slate-600"><Users className="h-3 w-3" />{subscribers} subscriber{subscribers === 1 ? "" : "s"}</span>
+                        <span aria-hidden className="text-slate-300">·</span>
+                        <code className="rounded bg-slate-100 px-1 text-[10px] text-slate-600">{p.slug}</code>
+                      </p>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
+                    <div className="flex shrink-0 flex-col items-end gap-1">
                       <Badge tone={STATE_TONE[p.status]}>{p.status.toLowerCase()}</Badge>
                       {p.visibility === "HIDDEN" && <Badge tone="slate"><EyeOff className="h-3 w-3" />hidden</Badge>}
                     </div>
                   </div>
-                  <div className="mt-3 space-y-1">
-                    {active.length ? active.map((x) => (
-                      <p key={x.id} className="text-sm text-[#334155]"><b>{taka(x.promoPrice ?? x.price)}</b> {perCycle(x.cycle?.months ?? 1)}{x.promoPrice && <s className="ml-1 text-xs text-[#94a3b8]">{taka(x.price)}</s>}{x.discountPercent && <span className="ml-1 text-xs text-emerald-600">−{Number(x.discountPercent)}%</span>}</p>
-                    )) : <p className="text-sm text-amber-700">No active price yet</p>}
+
+                  <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50/80 p-2.5">
+                    {hero ? (
+                      <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-xl font-extrabold tracking-tight text-slate-900 tabular-nums">{takaShort(hero.promoPrice ?? hero.price)}</span>
+                          <span className="text-[11px] font-medium text-slate-500">{perCycle(hero.cycle?.months ?? 1)}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {hero.promoPrice && <s className="text-[11px] text-slate-400 tabular-nums">{takaShort(hero.price)}</s>}
+                          {hero.discountPercent && (
+                            <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">−{Number(hero.discountPercent)}%</span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] font-semibold text-amber-700">No active price yet</p>
+                    )}
+                    {!!rest.length && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {rest.map((x) => (
+                          <span key={x.id} className="inline-flex items-baseline gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10.5px] text-slate-600">
+                            <b className="font-semibold text-slate-800 tabular-nums">{takaShort(x.promoPrice ?? x.price)}</b>
+                            {x.cycle?.name ?? perCycle(x.cycle?.months ?? 1)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <p className="mt-3 line-clamp-2 text-xs text-[#64748b]">{feats.length ? feats.map((f) => f.feature?.name).join(" · ") : "No features"}</p>
-                  <div className="mt-4 flex flex-wrap gap-1.5 border-t border-[#f5f3ff] pt-3">
+
+                  <div className="mt-2.5 flex flex-wrap gap-1">
+                    {feats.length ? (
+                      <>
+                        {feats.slice(0, 3).map((f) => (
+                          <span key={f.id} className="rounded border border-indigo-100 bg-indigo-50/70 px-1.5 py-0.5 text-[10.5px] font-medium text-indigo-700">{f.feature?.name}</span>
+                        ))}
+                        {feats.length > 3 && (
+                          <span className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10.5px] font-semibold text-slate-500" title={feats.slice(3).map((f) => f.feature?.name).join(", ")}>+{feats.length - 3} more</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-[11px] text-slate-400">No features assigned</span>
+                    )}
+                  </div>
+
+                  <div className="mt-auto flex flex-wrap gap-1.5 border-t border-slate-100 pt-2.5">
                     <Button size="sm" variant="secondary" onClick={() => setEditing(p.id)}><Pencil className="h-3.5 w-3.5" />Edit</Button>
                     <Button size="sm" variant="ghost" onClick={() => act(() => duplicate(p.id).unwrap(), `Copied ${p.name} as a draft.`)}><Copy className="h-3.5 w-3.5" />Duplicate</Button>
                     {p.status !== "PUBLISHED" && p.status !== "ARCHIVED" && <Button size="sm" variant="ghost" onClick={() => act(() => setPlanStatus({ id: p.id, status: "PUBLISHED" }).unwrap(), `${p.name} is live.`)}><Send className="h-3.5 w-3.5" />Publish</Button>}

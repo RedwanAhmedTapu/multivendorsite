@@ -35,6 +35,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -156,11 +157,22 @@ export default function CustomerWalletLoyalty() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center">
-                      Loading...
-                    </TableCell>
-                  </TableRow>
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={`sk-${i}`}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Sk soft className="h-8 w-8 rounded-full" />
+                          <div className="space-y-1.5">
+                            <Sk soft className="h-3 w-32" />
+                            <Sk soft className="h-2.5 w-20" />
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell><Sk soft className="h-3 w-20" /></TableCell>
+                      <TableCell><Sk soft className="h-3 w-16" /></TableCell>
+                      <TableCell><Sk className="ml-auto h-7 w-20 rounded-md" /></TableCell>
+                    </TableRow>
+                  ))
                 ) : (
                   data?.data?.map((customer: any) => (
                     <TableRow key={customer.id}>
@@ -231,7 +243,20 @@ export default function CustomerWalletLoyalty() {
             <DialogDescription>Manage wallet balance and history.</DialogDescription>
           </DialogHeader>
           {walletLoading ? (
-            <p>Loading wallet...</p>
+            <div aria-busy="true" aria-label="Loading wallet" className="space-y-3">
+              <Sk className="h-10 w-full rounded-md" />
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded border p-2">
+                    <div className="flex justify-between">
+                      <Sk soft className="h-3 w-24" />
+                      <Sk soft className="h-3 w-16" />
+                    </div>
+                    <Sk soft className="mt-2 h-2.5 w-32" />
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : (
             <>
               <div className="flex gap-2 items-center mb-4">
@@ -286,7 +311,20 @@ export default function CustomerWalletLoyalty() {
             </DialogDescription>
           </DialogHeader>
           {loyaltyLoading ? (
-            <p>Loading loyalty points...</p>
+            <div aria-busy="true" aria-label="Loading loyalty points" className="space-y-3">
+              <Sk className="h-10 w-full rounded-md" />
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded border p-2">
+                    <div className="flex justify-between">
+                      <Sk soft className="h-3 w-24" />
+                      <Sk soft className="h-3 w-16" />
+                    </div>
+                    <Sk soft className="mt-2 h-2.5 w-32" />
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : (
             <>
               <div className="flex gap-2 items-center mb-4">

@@ -1,7 +1,8 @@
 "use client";
 import React, { useState } from "react";
 import { toast } from "sonner";
-import { FolderTree, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { FolderTree, Plus, Pencil, Trash2 } from "lucide-react";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import {
   useListBlogCategoriesQuery,
   useCreateBlogCategoryMutation,
@@ -106,9 +107,19 @@ export default function CategoriesTab() {
         right={<SecondaryButton label="+ New Category" onClick={() => startCreate()} />}
       >
         {isLoading ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: COLORS.muted, fontSize: 13, padding: 8 }}>
-            <Loader2 size={16} style={{ animation: "fm-blogadmin-spin 1s linear infinite" }} />
-            Loading categories…
+          <div aria-busy="true" aria-label="Loading categories" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 9, border: `1px solid ${COLORS.cardBorder}`, background: "#FAFBFD" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+                  <Sk soft className="h-7 w-7 rounded-md" />
+                  <Sk soft className="h-3.5 w-40 max-w-full" />
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <Sk soft className="h-7 w-7 rounded-md" />
+                  <Sk soft className="h-7 w-7 rounded-md" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : topLevel.length === 0 ? (
           <p style={{ fontSize: 12.5, color: COLORS.hint }}>No categories yet — add your first one.</p>

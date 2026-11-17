@@ -9,7 +9,7 @@ import Link from "next/link";
 import { AlertTriangle, ChevronLeft, ChevronRight, Megaphone, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { TableSkeleton } from "@/components/admin/ui/AdminSkeletons";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -109,10 +109,8 @@ export function AdsCampaignList({
       </div>
 
       {isLoading ? (
-        <div className="space-y-3 p-4" aria-busy="true" aria-label="Loading campaigns">
-          {Array.from({ length: 4 }, (_, i) => (
-            <Skeleton key={i} className="h-14 w-full" />
-          ))}
+        <div aria-busy="true" aria-label="Loading campaigns">
+          <TableSkeleton rows={6} cols={showVendor ? 7 : 6} />
         </div>
       ) : isError ? (
         <div role="alert" className="flex flex-col items-center gap-3 px-4 py-12 text-center">

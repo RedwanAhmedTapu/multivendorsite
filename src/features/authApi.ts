@@ -95,6 +95,13 @@ export interface AuthResponse {
   };
   accessToken?: string;
   message?: string;
+  /** MFA gate: present instead of tokens when a second factor is required. */
+  mfaRequired?: boolean;
+  challengeId?: string;
+  enrollmentRequired?: boolean;
+  /** Set by /auth/mfa/verify when enrollment completed during login. */
+  mfaEnrolled?: boolean;
+  recoveryCodes?: string[];
 }
 
 export interface ForgotPasswordRequest {
@@ -120,6 +127,9 @@ export interface ResetPasswordRequest {
   otp?: string;
   newPassword: string;
   confirmPassword: string;
+  /** Required when the account has MFA enabled (403 { mfaRequired }). */
+  mfaCode?: string;
+  recoveryCode?: string;
 }
 
 // --------- Login History Types ---------

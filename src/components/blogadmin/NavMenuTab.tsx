@@ -1,7 +1,8 @@
 "use client";
 import React, { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Menu, Plus, Pencil, Trash2, ArrowUp, ArrowDown, Loader2, Eye, EyeOff } from "lucide-react";
+import { Menu, Plus, Pencil, Trash2, ArrowUp, ArrowDown, Eye, EyeOff } from "lucide-react";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import {
   useListBlogNavItemsQuery,
   useCreateBlogNavItemMutation,
@@ -122,9 +123,20 @@ export default function NavMenuTab() {
         right={<SecondaryButton label="+ Top-level Item" onClick={() => startCreate()} />}
       >
         {isLoading ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: COLORS.muted, fontSize: 13, padding: 8 }}>
-            <Loader2 size={16} style={{ animation: "fm-blogadmin-spin 1s linear infinite" }} />
-            Loading nav menu…
+          <div aria-busy="true" aria-label="Loading nav menu" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 9, border: `1px solid ${COLORS.cardBorder}`, background: "#FAFBFD" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+                  <Sk soft className="h-7 w-7 rounded-md" />
+                  <Sk soft className="h-3.5 w-36 max-w-full" />
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {Array.from({ length: 4 }).map((_, j) => (
+                    <Sk key={j} soft className="h-7 w-7 rounded-md" />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : topLevel.length === 0 ? (
           <p style={{ fontSize: 12.5, color: COLORS.hint }}>No nav items yet — add "Discover", "Electronics", etc.</p>

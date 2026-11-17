@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useGetAgentAuditQuery, type AuditEntry } from "@/features/agentAdminApi";
 import { AgentAdminHeader, Btn, Empty, Panel, Pill, fmtDateTime, tdCls, thCls, type Tone } from "@/components/agent-admin/AgentAdminUI";
+import { TableSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 const ENTITIES: Array<{ value: string; label: string }> = [
   { value: "", label: "Everything" },
@@ -54,7 +55,7 @@ export default function AgentAuditPage() {
       </div>
       <Panel>
         {isLoading ? (
-          <p className="p-6 text-sm text-slate-400">Loading…</p>
+          <TableSkeleton rows={8} cols={5} />
         ) : !data?.items.length ? (
           <Empty title="No changes recorded yet" />
         ) : (

@@ -16,6 +16,7 @@ import {
   type FraudProvider,
   type FraudCheckTestResult,
 } from "@/features/adminFraudProviderApi";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import {
   Loader2,
   ShieldCheck,
@@ -818,8 +819,19 @@ function LogsModal({ provider, onClose }: { provider: FraudProvider; onClose: ()
         </div>
 
         {isLoading ? (
-          <div style={{ padding: 24, textAlign: "center" }}>
-            <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+          <div aria-busy="true" aria-label="Loading recent checks" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 8, background: "#FAFBFD" }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Sk soft className="h-5 w-5 rounded-full" />
+                  <Sk soft className="h-3 w-32" />
+                </div>
+                <Sk soft className="h-3 w-16" />
+              </div>
+            ))}
           </div>
         ) : logs.length === 0 ? (
           <div style={{ padding: 28, textAlign: "center", color: "#9BAABB", fontSize: 12.5 }}>

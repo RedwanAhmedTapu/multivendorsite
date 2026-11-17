@@ -9,6 +9,8 @@ import { setCredentials as setReduxCredentials } from "@/features/authSlice";
 import SocialAuth from "@/components/sociallogin/SocialAuth";
 import { useRouter } from "next/navigation";
 import ForgotPasswordModal from "@/components/auth/ForgotPasswordModal";
+import MfaChallengeModal from "@/components/auth/MfaChallengeModal";
+import type { AuthResponse } from "@/features/authApi";
 import { browserSupportsWebAuthn, startAuthentication } from "@simplewebauthn/browser";
 
 // Beautiful Alert Dialog Component
@@ -154,6 +156,12 @@ export default function LoginPage() {
   const [passkeySupported, setPasskeySupported] = useState(false);
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
 
+  // --------- MFA challenge state ---------
+  const [mfaChallenge, setMfaChallenge] = useState<{
+    challengeId: string;
+    enrollmentRequired: boolean;
+  } | null>(null);
+
   const { showAlert, AlertComponent } = useAlert();
   const dispatch = useDispatch();
   const [login, { isLoading }] = useLoginMutation();
@@ -237,6 +245,18 @@ export default function LoginPage() {
     }, 2000);
   };
 
+  // Shared post-authentication handler (direct login or after MFA verify).
+  const completeLogin = (response: AuthResponse) => {
+    dispatch(
+      setReduxCredentials({
+        user: response.user,
+        accessToken: response.accessToken || "",
+      })
+    );
+    showAlert('success', 'Login Successful', 'Welcome back! Redirecting to your dashboard...');
+    redirectByRole(response.user?.role, response.user?.id, response.user?.employee?.vendorId ?? null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -274,15 +294,16 @@ export default function LoginPage() {
         password: credentials.password,
       }).unwrap();
 
-      dispatch(
-        setReduxCredentials({
-          user: response.user,
-          accessToken: response.accessToken || "",
-        })
-      );
+      // MFA gate: a protected account returns a challenge instead of tokens.
+      if (response.mfaRequired && response.challengeId) {
+        setMfaChallenge({
+          challengeId: response.challengeId,
+          enrollmentRequired: !!response.enrollmentRequired,
+        });
+        return;
+      }
 
-      showAlert('success', 'Login Successful', 'Welcome back! Redirecting to your dashboard...');
-      redirectByRole(response.user?.role, response.user?.id, response.user?.employee?.vendorId ?? null);
+      completeLogin(response);
 
     } catch (error: any) {
       showAlert('error', 'Login Failed', error.data?.message || error.message || "Unable to sign in. Please try again.");
@@ -302,15 +323,16 @@ export default function LoginPage() {
 
       const response = await verifyWebauthn({ challengeId, response: credentialResponse }).unwrap();
 
-      dispatch(
-        setReduxCredentials({
-          user: response.user,
-          accessToken: response.accessToken || "",
-        })
-      );
+      // MFA gate (D3): passkey login follows the same challenge flow.
+      if (response.mfaRequired && response.challengeId) {
+        setMfaChallenge({
+          challengeId: response.challengeId,
+          enrollmentRequired: !!response.enrollmentRequired,
+        });
+        return;
+      }
 
-      showAlert('success', 'Login Successful', 'Welcome back! Redirecting to your dashboard...');
-      redirectByRole(response.user?.role, response.user?.id, response.user?.employee?.vendorId ?? null);
+      completeLogin(response);
 
     } catch (error: any) {
       // User cancelling the OS prompt throws NotAllowedError — treat quietly
@@ -643,6 +665,9 @@ export default function LoginPage() {
               <SocialAuth
                 enableOneTap={true}
                 onSuccess={handleSocialLoginSuccess}
+                onMfaRequired={(challengeId, enrollmentRequired) =>
+                  setMfaChallenge({ challengeId, enrollmentRequired })
+                }
               />
             </div>
           </div>
@@ -655,6 +680,20 @@ export default function LoginPage() {
         onClose={() => setIsForgotPasswordOpen(false)}
         onSuccess={handleForgotPasswordSuccess}
       />
+
+      {/* MFA Challenge Modal */}
+      {mfaChallenge && (
+        <MfaChallengeModal
+          challengeId={mfaChallenge.challengeId}
+          enrollmentRequired={mfaChallenge.enrollmentRequired}
+          onSuccess={(response) => {
+            setMfaChallenge(null);
+            completeLogin(response);
+          }}
+          onCancel={() => setMfaChallenge(null)}
+          showError={(title, message) => showAlert('error', title, message)}
+        />
+      )}
 
       {/* Beautiful Alert Dialog */}
       <AlertComponent />

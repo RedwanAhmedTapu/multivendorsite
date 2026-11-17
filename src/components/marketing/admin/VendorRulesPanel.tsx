@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useGetCategoriesQuery } from "@/features/apiSlice";
 import type { Category } from "@/types/type";
@@ -58,7 +58,42 @@ function flatten(list: Category[] | undefined, depth = 0, out: { id: string; nam
 
 export function VendorRulesPanel({ pageId }: { pageId: string }) {
   const { data, isLoading, isError, error, refetch } = useGetCampaignProgrammeQuery(pageId);
-  if (isLoading) return <Skeleton className="h-64 w-full" />;
+  if (isLoading) {
+    return (
+      <div aria-busy="true" aria-label="Loading programme rules" className="space-y-4">
+        <div className="rounded-xl border p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <Sk className="h-4 w-40" />
+            <Sk className="h-6 w-20 rounded-full" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="space-y-1.5">
+                <Sk soft className="h-2.5 w-24" />
+                <Sk className="h-9 w-full rounded-md" />
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="space-y-1.5">
+                <Sk soft className="h-2.5 w-20" />
+                <Sk className="h-9 w-full rounded-md" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-xl border p-4">
+          <Sk className="mb-3 h-4 w-36" />
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Sk key={i} soft className="h-9 w-full rounded-md" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (isError || !data) return <ErrorState message={(error as any)?.data?.message} onRetry={refetch} />;
   const { page, programme } = data.data;
   // Remount the form when the stored programme changes.

@@ -460,9 +460,19 @@ useEffect(() => {
           </div>
         )}
         {isFetching && allConversations.length === 0 && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 20px", color: "#94a3b8", gap: 12 }}>
-            <Loader2 size={28} className="animate-spin" />
-            <span style={{ fontSize: 13 }}>Loading conversations...</span>
+          <div aria-busy="true" aria-label="Loading conversations" style={{ display: "flex", flexDirection: "column", gap: 2, padding: "8px 10px" }}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 8px", borderRadius: 10 }}>
+                <div className="animate-pulse" style={{ width: 36, height: 36, borderRadius: "50%", background: "#EEF2F7", flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                    <div className="animate-pulse" style={{ height: 10, width: i % 2 ? "38%" : "50%", borderRadius: 4, background: "#E9EEF5" }} />
+                    <div className="animate-pulse" style={{ height: 8, width: 28, borderRadius: 4, background: "#F1F5F9" }} />
+                  </div>
+                  <div className="animate-pulse" style={{ height: 8, width: "72%", borderRadius: 4, background: "#F1F5F9" }} />
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

@@ -9,11 +9,22 @@
 import { ShieldAlert } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ProductCardEditor } from "@/components/admin/product-card-editor/ProductCardEditor";
+import { FormSkeleton, HeaderSkeleton, PageSkeleton } from "@/components/admin/ui/AdminSkeletons";
 
 export default function ProductCardDesignPage() {
   const { me, role, isLoading } = usePermissions();
 
-  if (isLoading) return <div className="p-8 text-sm text-gray-500">Loading…</div>;
+  if (isLoading) {
+    return (
+      <PageSkeleton>
+        <HeaderSkeleton actions={2} />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <FormSkeleton sections={2} fields={4} footer={false} />
+          <FormSkeleton sections={1} fields={5} footer={false} />
+        </div>
+      </PageSkeleton>
+    );
+  }
   if (!me || role !== "ADMIN") {
     return (
       <div className="m-6 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-6">

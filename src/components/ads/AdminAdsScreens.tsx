@@ -12,7 +12,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { CheckCircle2, Eye, FileText, MessageSquare, Package, Store, XCircle } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PanelSkeleton, Sk, StatsSkeleton } from "@/components/admin/ui/AdminSkeletons";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,7 +32,19 @@ import { AdsCampaignList } from "./AdsCampaignList";
 
 function AdminAdsGate({ children }: { children: React.ReactNode }) {
   const { isLoading, role } = usePermissions();
-  if (isLoading) return <Skeleton className="h-40 w-full" />;
+  if (isLoading) {
+    return (
+      <div aria-busy="true" aria-label="Loading advertisements" className="space-y-4">
+        <div className="space-y-2">
+          <Sk className="h-6 w-56" />
+          <Sk soft className="h-3 w-80 max-w-full" />
+        </div>
+        <Sk soft className="h-12 w-full rounded-2xl" />
+        <StatsSkeleton count={4} />
+        <PanelSkeleton rows={6} cols={6} />
+      </div>
+    );
+  }
   if (role !== "ADMIN") {
     return (
       <AccessNotice title="Advertisement review is limited to administrators for now">
@@ -105,7 +117,30 @@ function AdminAdReview({ id }: { id: string }) {
   const [error, setError] = React.useState<string | null>(null);
   const [decidedInDemo, setDecidedInDemo] = React.useState(false);
 
-  if (isLoading) return <Skeleton className="h-64 w-full" />;
+  if (isLoading) {
+    return (
+      <div aria-busy="true" aria-label="Loading campaign review" className="space-y-4">
+        <Sk soft className="h-3 w-40" />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-2">
+            <Sk className="h-6 w-64" />
+            <Sk soft className="h-3 w-80 max-w-full" />
+          </div>
+          <Sk className="h-9 w-28 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="space-y-4 lg:col-span-2">
+            <Sk className="h-48 w-full rounded-[14px]" />
+            <PanelSkeleton rows={5} cols={4} />
+          </div>
+          <div className="space-y-4">
+            <Sk className="h-40 w-full rounded-[14px]" />
+            <Sk className="h-56 w-full rounded-[14px]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
   const c = campaigns.find((x) => x.id === id);
   if (!c) {
     return (

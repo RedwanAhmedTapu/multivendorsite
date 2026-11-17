@@ -1,7 +1,8 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Palette, Loader2 } from "lucide-react";
+import { Palette } from "lucide-react";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import { useGetBlogSiteSettingsQuery, useUpdateBlogSiteSettingsMutation } from "@/features/blogApi";
 import { SectionCard, FieldLabel, TextInput, PrimaryButton, SuccessNote, COLORS } from "./ui";
 import { BlogImageUploader } from "./BlogImageUploader";
@@ -78,9 +79,21 @@ export default function SiteSettingsTab() {
 
   if (isFetching) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: COLORS.muted, fontSize: 13, padding: 24 }}>
-        <Loader2 size={16} style={{ animation: "fm-blogadmin-spin 1s linear infinite" }} />
-        Loading site settings…
+      <div aria-busy="true" aria-label="Loading site settings" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {Array.from({ length: 2 }).map((_, section) => (
+          <div key={section} style={{ borderRadius: 12, border: `1px solid ${COLORS.cardBorder}`, background: "#fff", padding: 18 }}>
+            <Sk className="h-4 w-40" />
+            <Sk soft className="mt-2 h-2.5 w-64 max-w-full" />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 16 }}>
+              {Array.from({ length: 4 }).map((_, field) => (
+                <div key={field} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <Sk soft className="h-2.5 w-20" />
+                  <Sk className="h-9 w-full rounded-lg" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }

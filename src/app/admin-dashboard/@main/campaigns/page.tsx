@@ -840,9 +840,27 @@ export default function CampaignsPage() {
               </div>
 
               {isLoading ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }} aria-busy="true" aria-label="Loading campaigns">
                   {[1, 2, 3, 4].map((i) => (
-                    <div key={i} style={{ height: 64, borderRadius: 12, background: C.borderSoft }} className="animate-pulse" />
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        borderRadius: 12,
+                        border: `1px solid ${C.border}`,
+                        background: "#fff",
+                        padding: "10px 12px",
+                      }}
+                    >
+                      <div className="animate-pulse" style={{ height: 38, width: 38, borderRadius: 9, background: C.primarySoft, flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                        <div className="animate-pulse" style={{ height: 10, width: "45%", borderRadius: 4, background: C.borderSoft }} />
+                        <div className="animate-pulse" style={{ height: 8, width: "65%", borderRadius: 4, background: C.borderSoft }} />
+                      </div>
+                      <div className="animate-pulse" style={{ height: 20, width: 62, borderRadius: 999, background: C.borderSoft, flexShrink: 0 }} />
+                    </div>
                   ))}
                 </div>
               ) : isError ? (

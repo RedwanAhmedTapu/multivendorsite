@@ -15,6 +15,7 @@ import {
   type UpsertPaymentCredentialDto,
   type ApiErrorResponse,
 } from "@/features/adminPaymentProviderApi";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import {
   Loader2,
   Landmark,
@@ -1163,11 +1164,15 @@ export default function PaymentProvidersPage() {
               </thead>
               <tbody>
                 {providersLoading ? (
-                  <tr>
-                    <td colSpan={6} style={{ padding: 24, textAlign: "center" }}>
-                      <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
-                    </td>
-                  </tr>
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={`sk-${i}`} style={{ borderBottom: "1px solid #F0F4FA" }}>
+                      {Array.from({ length: 6 }).map((_, c) => (
+                        <td key={c} style={{ padding: "12px 14px" }}>
+                          <Sk soft className={c === 0 ? "h-3.5 w-36" : c === 5 ? "ml-auto h-6 w-16 rounded-md" : "h-3 w-20"} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
                 ) : providersError ? (
                   <tr>
                     <td colSpan={6} style={{ padding: 28, textAlign: "center", color: "#DC2626", fontSize: 12.5 }}>

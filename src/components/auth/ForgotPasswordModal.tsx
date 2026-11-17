@@ -33,6 +33,10 @@ export default function ForgotPasswordModal({
   });
   const [verifiedEmail, setVerifiedEmail] = useState("");
   const [verifiedPhone, setVerifiedPhone] = useState("");
+  // MFA: set when the account has 2FA enabled — the reset step then requires
+  // an authenticator code or a recovery code (backend enforces it).
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaCode, setMfaCode] = useState("");
 
   // RTK Query mutations
   const [forgotPassword, { isLoading: isSending }] = useForgotPasswordMutation();
@@ -55,6 +59,8 @@ export default function ForgotPasswordModal({
     });
     setVerifiedEmail("");
     setVerifiedPhone("");
+    setMfaRequired(false);
+    setMfaCode("");
     onClose();
   };
 
@@ -145,11 +151,22 @@ export default function ForgotPasswordModal({
         otp: !useEmail ? formData.otp : undefined,
         newPassword: formData.newPassword,
         confirmPassword: formData.confirmPassword,
+        ...(mfaRequired && /^\d{6}$/.test(mfaCode) ? { mfaCode } : {}),
+        ...(mfaRequired && !/^\d{6}$/.test(mfaCode) && mfaCode.trim()
+          ? { recoveryCode: mfaCode.trim() }
+          : {}),
       }).unwrap();
 
       setStep("success");
       onSuccess?.(response.message || "Password reset successfully!");
     } catch (error: any) {
+      if (error?.data?.mfaRequired) {
+        // The account has 2FA enabled — reveal the second-factor field and
+        // let the user retry with their authenticator/recovery code.
+        setMfaRequired(true);
+        alert("This account has two-factor authentication enabled. Enter your authenticator or recovery code below.");
+        return;
+      }
       alert(error.data?.message || "Failed to reset password");
     }
   };
@@ -430,6 +447,26 @@ export default function ForgotPasswordModal({
                       disabled={isLoading}
                     />
                   </div>
+
+                  {mfaRequired && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Two-Factor Code
+                      </label>
+                      <input
+                        type="text"
+                        value={mfaCode}
+                        onChange={(e) => setMfaCode(e.target.value)}
+                        placeholder="6-digit authenticator code or recovery code"
+                        className="w-full px-3 py-2 border border-teal-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-colors disabled:opacity-50"
+                        disabled={isLoading}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        This account has 2FA enabled. Enter the code from your
+                        authenticator app, or one of your recovery codes.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <button

@@ -1,8 +1,9 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Sk } from "@/components/admin/ui/AdminSkeletons";
 import {
-  Newspaper, Plus, Pencil, Trash2, Loader2, FileText, Tag, Image as ImageIcon,
+  Newspaper, Plus, Pencil, Trash2, FileText, Tag, Image as ImageIcon,
   Search as SearchIcon, Link as LinkIcon, Sparkles, ArrowRight, X,
 } from "lucide-react";
 import {
@@ -124,9 +125,22 @@ export default function PostsTab() {
         }
       >
         {isLoading ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: COLORS.muted, fontSize: 13, padding: 8 }}>
-            <Loader2 size={16} style={{ animation: "fm-blogadmin-spin 1s linear infinite" }} />
-            Loading posts…
+          <div aria-busy="true" aria-label="Loading posts" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 9, border: `1px solid ${COLORS.cardBorder}`, background: "#FAFBFD" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+                  <Sk soft className="h-8 w-11 shrink-0 rounded-md" />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+                    <Sk soft className="h-3.5 w-1/2" />
+                    <Sk soft className="h-2.5 w-32" />
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <Sk soft className="h-7 w-7 rounded-md" />
+                  <Sk soft className="h-7 w-7 rounded-md" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : posts.length === 0 ? (
           <p style={{ fontSize: 12.5, color: COLORS.hint }}>No posts yet — click "New Post" to write your first article.</p>
@@ -250,9 +264,21 @@ function PostForm({ postId, categories, onDone }: { postId: string | null; categ
 
   if (postId && isFetching) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: COLORS.muted, fontSize: 13, padding: 24 }}>
-        <Loader2 size={16} style={{ animation: "fm-blogadmin-spin 1s linear infinite" }} />
-        Loading post…
+      <div aria-busy="true" aria-label="Loading post" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Sk soft className="h-3 w-28" />
+        {Array.from({ length: 3 }).map((_, section) => (
+          <div key={section} style={{ borderRadius: 12, border: `1px solid ${COLORS.cardBorder}`, background: "#fff", padding: 18 }}>
+            <Sk className="h-4 w-44" />
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16 }}>
+              {Array.from({ length: 3 }).map((_, field) => (
+                <div key={field} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <Sk soft className="h-2.5 w-24" />
+                  <Sk className={field === 2 ? "h-20 w-full rounded-lg" : "h-9 w-full rounded-lg"} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
